@@ -39,22 +39,10 @@ export default function ChatDetailScreen() {
   // ============================
   const userId = useAuthStore((s) => s.userId);
 
-  // Chat-State aus dem globalen Store
+  // Chat-State aus dem globalen Store (nur diese Felder – kein ganzes Store-Abo!)
   const messages = useChatStore((s) => s.messagesByConversation[conversationId] || []);
   const conversation = useChatStore((s) => s.activeConversation);
   const loading = useChatStore((s) => s.messagesLoading[conversationId] ?? true);
-
-  // Chat-Actions aus dem Store
-  const {
-    loadMessages,
-    loadConversationDetails,
-    sendTextMessage,
-    sendMediaMessage: storeSendMediaMessage,
-    markAsRead,
-    subscribeMessages,
-    unsubscribeMessages,
-    clearActiveConversation,
-  } = useChatStore();
 
   // ============================
   // Lokaler UI-State
@@ -64,37 +52,41 @@ export default function ChatDetailScreen() {
 
   // ============================
   // Initialisierung: Chat-Daten laden und Realtime abonnieren
+  // WICHTIG: Store-Actions ueber getState() – verhindert Update-Loop,
+  // da wir nicht auf den gesamten Store subscriben (inkl. _messageChannels).
   // ============================
   useEffect(() => {
     if (!userId || !conversationId) return;
 
-    loadConversationDetails(conversationId, userId);
-    loadMessages(conversationId);
-    markAsRead(conversationId, userId);
-    subscribeMessages(conversationId, userId);
+    const store = useChatStore.getState();
+    store.loadConversationDetails(conversationId, userId);
+    store.loadMessages(conversationId);
+    store.markAsRead(conversationId, userId);
+    store.subscribeMessages(conversationId, userId);
 
     return () => {
-      unsubscribeMessages(conversationId);
-      clearActiveConversation();
+      store.unsubscribeMessages(conversationId);
+      store.clearActiveConversation();
     };
   }, [conversationId, userId]);
 
   // ============================
   // Callbacks fuer Kinder-Komponenten (stabil via useCallback)
+  // Store-Actions ueber getState() – keine Store-Subscription noetig.
   // ============================
 
   /** Text-Nachricht senden (wird an MessageInput weitergegeben) */
   const handleSendText = useCallback(async (text) => {
     if (!userId) return;
-    await sendTextMessage(conversationId, userId, text);
-  }, [conversationId, userId, sendTextMessage]);
+    await useChatStore.getState().sendTextMessage(conversationId, userId, text);
+  }, [conversationId, userId]);
 
   /** Sprachnachricht hochladen + senden (wird an MessageInput weitergegeben) */
   const handleSendVoice = useCallback(async (localUri) => {
     if (!userId) return;
     const publicUrl = await uploadVoiceMessage(conversationId, localUri, 'audio/m4a');
-    await storeSendMediaMessage(conversationId, userId, publicUrl, 'voice');
-  }, [conversationId, userId, storeSendMediaMessage]);
+    await useChatStore.getState().sendMediaMessage(conversationId, userId, publicUrl, 'voice');
+  }, [conversationId, userId]);
 
   /** Share Sheet Optionsauswahl verarbeiten */
   const handleShareSelect = useCallback((key) => {
