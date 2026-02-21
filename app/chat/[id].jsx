@@ -29,6 +29,9 @@ import ChatBubble from '../../components/chat/ChatBubble';
 import MessageInput from '../../components/chat/MessageInput';
 import ShareSheet from '../../components/chat/ShareSheet';
 
+// Stabiler Fallback – verhindert Update-Loop bei leerem messagesByConversation
+const EMPTY_MESSAGES = [];
+
 export default function ChatDetailScreen() {
   // Konversations-ID aus der Route
   const { id: conversationId } = useLocalSearchParams();
@@ -38,9 +41,7 @@ export default function ChatDetailScreen() {
   // Globale Stores: Auth und Chat
   // ============================
   const userId = useAuthStore((s) => s.userId);
-
-  // Chat-State aus dem globalen Store (nur diese Felder – kein ganzes Store-Abo!)
-  const messages = useChatStore((s) => s.messagesByConversation[conversationId] || []);
+  const messages = useChatStore((s) => s.messagesByConversation[conversationId] ?? EMPTY_MESSAGES);
   const conversation = useChatStore((s) => s.activeConversation);
   const loading = useChatStore((s) => s.messagesLoading[conversationId] ?? true);
 

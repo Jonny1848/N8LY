@@ -9,9 +9,15 @@
  *
  * Dateien werden in Unterordnern nach User-ID organisiert,
  * damit die RLS-Policies (Loeschrechte) korrekt greifen.
+ *
+ * WICHTIG (React Native): Blob-Uploads zu Supabase liefern oft 0 Bytes,
+ * da Blob/FormData in RN nicht korrekt serialisiert werden.
+ * Sprachnachrichten nutzen daher expo-file-system + base64 → ArrayBuffer.
  * =============================================================
  */
 
+import * as FileSystem from 'expo-file-system';
+import { decode } from 'base64-arraybuffer';
 import { supabase } from '../lib/supabase';
 
 // Bucket-Namen als Konstanten (falls sie sich aendern)
@@ -73,19 +79,21 @@ export async function uploadVoiceMessage(conversationId, uri, mimeType = 'audio/
   const fileName = `voice_${Date.now()}.${fileExtension}`;
   const filePath = `${conversationId}/${fileName}`;
 
-  // Datei als Blob lesen
-  const response = await fetch(uri);
-  const blob = await response.blob();
+  // Datei mit expo-file-system als Base64 lesen (Blob-Upload liefert in RN oft 0 Bytes)
+  const base64 = await FileSystem.readAsStringAsync(uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  const arrayBuffer = decode(base64);
 
-  // Upload zu Supabase Storage
+  // ArrayBuffer zu Supabase hochladen – funktioniert zuverlaessig in React Native
   const { data, error } = await supabase.storage
     .from(CHAT_MEDIA_BUCKET)
-    .upload(filePath, blob, {
+    .upload(filePath, arrayBuffer, {
       contentType: mimeType,
       upsert: false,
     });
 
-  if (error) {
+  if (error || !data) {
     console.error('Fehler beim Hochladen der Sprachnachricht:', error);
     throw error;
   }
