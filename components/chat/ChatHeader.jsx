@@ -61,10 +61,14 @@ export default function ChatHeader({ conversation, onBack, onOptions }) {
         </View>
       </Pressable>
 
-      {/* Options-Button (Gallery, Chat-Info etc.) */}
-      <Pressable style={styles.headerBtn} onPress={onOptions}>
-        <EllipsisHorizontalIcon size={28} strokeWidth={2} color={theme.colors.neutral.gray[700]} />
-      </Pressable>
+      {/* N8LY-Logo rechts oben (Einzel- und Gruppenchats) */}
+      <View style={styles.headerLogoContainer}>
+        <Image
+          source={require('../../assets/N8LY9.png')}
+          style={styles.headerLogo}
+          resizeMode="contain"
+        />
+      </View>
     </View>
   );
 }
@@ -81,6 +85,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.neutral.gray[100],
+    position: 'relative',
   },
   headerBtn: {
     width: 40,
@@ -129,5 +134,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.colors.neutral.gray[500],
     fontFamily: 'Manrope_400Regular',
+  },
+  // N8LY-Logo rechts oben im Header
+  headerLogoContainer: {
+    position: 'absolute',
+    right: 12,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+  },
+  headerLogo: {
+    width: 60,
+    height: 60,
   },
 });

@@ -16,7 +16,7 @@
  *  - onOpenShareSheet: Callback fuer den PaperClip-Button
  */
 import { View, Text, TextInput, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { theme } from '../../constants/theme';
 import {
   PaperClipIcon,
@@ -39,6 +39,7 @@ import {
   useAudioPlayer,
   useAudioPlayerStatus,
 } from 'expo-audio';
+import EmojiPickerModal, { emojiData } from '@hiraku-ai/react-native-emoji-picker';
 
 export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet }) {
   // ============================
@@ -52,6 +53,9 @@ export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet
   const [recordedUri, setRecordedUri] = useState(null);
   const [waveformSamples, setWaveformSamples] = useState([]);
   const [uploadingVoice, setUploadingVoice] = useState(false);
+
+  // Emoji-Picker: Sichtbarkeit des Modals
+  const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
 
   // expo-audio: Recorder mit Metering fuer Waveform (Lautstaerke pro Zeitscheibe)
   const recordingOptions = {
@@ -190,6 +194,7 @@ export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet
   // RENDER – Drei Modi
   // ============================
   return (
+    <Fragment>
     <View style={styles.inputBar}>
       {recording ? (
         /* ========== RECORDING-MODUS ========== */
@@ -279,7 +284,10 @@ export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet
               multiline
               maxLength={2000}
             />
-            <Pressable style={styles.emojiBtn}>
+            <Pressable
+              style={styles.emojiBtn}
+              onPress={() => setEmojiPickerVisible(true)}
+            >
               <FaceSmileIcon size={26} strokeWidth={2} color={theme.colors.neutral.gray[500]} />
             </Pressable>
           </View>
@@ -311,6 +319,16 @@ export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet
         </View>
       )}
     </View>
+
+    {/* Emoji-Picker Modal – oeffnet sich beim Tippen auf das Smiley-Icon */}
+    <EmojiPickerModal
+      visible={emojiPickerVisible}
+      onClose={() => setEmojiPickerVisible(false)}
+      onEmojiSelect={(emoji) => setInputText((prev) => prev + emoji)}
+      emojis={emojiData}
+      searchPlaceholder="Emoji suchen..."
+    />
+    </Fragment>
   );
 }
 

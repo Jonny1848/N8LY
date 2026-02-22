@@ -85,11 +85,13 @@ export default function ChatBubble({ item, index, messages, userId, conversation
           </Text>
         </View>
       ) : (
-        /* Chatbox-Style Message Bubble */
-        <View className={`flex-row px-4 mb-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-          {/* Avatar links (nur bei fremden Nachrichten in Gruppenchats) */}
+        /* Chatbox-Style: Bubble + Zeitstempel fix am linken/rechten Rand (unabhaengig von Nachrichtenlaenge) */
+        <View
+          className={`flex-row px-4 mb-8 items-end ${isOwn ? 'justify-end' : 'justify-start'}`}
+          style={isOwn ? styles.rowContainerOwn : styles.rowContainerOther}
+        >
           {!isOwn && conversation?.type === 'group' && (
-            <View className="mr-2.5 self-end mb-1">
+            <View className="mr-2.5 mb-1">
               {item.profiles?.avatar_url ? (
                 <Image
                   source={{ uri: item.profiles.avatar_url }}
@@ -103,21 +105,31 @@ export default function ChatBubble({ item, index, messages, userId, conversation
             </View>
           )}
 
-          {/* Bubble: Chatbox-typisch mit einer flachen Ecke */}
+          {/* Zeitstempel fix am linken Rand bei eigenen Nachrichten (absolute Positionierung) */}
+          {isOwn && (
+            <Text
+              style={[
+                styles.timestampOutside,
+                styles.timestampLeft,
+                { color: theme.colors.secondary.dark },
+              ]}
+            >
+              {formatMessageTime(item.created_at)}
+            </Text>
+          )}
+
           <View
             style={[
               styles.bubble,
               isOwn ? styles.bubbleOwn : styles.bubbleOther,
             ]}
           >
-            {/* Absender-Name in Gruppenchats */}
             {!isOwn && conversation?.type === 'group' && item.profiles?.username && (
               <Text style={[styles.senderName, { color: theme.colors.primary.main }]}>
                 {item.profiles.username}
               </Text>
             )}
 
-            {/* Nachrichteninhalt: Text oder Sprachnachricht */}
             {item.message_type === 'voice' && item.media_url ? (
               <VoiceMessageBubble
                 mediaUrl={item.media_url}
@@ -134,21 +146,20 @@ export default function ChatBubble({ item, index, messages, userId, conversation
                 {item.content}
               </Text>
             )}
+          </View>
 
-            {/* Zeitstempel rechts unten */}
+          {/* Zeitstempel fix am rechten Rand bei fremden Nachrichten (absolute Positionierung) */}
+          {!isOwn && (
             <Text
               style={[
-                styles.timestamp,
-                {
-                  color: isOwn
-                    ? 'rgba(255,255,255,0.6)'
-                    : theme.colors.neutral.gray[400],
-                },
+                styles.timestampOutside,
+                styles.timestampRight,
+                { color: theme.colors.secondary.dark },
               ]}
             >
               {formatMessageTime(item.created_at)}
             </Text>
-          </View>
+          )}
         </View>
       )}
     </View>
@@ -159,6 +170,14 @@ export default function ChatBubble({ item, index, messages, userId, conversation
 // Styles
 // ============================
 const styles = StyleSheet.create({
+  // Positionierungskontext fuer absolute Zeitstempel – eigene Nachrichten
+  rowContainerOwn: {
+    position: 'relative',
+  },
+  // Positionierungskontext fuer absolute Zeitstempel – fremde Nachrichten
+  rowContainerOther: {
+    position: 'relative',
+  },
   bubble: {
     maxWidth: '75%',
     paddingHorizontal: 14,
@@ -166,7 +185,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   bubbleOwn: {
-    backgroundColor: theme.colors.primary.main,
+    backgroundColor: "black",
     borderBottomRightRadius: 4,
   },
   bubbleOther: {
@@ -181,12 +200,23 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 15,
     lineHeight: 21,
-    fontFamily: 'Manrope_400Regular',
+    fontFamily: 'Manrope_500Medium',
   },
-  timestamp: {
-    fontSize: 10,
-    fontFamily: 'Manrope_400Regular',
-    alignSelf: 'flex-end',
-    marginTop: 4,
+  timestampOutside: {
+    fontSize: 11,
+    fontFamily: 'Manrope_500Medium',
+    marginBottom: 2,
+    position: 'absolute',
+    bottom: 2,
+  },
+  // Eigene Nachrichten: Zeitstempel fix am linken Rand (marginLeft fuer Abstand)
+  timestampLeft: {
+    left: 0,
+    marginLeft: 12,
+  },
+  // Fremde Nachrichten: Zeitstempel fix am rechten Rand (marginRight fuer Abstand)
+  timestampRight: {
+    right: 0,
+    marginRight: 12,
   },
 });
