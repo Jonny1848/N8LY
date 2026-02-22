@@ -347,6 +347,7 @@ export async function getMessages(conversationId, limit = 50, offset = 0) {
       content,
       message_type,
       media_url,
+      waveform_data,
       created_at,
       profiles:sender_id (
         id,
@@ -405,18 +406,33 @@ export async function sendMessage(conversationId, senderId, content) {
  * @param {string} mediaUrl – Die URL des Mediums aus Supabase Storage
  * @param {'image'|'voice'} messageType – Der Typ des Mediums
  * @param {string|null} caption – Optionaler Text zur Medien-Nachricht
+ * @param {number[]|null} waveformData – Optional: Amplitude-Werte (0-1) fuer Waveform bei Sprachnachrichten
  * @returns {Object} – Die gesendete Nachricht
  */
-export async function sendMediaMessage(conversationId, senderId, mediaUrl, messageType, caption = null) {
+export async function sendMediaMessage(
+  conversationId,
+  senderId,
+  mediaUrl,
+  messageType,
+  caption = null,
+  waveformData = null
+) {
+  const insertData = {
+    conversation_id: conversationId,
+    sender_id: senderId,
+    content: caption,
+    message_type: messageType,
+    media_url: mediaUrl,
+  };
+
+  // Waveform-Daten nur bei Sprachnachrichten speichern
+  if (messageType === 'voice' && waveformData && Array.isArray(waveformData) && waveformData.length > 0) {
+    insertData.waveform_data = waveformData;
+  }
+
   const { data, error } = await supabase
     .from('messages')
-    .insert({
-      conversation_id: conversationId,
-      sender_id: senderId,
-      content: caption,
-      message_type: messageType,
-      media_url: mediaUrl,
-    })
+    .insert(insertData)
     .select()
     .single();
 

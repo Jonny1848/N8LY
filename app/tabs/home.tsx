@@ -38,7 +38,7 @@ export default function HomeScreen() {
 
   const cameraRef = useRef<MapboxGL.Camera>(null);
   const mapRef = useRef<MapboxGL.MapView>(null);
-  const flightPlayer = useAudioPlayer(require('../../assets/flight.mp3'));
+  const flightPlayer = useAudioPlayer(require('../../assets/flight.mp3'), 16);
 
   
 

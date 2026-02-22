@@ -83,10 +83,16 @@ export default function ChatDetailScreen() {
   }, [conversationId, userId]);
 
   /** Sprachnachricht hochladen + senden (wird an MessageInput weitergegeben) */
-  const handleSendVoice = useCallback(async (localUri) => {
+  const handleSendVoice = useCallback(async (localUri, waveformData = null) => {
     if (!userId) return;
     const publicUrl = await uploadVoiceMessage(conversationId, localUri, 'audio/m4a');
-    await useChatStore.getState().sendMediaMessage(conversationId, userId, publicUrl, 'voice');
+    await useChatStore.getState().sendMediaMessage(
+      conversationId,
+      userId,
+      publicUrl,
+      'voice',
+      waveformData,
+    );
   }, [conversationId, userId]);
 
   /** Share Sheet Optionsauswahl verarbeiten */

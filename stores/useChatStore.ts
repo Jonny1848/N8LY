@@ -115,6 +115,7 @@ interface ChatState {
     userId: string,
     mediaUrl: string,
     messageType: 'image' | 'voice',
+    waveformData?: number[] | null,
   ) => Promise<Message | null>;
 
   /** Markiert eine Konversation als gelesen */
@@ -251,13 +252,15 @@ const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  sendMediaMessage: async (conversationId, userId, mediaUrl, messageType) => {
+  sendMediaMessage: async (conversationId, userId, mediaUrl, messageType, waveformData = null) => {
     try {
       const msg: any = await apiSendMediaMessage(
         conversationId,
         userId,
         mediaUrl,
         messageType,
+        null, // caption
+        waveformData,
       );
 
       // Nachricht optimistisch zum Cache hinzufuegen

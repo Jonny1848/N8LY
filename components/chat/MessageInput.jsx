@@ -11,12 +11,12 @@
  *
  * Props:
  *  - onSendText(text): Callback wenn eine Text-Nachricht gesendet werden soll
- *  - onSendVoice(localUri): Callback wenn eine Sprachnachricht gesendet werden soll
+ *  - onSendVoice(localUri, waveformData): Callback wenn eine Sprachnachricht gesendet werden soll
  *                            (Upload + DB-Eintrag macht der Parent/Store)
  *  - onOpenShareSheet: Callback fuer den PaperClip-Button
  */
 import { View, Text, TextInput, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { theme } from '../../constants/theme';
 import {
   PaperClipIcon,
@@ -47,25 +47,40 @@ export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
 
-  // Sprachnachrichten: Aufnahme-States
+  // Sprachnachrichten: Aufnahme-States (waveformSamples wird in Schritt 4 befuellt)
   const [recording, setRecording] = useState(false);
   const [recordedUri, setRecordedUri] = useState(null);
+  const [waveformSamples, setWaveformSamples] = useState([]);
   const [uploadingVoice, setUploadingVoice] = useState(false);
 
-  // expo-audio: Recorder-Hook (HIGH_QUALITY = .m4a, AAC)
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const recorderState = useAudioRecorderState(audioRecorder, 200);
+  // expo-audio: Recorder mit Metering fuer Waveform (Lautstaerke pro Zeitscheibe)
+  const recordingOptions = {
+    ...RecordingPresets.HIGH_QUALITY,
+    isMeteringEnabled: true,
+  };
+  const audioRecorder = useAudioRecorder(recordingOptions);
+  const recorderState = useAudioRecorderState(audioRecorder, 16);
 
   // Audio-Player fuer die Vorschau der eigenen Aufnahme (vor dem Senden)
-  const previewPlayer = useAudioPlayer(recordedUri);
+  const previewPlayer = useAudioPlayer(recordedUri, 16);
   const previewStatus = useAudioPlayerStatus(previewPlayer);
 
   // Sende-Button nur anzeigen wenn Text vorhanden ist
   const hasContent = inputText.trim().length > 0;
 
-  // ============================
+  // Metering waehrend der Aufnahme sammeln (fuer Waveform-Anzeige)
+  // recorderState.metering: dB-Wert (-160 bis 0), wird alle 200ms aktualisiert
+  useEffect(() => {
+    if (!recording || !recorderState.isRecording) return;
+    const raw = recorderState.metering;
+    // dB zu 0-1 normalisieren (-60 dB = leise, 0 dB = laut)
+    const normalized =
+      raw == null ? 0.3 : Math.max(0.15, Math.min(1, (raw + 60) / 60));
+    setWaveformSamples((prev) => [...prev, normalized]);
+  }, [recording, recorderState.isRecording, recorderState.metering, recorderState.durationMillis]);
+
+ 
   // Hilfsfunktion: Dauer in mm:ss formatieren
-  // ============================
   const formatRecordingTime = (millis) => {
     const totalSec = Math.floor((millis || 0) / 1000);
     const min = Math.floor(totalSec / 60);
@@ -103,10 +118,11 @@ export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet
         console.warn('[VOICE] Mikrofon-Berechtigung verweigert');
         return;
       }
-      await audioRecorder.prepareToRecordAsync();
+      await audioRecorder.prepareToRecordAsync(recordingOptions);
       audioRecorder.record();
       setRecording(true);
       setRecordedUri(null);
+      setWaveformSamples([]); // Reset fuer neue Aufnahme
     } catch (err) {
       console.error('[VOICE] Fehler beim Starten der Aufnahme:', err);
     }
@@ -132,6 +148,7 @@ export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet
   const handleDiscardRecording = () => {
     setRecording(false);
     setRecordedUri(null);
+    setWaveformSamples([]);
     if (previewStatus.playing) {
       previewPlayer.pause();
     }
@@ -146,8 +163,9 @@ export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet
 
     setUploadingVoice(true);
     try {
-      await onSendVoice(uri);
+      await onSendVoice(uri, waveformSamples);
       setRecordedUri(null);
+      setWaveformSamples([]);
       setRecording(false);
     } catch (err) {
       console.error('[VOICE] Fehler beim Senden der Sprachnachricht:', err);

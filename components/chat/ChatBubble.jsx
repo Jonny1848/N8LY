@@ -119,7 +119,11 @@ export default function ChatBubble({ item, index, messages, userId, conversation
 
             {/* Nachrichteninhalt: Text oder Sprachnachricht */}
             {item.message_type === 'voice' && item.media_url ? (
-              <VoiceMessageBubble mediaUrl={item.media_url} isOwn={isOwn} />
+              <VoiceMessageBubble
+                mediaUrl={item.media_url}
+                waveformData={item.waveform_data}
+                isOwn={isOwn}
+              />
             ) : (
               <Text
                 style={[
