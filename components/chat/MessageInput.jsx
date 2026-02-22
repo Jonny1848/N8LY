@@ -20,9 +20,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { theme } from '../../constants/theme';
 import {
   PaperClipIcon,
-  CameraIcon,
   FaceSmileIcon,
-  MicrophoneIcon,
   TrashIcon,
 } from 'react-native-heroicons/outline';
 import {
@@ -30,6 +28,8 @@ import {
   PlayIcon,
   StopIcon,
   PauseIcon,
+  CameraIcon,
+  MicrophoneIcon,
 } from 'react-native-heroicons/solid';
 import {
   useAudioRecorder,
@@ -39,7 +39,7 @@ import {
   useAudioPlayer,
   useAudioPlayerStatus,
 } from 'expo-audio';
-import EmojiPickerModal, { emojiData } from '@hiraku-ai/react-native-emoji-picker';
+import EmojiPicker, { emojiData } from '@hiraku-ai/react-native-emoji-picker';
 
 export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet }) {
   // ============================
@@ -195,6 +195,7 @@ export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet
   // ============================
   return (
     <Fragment>
+    <View style={styles.inputBarWrapper}>
     <View style={styles.inputBar}>
       {recording ? (
         /* ========== RECORDING-MODUS ========== */
@@ -266,43 +267,43 @@ export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet
           </Pressable>
         </View>
       ) : (
-        /* ========== NORMALER MODUS ========== */
+        /* ========== NORMALER MODUS – Schwebende Leiste wie im Screenshot ========== */
         <View style={styles.inputRow}>
-          {/* Attachment-Button – oeffnet "Inhalt teilen" */}
-          <Pressable style={styles.inputAction} onPress={onOpenShareSheet}>
-            <PaperClipIcon size={26} strokeWidth={2} color={theme.colors.neutral.gray[600]} />
+          {/* Emoji-Button links */}
+          <Pressable
+            style={styles.inputAction}
+            onPress={() => setEmojiPickerVisible(true)}
+          >
+            <FaceSmileIcon size={24} strokeWidth={2} color={theme.colors.neutral.black} />
           </Pressable>
 
-          {/* Eingabefeld + Emoji */}
-          <View style={styles.inputFieldContainer}>
-            <TextInput
-              style={styles.inputField}
-              placeholder="Nachricht schreiben..."
-              placeholderTextColor={theme.colors.neutral.gray[400]}
-              value={inputText}
-              onChangeText={setInputText}
-              multiline
-              maxLength={2000}
-            />
-            <Pressable
-              style={styles.emojiBtn}
-              onPress={() => setEmojiPickerVisible(true)}
-            >
-              <FaceSmileIcon size={26} strokeWidth={2} color={theme.colors.neutral.gray[500]} />
-            </Pressable>
-          </View>
+          {/* Eingabefeld (Mitte) */}
+          <TextInput
+            style={styles.inputField}
+            placeholder="Nachricht"
+            placeholderTextColor={theme.colors.neutral.gray[400]}
+            value={inputText}
+            onChangeText={setInputText}
+            multiline
+            maxLength={2000}
+          />
+
+          {/* Attachment-Button */}
+          <Pressable style={styles.inputAction} onPress={onOpenShareSheet}>
+            <PaperClipIcon size={24} strokeWidth={2} color={theme.colors.neutral.black} />
+          </Pressable>
 
           {/* Kamera-Button: nur wenn kein Text */}
           {!hasContent && (
             <Pressable style={styles.inputAction}>
-              <CameraIcon size={26} strokeWidth={2} color={theme.colors.neutral.gray[600]} />
+              <CameraIcon size={24} strokeWidth={2} color={theme.colors.neutral.black} />
             </Pressable>
           )}
 
           {/* Mikrofon-Button: nur wenn kein Text */}
           {!hasContent && (
             <Pressable style={styles.inputAction} onPress={handleStartRecording}>
-              <MicrophoneIcon size={26} strokeWidth={2} color={theme.colors.neutral.gray[600]} />
+              <MicrophoneIcon size={24} strokeWidth={2} color={theme.colors.neutral.black} />
             </Pressable>
           )}
 
@@ -319,9 +320,10 @@ export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet
         </View>
       )}
     </View>
+    </View>
 
     {/* Emoji-Picker Modal – oeffnet sich beim Tippen auf das Smiley-Icon */}
-    <EmojiPickerModal
+    <EmojiPicker
       visible={emojiPickerVisible}
       onClose={() => setEmojiPickerVisible(false)}
       onEmojiSelect={(emoji) => setInputText((prev) => prev + emoji)}
@@ -336,16 +338,30 @@ export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet
 // Styles: Input Bar (allgemein)
 // ============================
 const styles = StyleSheet.create({
+  // Wrapper fuer schwebende Position – Abstand zu den Raendern
+  inputBarWrapper: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    paddingTop: 8,
+  },
+  // Schwebende ChatBar – eine Leiste, abgerundet, mit Schatten (dunkleres Grau fuer bessere Abhebung)
   inputBar: {
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.neutral.gray[100],
+    backgroundColor: theme.colors.neutral.gray[200],
+    borderRadius: 24,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    minHeight: 48,
+    // Schatten fuer schwebenden Effekt
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
   },
   inputRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
+    flex: 1,
   },
   inputAction: {
     width: 40,
@@ -353,33 +369,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  inputFieldContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    backgroundColor: theme.colors.neutral.gray[100],
-    borderRadius: 24,
-    paddingLeft: 16,
-    paddingRight: 8,
-    paddingVertical: 8,
-    marginHorizontal: 4,
-    minHeight: 42,
-    maxHeight: 120,
-  },
   inputField: {
     flex: 1,
     fontSize: 15,
     color: theme.colors.neutral.gray[900],
     fontFamily: 'Manrope_400Regular',
-    paddingVertical: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     maxHeight: 100,
-  },
-  emojiBtn: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 4,
   },
   sendBtn: {
     width: 40,

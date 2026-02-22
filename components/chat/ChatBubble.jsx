@@ -85,10 +85,9 @@ export default function ChatBubble({ item, index, messages, userId, conversation
           </Text>
         </View>
       ) : (
-        /* Chatbox-Style: Bubble + Zeitstempel fix am linken/rechten Rand (unabhaengig von Nachrichtenlaenge) */
+        /* Chatbox-Style: Bubble mit Zeitstempel innen */
         <View
           className={`flex-row px-4 mb-8 items-end ${isOwn ? 'justify-end' : 'justify-start'}`}
-          style={isOwn ? styles.rowContainerOwn : styles.rowContainerOther}
         >
           {!isOwn && conversation?.type === 'group' && (
             <View className="mr-2.5 mb-1">
@@ -105,61 +104,67 @@ export default function ChatBubble({ item, index, messages, userId, conversation
             </View>
           )}
 
-          {/* Zeitstempel fix am linken Rand bei eigenen Nachrichten (absolute Positionierung) */}
-          {isOwn && (
-            <Text
-              style={[
-                styles.timestampOutside,
-                styles.timestampLeft,
-                { color: theme.colors.secondary.dark },
-              ]}
-            >
-              {formatMessageTime(item.created_at)}
-            </Text>
-          )}
-
           <View
             style={[
-              styles.bubble,
-              isOwn ? styles.bubbleOwn : styles.bubbleOther,
+              styles.bubbleWrapper,
+              { alignItems: isOwn ? 'flex-end' : 'flex-start' },
             ]}
           >
-            {!isOwn && conversation?.type === 'group' && item.profiles?.username && (
-              <Text style={[styles.senderName, { color: theme.colors.primary.main }]}>
-                {item.profiles.username}
-              </Text>
-            )}
+            <View
+              style={[
+                styles.bubble,
+                styles.bubbleInWrapper,
+                isOwn ? styles.bubbleOwn : styles.bubbleOther,
+                item.message_type === 'voice' && styles.bubbleVoice,
+              ]}
+            >
+              {!isOwn && conversation?.type === 'group' && item.profiles?.username && (
+                <Text style={[styles.senderName, { color: theme.colors.primary.main }]}>
+                  {item.profiles.username}
+                </Text>
+              )}
 
-            {item.message_type === 'voice' && item.media_url ? (
-              <VoiceMessageBubble
-                mediaUrl={item.media_url}
-                waveformData={item.waveform_data}
-                isOwn={isOwn}
-              />
-            ) : (
+              {item.message_type === 'voice' && item.media_url ? (
+                <VoiceMessageBubble
+                  mediaUrl={item.media_url}
+                  waveformData={item.waveform_data}
+                  isOwn={isOwn}
+                />
+              ) : (
+                <>
+                  <Text
+                    style={[
+                      styles.messageText,
+                      { color: isOwn ? '#FFFFFF' : theme.colors.neutral.gray[900] },
+                    ]}
+                  >
+                    {item.content}
+                  </Text>
+                  {/* Zeitstempel innerhalb der Bubble (nur bei Text-Nachrichten) */}
+                  <Text
+                    style={[
+                      styles.timestampInside,
+                      { color: isOwn ? 'rgba(255,255,255,0.85)' : theme.colors.neutral.gray[500] },
+                    ]}
+                  >
+                    {formatMessageTime(item.created_at)}
+                  </Text>
+                </>
+              )}
+            </View>
+
+            {/* Zeitstempel unter der Bubble – nur bei Sprachnachrichten */}
+            {item.message_type === 'voice' && (
               <Text
                 style={[
-                  styles.messageText,
-                  { color: isOwn ? '#FFFFFF' : theme.colors.neutral.gray[900] },
+                  styles.timestampBelow,
+                  { color: theme.colors.neutral.gray[500] },
                 ]}
               >
-                {item.content}
+                {formatMessageTime(item.created_at)}
               </Text>
             )}
           </View>
-
-          {/* Zeitstempel fix am rechten Rand bei fremden Nachrichten (absolute Positionierung) */}
-          {!isOwn && (
-            <Text
-              style={[
-                styles.timestampOutside,
-                styles.timestampRight,
-                { color: theme.colors.secondary.dark },
-              ]}
-            >
-              {formatMessageTime(item.created_at)}
-            </Text>
-          )}
         </View>
       )}
     </View>
@@ -170,27 +175,28 @@ export default function ChatBubble({ item, index, messages, userId, conversation
 // Styles
 // ============================
 const styles = StyleSheet.create({
-  // Positionierungskontext fuer absolute Zeitstempel – eigene Nachrichten
-  rowContainerOwn: {
-    position: 'relative',
-  },
-  // Positionierungskontext fuer absolute Zeitstempel – fremde Nachrichten
-  rowContainerOther: {
-    position: 'relative',
-  },
   bubble: {
-    maxWidth: '75%',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 18,
   },
+  // Bubble fuellt den Wrapper (max 75% des Chat-Bereichs) – verhindert doppelte 75%-Begrenzung
+  bubbleInWrapper: {
+    maxWidth: '100%',
+  },
   bubbleOwn: {
-    backgroundColor: "black",
+    backgroundColor: theme.colors.primary.main,
     borderBottomRightRadius: 4,
   },
   bubbleOther: {
-    backgroundColor: theme.colors.neutral.gray[100],
+    backgroundColor: theme.colors.neutral.gray[200],
     borderBottomLeftRadius: 4,
+  },
+  // Sprachnachrichten: minimales Padding, rechts mehr Abstand damit Waveform nicht direkt endet
+  bubbleVoice: {
+    paddingVertical: 8,
+    paddingLeft: 10,
+    paddingRight: 16,
   },
   senderName: {
     fontSize: 12,
@@ -202,21 +208,21 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     fontFamily: 'Manrope_500Medium',
   },
-  timestampOutside: {
+  // Wrapper fuer Bubble + optionalen Zeitstempel darunter (Sprachnachrichten)
+  bubbleWrapper: {
+    maxWidth: '75%',
+  },
+  // Zeitstempel innerhalb der Chatbox (nur Text-Nachrichten, unten rechts)
+  timestampInside: {
     fontSize: 11,
-    fontFamily: 'Manrope_500Medium',
-    marginBottom: 2,
-    position: 'absolute',
-    bottom: 2,
+    fontFamily: 'Manrope_400Regular',
+    marginTop: 4,
+    alignSelf: 'flex-end',
   },
-  // Eigene Nachrichten: Zeitstempel fix am linken Rand (marginLeft fuer Abstand)
-  timestampLeft: {
-    left: 0,
-    marginLeft: 12,
-  },
-  // Fremde Nachrichten: Zeitstempel fix am rechten Rand (marginRight fuer Abstand)
-  timestampRight: {
-    right: 0,
-    marginRight: 12,
+  // Zeitstempel unter der Bubble (nur Sprachnachrichten)
+  timestampBelow: {
+    fontSize: 11,
+    fontFamily: 'Manrope_400Regular',
+    marginTop: 4,
   },
 });

@@ -361,7 +361,7 @@ export default function SocialScreen() {
           <MagnifyingGlassIcon size={20} color={theme.colors.neutral.gray[400]} />
           <TextInput
             className="flex-1 ml-2.5 text-base text-gray-900"
-            placeholder="Chats durchsuchen..."
+            placeholder="Suchen..."
             placeholderTextColor={theme.colors.neutral.gray[400]}
             value={searchQuery}
             onChangeText={setSearchQuery}

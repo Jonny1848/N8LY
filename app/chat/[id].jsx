@@ -13,8 +13,8 @@
  *
  * Route: /chat/[id] – Die ID ist die conversation_id aus Supabase.
  */
-import { FlatList, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FlatList, KeyboardAvoidingView, Platform, View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -28,6 +28,7 @@ import ChatHeader from '../../components/chat/ChatHeader';
 import ChatBubble from '../../components/chat/ChatBubble';
 import MessageInput from '../../components/chat/MessageInput';
 import ShareSheet from '../../components/chat/ShareSheet';
+import { theme } from '../../constants/theme';
 
 // Stabiler Fallback – verhindert Update-Loop bei leerem messagesByConversation
 const EMPTY_MESSAGES = [];
@@ -50,6 +51,10 @@ export default function ChatDetailScreen() {
   // ============================
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
   const flatListRef = useRef(null);
+  const insets = useSafeAreaInsets();
+
+  // Reduzierter Abstand unten: max. 12px statt vollem Safe-Area-Inset (34px+)
+  const bottomPadding = Math.min(insets.bottom, 12);
 
   // ============================
   // Initialisierung: Chat-Daten laden und Realtime abonnieren
@@ -101,6 +106,27 @@ export default function ChatDetailScreen() {
     console.log('[SHARE] Option gewaehlt:', key);
   }, []);
 
+  // Empty-State mit Schatten: Loading oder freundlicher Hinweis bei leerem Chat
+  const renderEmptyList = () => {
+    const content = loading ? (
+      <View style={styles.centerContent}>
+        <View style={[styles.emptyCard, styles.emptyCardShadow]}>
+          <ActivityIndicator size="large" color={theme.colors.primary.main} />
+          <Text style={styles.emptyText}>Nachrichten werden geladen...</Text>
+        </View>
+      </View>
+    ) : (
+      <View style={styles.centerContent}>
+        <View style={[styles.emptyCard, styles.emptyCardShadow]}>
+          <Text style={styles.emptyEmoji}>💬</Text>
+          <Text style={styles.emptyTitle}>Schreib die erste Nachricht</Text>
+          <Text style={styles.emptySubtitle}>Sag Hallo und starte die Unterhaltung</Text>
+        </View>
+      </View>
+    );
+    return <View style={styles.emptyWrapper}>{content}</View>;
+  };
+
   // ============================
   // RENDER
   // ============================
@@ -132,9 +158,13 @@ export default function ChatDetailScreen() {
             />
           )}
           inverted
-          contentContainerStyle={{ paddingVertical: 8 }}
+          contentContainerStyle={[
+            styles.listContent,
+            messages.length === 0 && styles.listContentEmpty,
+          ]}
           showsVerticalScrollIndicator={false}
-          style={{ backgroundColor: '#FFFFFF' }}
+          style={styles.list}
+          ListEmptyComponent={renderEmptyList}
         />
 
         {/* Input Bar: Text, Sprachaufnahme, Preview */}
@@ -144,8 +174,8 @@ export default function ChatDetailScreen() {
           onOpenShareSheet={() => setShareSheetVisible(true)}
         />
 
-        {/* SafeArea-Padding unten (Home-Indicator) */}
-        <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#FFFFFF' }} />
+        {/* Reduzierter Abstand unten (statt vollem Safe-Area-Inset) */}
+        <View style={{ height: bottomPadding, backgroundColor: '#FFFFFF' }} />
       </KeyboardAvoidingView>
 
       {/* "Inhalt teilen" Bottom Sheet */}
@@ -158,3 +188,63 @@ export default function ChatDetailScreen() {
     </SafeAreaView>
   );
 }
+
+// ============================
+// Styles – Loading/Empty State mit Schatten
+// ============================
+const styles = StyleSheet.create({
+  list: {
+    backgroundColor: '#FFFFFF',
+  },
+  listContent: {
+    paddingVertical: 8,
+  },
+  listContentEmpty: {
+    flexGrow: 1,
+  },
+  emptyWrapper: {
+    flex: 1,
+    transform: [{ scaleY: -1 }],
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  emptyCard: {
+    backgroundColor: theme.colors.neutral.white,
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    minWidth: 200,
+  },
+  emptyCardShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  emptyEmoji: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontFamily: 'Manrope_600SemiBold',
+    color: theme.colors.neutral.gray[700],
+    marginBottom: 4,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    fontFamily: 'Manrope_400Regular',
+    color: theme.colors.neutral.gray[500],
+  },
+  emptyText: {
+    fontSize: 14,
+    fontFamily: 'Manrope_400Regular',
+    color: theme.colors.neutral.gray[500],
+    marginTop: 12,
+  },
+});

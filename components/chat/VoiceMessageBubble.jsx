@@ -176,102 +176,98 @@ export default function VoiceMessageBubble({ mediaUrl, waveformData, isOwn }) {
     <View style={styles.container}>
       <Pressable onPress={togglePlayback} style={styles.playBtn}>
         {status.playing ? (
-          <PauseIcon size={16} color={isOwn ? '#FFFFFF' : theme.colors.primary.main} />
+          <PauseIcon size={12} color={isOwn ? '#FFFFFF' : theme.colors.primary.main} />
         ) : (
-          <PlayIcon size={16} color={isOwn ? '#FFFFFF' : theme.colors.primary.main} />
+          <PlayIcon size={12} color={isOwn ? '#FFFFFF' : theme.colors.primary.main} />
         )}
       </Pressable>
 
-      <View style={styles.progressArea}>
+      <View
+        style={[styles.waveformContainer, { width: WAVEFORM_WIDTH }]}
+        {...panResponder.panHandlers}
+      >
+        {bars.map((amplitude, i) => (
+          <View
+            key={`u-${i}`}
+            style={[
+              styles.waveformBar,
+              {
+                width: BAR_WIDTH,
+                height: barHeight(amplitude),
+                marginHorizontal: BAR_GAP / 2,
+                backgroundColor: unfilledColor,
+              },
+            ]}
+          />
+        ))}
         <View
-          style={[styles.waveformContainer, { width: WAVEFORM_WIDTH }]}
-          {...panResponder.panHandlers}
+          style={[
+            StyleSheet.absoluteFill,
+            styles.waveformReveal,
+            { width: effectiveProgress * WAVEFORM_WIDTH },
+          ]}
         >
           {bars.map((amplitude, i) => (
             <View
-              key={`u-${i}`}
+              key={`f-${i}`}
               style={[
                 styles.waveformBar,
                 {
                   width: BAR_WIDTH,
                   height: barHeight(amplitude),
                   marginHorizontal: BAR_GAP / 2,
-                  backgroundColor: unfilledColor,
+                  backgroundColor: filledColor,
                 },
               ]}
             />
           ))}
-          <View
-            style={[
-              StyleSheet.absoluteFill,
-              styles.waveformReveal,
-              { width: effectiveProgress * WAVEFORM_WIDTH },
-            ]}
-          >
-            {bars.map((amplitude, i) => (
-              <View
-                key={`f-${i}`}
-                style={[
-                  styles.waveformBar,
-                  {
-                    width: BAR_WIDTH,
-                    height: barHeight(amplitude),
-                    marginHorizontal: BAR_GAP / 2,
-                    backgroundColor: filledColor,
-                  },
-                ]}
-              />
-            ))}
-          </View>
-          <View
-            style={[
-              styles.progressDot,
-              {
-                left: effectiveProgress * WAVEFORM_WIDTH,
-                backgroundColor: filledColor,
-              },
-            ]}
-          />
         </View>
-        <Text
+        <View
           style={[
-            styles.duration,
-            { color: isOwn ? 'rgba(255,255,255,0.7)' : theme.colors.neutral.gray[500] },
+            styles.progressDot,
+            {
+              left: effectiveProgress * WAVEFORM_WIDTH,
+              backgroundColor: filledColor,
+            },
           ]}
-        >
-          {status.playing || status.currentTime > 0
-            ? formatDuration(dragging ? seekProgress * duration : displayTime)
-            : formatDuration(duration)}
-        </Text>
+        />
       </View>
+
+      <Text
+        style={[
+          styles.duration,
+          { color: isOwn ? 'rgba(255,255,255,0.8)' : theme.colors.neutral.gray[500] },
+        ]}
+      >
+        {status.playing || status.currentTime > 0
+          ? formatDuration(dragging ? seekProgress * duration : displayTime)
+          : formatDuration(duration)}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // Kompakte Zeile: Play, Waveform und Dauer horizontal ausgerichtet
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 220,
+    minWidth: 180,
   },
   playBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
-  },
-  progressArea: {
-    flex: 1,
+    marginRight: 8,
   },
   waveformContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     height: MAX_BAR_HALF_HEIGHT * 2,
-    marginBottom: 6,
     position: 'relative',
+    marginRight: 8,
   },
   waveformReveal: {
     flexDirection: 'row',
@@ -290,7 +286,7 @@ const styles = StyleSheet.create({
     marginLeft: -(DOT_SIZE / 2),
   },
   duration: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: 'Manrope_500Medium',
   },
 });

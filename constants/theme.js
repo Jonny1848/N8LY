@@ -11,7 +11,8 @@ export const theme = {
       lighter: '#6B7280',   // Helles Grau
       dark: '#111827',      // Sehr dunkles Grau
       bg: '#F9FAFB',        // Sehr heller Hintergrund
-      main2: '#191970'       // Midnight Blue
+      main2: '#191970' ,     // Midnight Blue
+      main3: "#1E90FF"      // Dodger Blue
     },
     // Sekundäre Farben: Hellere Grautöne
     secondary: {
@@ -36,6 +37,7 @@ export const theme = {
       offWhite: '#FAFAFA',
       offBlack: '#0F172A',
       gray: {
+        0: '#000000',
         50: '#F9FAFB',
         100: '#F3F4F6',
         200: '#E5E7EB',
