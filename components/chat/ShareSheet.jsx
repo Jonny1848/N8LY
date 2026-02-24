@@ -20,6 +20,8 @@ import {
   ChartBarIcon,
   PhotoIcon,
   MapPinIcon,
+  CameraIcon,
+  MicrophoneIcon,
 } from 'react-native-heroicons/outline';
 import { UserGroupIcon } from 'react-native-heroicons/solid';
 
@@ -28,6 +30,18 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 // Share-Optionen mit Icon, Label und optionalem Gruppen-Flag
 const SHARE_OPTIONS = [
+  {
+    key: 'camera',
+    icon: <CameraIcon size={24} strokeWidth={1.8} color={theme.colors.neutral.gray[700]} />,
+    label: 'Kamera',
+    subtitle: 'Foto aufnehmen',
+  },
+  {
+    key: 'voice',
+    icon: <MicrophoneIcon size={24} strokeWidth={1.8} color={theme.colors.neutral.gray[700]} />,
+    label: 'Sprachnachricht',
+    subtitle: 'Audio aufnehmen',
+  },
   {
     key: 'documents',
     icon: <DocumentIcon size={24} strokeWidth={1.8} color={theme.colors.neutral.gray[700]} />,

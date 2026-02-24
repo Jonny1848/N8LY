@@ -41,16 +41,18 @@ export async function uploadChatImage(conversationId, uri, mimeType = 'image/jpe
   const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
   const filePath = `${conversationId}/${fileName}`;
 
-  // Datei als Blob lesen (fuer React Native)
-  const response = await fetch(uri);
-  const blob = await response.blob();
+  // Datei mit expo-file-system als Base64 lesen (Blob-Upload liefert in RN oft 0 Bytes)
+  const base64 = await FileSystem.readAsStringAsync(uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  const arrayBuffer = decode(base64);
 
-  // Upload zu Supabase Storage
+  // ArrayBuffer zu Supabase hochladen – funktioniert zuverlaessig in React Native
   const { data, error } = await supabase.storage
     .from(CHAT_MEDIA_BUCKET)
-    .upload(filePath, blob, {
+    .upload(filePath, arrayBuffer, {
       contentType: mimeType,
-      upsert: false, // Kein Ueberschreiben bestehender Dateien
+      upsert: false,
     });
 
   if (error) {

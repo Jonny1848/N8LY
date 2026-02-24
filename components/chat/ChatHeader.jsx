@@ -11,7 +11,7 @@
  */
 import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { theme } from '../../constants/theme';
-import { ChevronLeftIcon, EllipsisHorizontalIcon } from 'react-native-heroicons/outline';
+import { ChevronLeftIcon, VideoCameraIcon, PhoneIcon } from 'react-native-heroicons/outline';
 import { UserIcon } from 'react-native-heroicons/solid';
 
 export default function ChatHeader({ conversation, onBack, onOptions }) {
@@ -29,7 +29,7 @@ export default function ChatHeader({ conversation, onBack, onOptions }) {
     <View style={styles.header}>
       {/* Zurueck-Pfeil */}
       <Pressable style={styles.headerBtn} onPress={onBack}>
-        <ChevronLeftIcon size={28} color={theme.colors.neutral.gray[900]} strokeWidth={2.5} />
+        <ChevronLeftIcon size={30} color={theme.colors.neutral.gray[900]} strokeWidth={2.5} />
       </Pressable>
 
       {/* Avatar + Name + Status (tappbar fuer Profil-Info) */}
@@ -41,7 +41,7 @@ export default function ChatHeader({ conversation, onBack, onOptions }) {
           />
         ) : (
           <View style={[styles.headerAvatar, styles.headerAvatarPlaceholder]}>
-            <UserIcon size={22} color={theme.colors.neutral.gray[400]} />
+            <UserIcon size={24} color={theme.colors.neutral.gray[400]} />
           </View>
         )}
 
@@ -61,13 +61,14 @@ export default function ChatHeader({ conversation, onBack, onOptions }) {
         </View>
       </Pressable>
 
-      {/* N8LY-Logo rechts oben (Einzel- und Gruppenchats) */}
-      <View style={styles.headerLogoContainer}>
-        <Image
-          source={require('../../assets/N8LY9.png')}
-          style={styles.headerLogo}
-          resizeMode="contain"
-        />
+      {/* Video-Anruf + Telefon Icons – groesser fuer bessere Erreichbarkeit */}
+      <View className="flex-row items-center gap-2">
+        <Pressable className="w-12 h-12 items-center justify-center">
+          <VideoCameraIcon size={28} strokeWidth={2} color={theme.colors.neutral.gray[700]} />
+        </Pressable>
+        <Pressable className="w-12 h-12 items-center justify-center">
+          <PhoneIcon size={28} strokeWidth={2} color={theme.colors.neutral.gray[700]} />
+        </Pressable>
       </View>
     </View>
   );
@@ -80,8 +81,8 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.neutral.gray[100],
@@ -93,8 +94,8 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   headerBtn: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -105,9 +106,9 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   headerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: theme.colors.neutral.gray[100],
   },
   headerAvatarPlaceholder: {
@@ -119,7 +120,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerName: {
-    fontSize: 17,
+    fontSize: 18,
     color: theme.colors.neutral.gray[900],
     fontFamily: 'Manrope_700Bold',
   },
@@ -136,20 +137,8 @@ const styles = StyleSheet.create({
     marginRight: 5,
   },
   headerStatus: {
-    fontSize: 12,
+    fontSize: 13,
     color: theme.colors.neutral.gray[500],
     fontFamily: 'Manrope_400Regular',
-  },
-  // N8LY-Logo rechts oben im Header
-  headerLogoContainer: {
-    position: 'absolute',
-    right: 12,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-  },
-  headerLogo: {
-    width: 60,
-    height: 60,
   },
 });

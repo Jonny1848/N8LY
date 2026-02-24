@@ -21,7 +21,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 // Zustand: Globale Stores fuer Auth und Chat
 import useAuthStore from '../../stores/useAuthStore';
 import useChatStore from '../../stores/useChatStore';
-import { uploadVoiceMessage } from '../../services/storageService';
+import { uploadVoiceMessage, uploadChatImage } from '../../services/storageService';
 
 // Wiederverwendbare Chat-Komponenten
 import ChatHeader from '../../components/chat/ChatHeader';
@@ -51,6 +51,7 @@ export default function ChatDetailScreen() {
   // ============================
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
   const flatListRef = useRef(null);
+  const messageInputRef = useRef(null);
   const insets = useSafeAreaInsets();
 
   // Reduzierter Abstand unten: max. 12px statt vollem Safe-Area-Inset (34px+)
@@ -100,10 +101,29 @@ export default function ChatDetailScreen() {
     );
   }, [conversationId, userId]);
 
-  /** Share Sheet Optionsauswahl verarbeiten */
+  /** Foto aus Kamera hochladen + als Bildnachricht senden */
+  const handleSendImage = useCallback(async (localUri) => {
+    if (!userId) return;
+    const publicUrl = await uploadChatImage(conversationId, localUri, 'image/jpeg');
+    await useChatStore.getState().sendMediaMessage(
+      conversationId,
+      userId,
+      publicUrl,
+      'image',
+    );
+  }, [conversationId, userId]);
+
+  /** Share Sheet Optionsauswahl – Kamera, Medien, Sprachnachricht an MessageInput weiterleiten */
   const handleShareSelect = useCallback((key) => {
-    // TODO: Jeweilige Aktion implementieren (Dokument, Medien, Standort etc.)
-    console.log('[SHARE] Option gewaehlt:', key);
+    if (key === 'camera') {
+      setTimeout(() => messageInputRef.current?.openCamera?.(), 300);
+    } else if (key === 'media') {
+      setTimeout(() => messageInputRef.current?.openMediaLibrary?.(), 300);
+    } else if (key === 'voice') {
+      setTimeout(() => messageInputRef.current?.startVoiceRecording?.(), 300);
+    } else {
+      console.log('[SHARE] Option gewaehlt:', key);
+    }
   }, []);
 
   // Empty-State mit Schatten: Loading oder freundlicher Hinweis bei leerem Chat
@@ -167,10 +187,12 @@ export default function ChatDetailScreen() {
           ListEmptyComponent={renderEmptyList}
         />
 
-        {/* Input Bar: Text, Sprachaufnahme, Preview */}
+        {/* Input Bar: + | Input | Send (wie Screenshot) – Kamera/Voice ueber ShareSheet */}
         <MessageInput
+          ref={messageInputRef}
           onSendText={handleSendText}
           onSendVoice={handleSendVoice}
+          onSendImage={handleSendImage}
           onOpenShareSheet={() => setShareSheetVisible(true)}
         />
 

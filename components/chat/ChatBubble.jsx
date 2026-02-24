@@ -3,7 +3,7 @@
  *
  * Rendert eine Nachricht als Bubble mit optionalem Datumsseparator,
  * System-Nachrichten und Gruppen-Avatar/Name.
- * Unterstuetzt Text- und Sprachnachrichten.
+ * Unterstuetzt Text-, Sprachnachrichten und Bildnachrichten.
  *
  * Props:
  *  - item: Nachricht-Objekt (aus messages-Tabelle)
@@ -12,7 +12,7 @@
  *  - userId: ID des aktuellen Users
  *  - conversation: Konversation-Objekt (fuer Gruppeninfo)
  */
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, Image, useWindowDimensions } from 'react-native';
 import { theme } from '../../constants/theme';
 import { UserIcon } from 'react-native-heroicons/solid';
 import VoiceMessageBubble from './VoiceMessageBubble';
@@ -51,23 +51,35 @@ function formatDateSeparator(dateStr) {
 }
 
 export default function ChatBubble({ item, index, messages, userId, conversation }) {
+  const { width: screenWidth } = useWindowDimensions();
   const isOwn = item.sender_id === userId;
   const isSystem = item.message_type === 'system';
+  const isImage = item.message_type === 'image';
+  const isVoice = item.message_type === 'voice';
+
+  // Bildbreite: max. 65% Bildschirmbreite, maximal 260px (wie vorher mit StyleSheet)
+  const imageWidth = Math.min(screenWidth * 0.65, 260);
 
   // Datumsseparator: Pruefen ob der Tag sich aendert (FlatList ist inverted)
   const nextMsg = messages[index + 1];
   const showDate = shouldShowDateSeparator(item, nextMsg);
+
+  // Tailwind-Klassen fuer die Bubble – dynamisch je nach Nachrichtentyp
+  const bubbleBaseClasses =
+    'rounded-2xl max-w-full ' +
+    (isImage
+      ? 'bg-transparent p-0 overflow-hidden'
+      : isVoice
+        ? 'py-2 pl-2.5 pr-4 ' + (isOwn ? 'bg-n8tly-blue rounded-br-[4px]' : 'bg-gray-100 rounded-bl-[4px]')
+        : 'px-3.5 py-2.5 ' + (isOwn ? 'bg-n8tly-blue rounded-br-[4px]' : 'bg-gray-100 rounded-bl-[4px]'));
 
   return (
     <View>
       {/* Datumsseparator: Zentriertes Datum-Badge */}
       {showDate && (
         <View className="items-center py-4">
-          <View className="px-4 py-1.5 rounded-full" style={{ backgroundColor: theme.colors.neutral.gray[100] }}>
-            <Text
-              className="text-xs text-gray-500"
-              style={{ fontFamily: 'Manrope_500Medium' }}
-            >
+          <View className="px-4 py-1.5 rounded-full bg-gray-100">
+            <Text className="text-xs text-gray-500" style={{ fontFamily: 'Manrope_500Medium' }}>
               {formatDateSeparator(item.created_at)}
             </Text>
           </View>
@@ -87,7 +99,7 @@ export default function ChatBubble({ item, index, messages, userId, conversation
       ) : (
         /* Chatbox-Style: Bubble mit Zeitstempel innen */
         <View
-          className={`flex-row px-4 mb-8 items-end ${isOwn ? 'justify-end' : 'justify-start'}`}
+          className={`flex-row px-4 mb-5 items-end ${isOwn ? 'justify-end' : 'justify-start'}`}
         >
           {!isOwn && conversation?.type === 'group' && (
             <View className="mr-2.5 mb-1">
@@ -104,125 +116,63 @@ export default function ChatBubble({ item, index, messages, userId, conversation
             </View>
           )}
 
-          <View
-            style={[
-              styles.bubbleWrapper,
-              { alignItems: isOwn ? 'flex-end' : 'flex-start' },
-            ]}
-          >
-            <View
-              style={[
-                styles.bubble,
-                styles.bubbleInWrapper,
-                isOwn ? styles.bubbleOwn : styles.bubbleOther,
-                item.message_type === 'voice' && styles.bubbleVoice,
-              ]}
-            >
+          {/* Wrapper fuer Bubble + Zeitstempel – max. 75% Chat-Breite */}
+          <View className={`max-w-[75%] ${isOwn ? 'items-end' : 'items-start'}`}>
+            <View className={bubbleBaseClasses}>
               {!isOwn && conversation?.type === 'group' && item.profiles?.username && (
-                <Text style={[styles.senderName, { color: theme.colors.primary.main }]}>
+                <Text
+                  className="text-xs mb-0.5 text-n8tly-blue"
+                  style={{ fontFamily: 'Manrope_600SemiBold' }}
+                >
                   {item.profiles.username}
                 </Text>
               )}
 
-              {item.message_type === 'voice' && item.media_url ? (
+              {isVoice && item.media_url ? (
                 <VoiceMessageBubble
                   mediaUrl={item.media_url}
                   waveformData={item.waveform_data}
                   isOwn={isOwn}
                 />
-              ) : (
+              ) : isImage && item.media_url ? (
+                /* Bildnachricht: Foto mit optionalem Caption – Zeitstempel unter der Bubble */
                 <>
-                  <Text
-                    style={[
-                      styles.messageText,
-                      { color: isOwn ? '#FFFFFF' : theme.colors.neutral.gray[900] },
-                    ]}
-                  >
-                    {item.content}
-                  </Text>
-                  {/* Zeitstempel innerhalb der Bubble (nur bei Text-Nachrichten) */}
-                  <Text
-                    style={[
-                      styles.timestampInside,
-                      { color: isOwn ? 'rgba(255,255,255,0.85)' : theme.colors.neutral.gray[500] },
-                    ]}
-                  >
-                    {formatMessageTime(item.created_at)}
-                  </Text>
+                  <Image
+                    source={{ uri: item.media_url }}
+                    className="aspect-[4/3] rounded-xl"
+                    style={{ width: imageWidth }}
+                    resizeMode="cover"
+                  />
+                  {item.content ? (
+                    <Text
+                      className={`text-sm mt-1.5 leading-5 ${isOwn ? 'text-white' : 'text-gray-900'}`}
+                      style={{ fontFamily: 'Manrope_500Medium' }}
+                    >
+                      {item.content}
+                    </Text>
+                  ) : null}
                 </>
+              ) : (
+                /* Textnachricht – nur Inhalt, Zeitstempel unter der Bubble */
+                <Text
+                  className={`text-[15px] leading-[21px] ${isOwn ? 'text-white' : 'text-gray-900'}`}
+                  style={{ fontFamily: 'Manrope_500Medium' }}
+                >
+                  {item.content}
+                </Text>
               )}
             </View>
 
-            {/* Zeitstempel unter der Bubble – nur bei Sprachnachrichten */}
-            {item.message_type === 'voice' && (
-              <Text
-                style={[
-                  styles.timestampBelow,
-                  { color: theme.colors.neutral.gray[500] },
-                ]}
-              >
-                {formatMessageTime(item.created_at)}
-              </Text>
-            )}
+            {/* Zeitstempel unter der Bubble – fuer alle Nachrichtentypen (clean, aeesthetisch) */}
+            <Text
+              className={`text-xs text-gray-500 mt-1.5 ${isOwn ? 'text-right' : 'text-left'}`}
+              style={{ fontFamily: 'Manrope_400Regular' }}
+            >
+              {formatMessageTime(item.created_at)}
+            </Text>
           </View>
         </View>
       )}
     </View>
   );
 }
-
-// ============================
-// Styles
-// ============================
-const styles = StyleSheet.create({
-  bubble: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 18,
-  },
-  // Bubble fuellt den Wrapper (max 75% des Chat-Bereichs) – verhindert doppelte 75%-Begrenzung
-  bubbleInWrapper: {
-    maxWidth: '100%',
-  },
-  bubbleOwn: {
-    backgroundColor: theme.colors.primary.main,
-    borderBottomRightRadius: 4,
-  },
-  bubbleOther: {
-    backgroundColor: theme.colors.neutral.gray[200],
-    borderBottomLeftRadius: 4,
-  },
-  // Sprachnachrichten: minimales Padding, rechts mehr Abstand damit Waveform nicht direkt endet
-  bubbleVoice: {
-    paddingVertical: 8,
-    paddingLeft: 10,
-    paddingRight: 16,
-  },
-  senderName: {
-    fontSize: 12,
-    fontFamily: 'Manrope_600SemiBold',
-    marginBottom: 3,
-  },
-  messageText: {
-    fontSize: 15,
-    lineHeight: 21,
-    fontFamily: 'Manrope_500Medium',
-  },
-  // Wrapper fuer Bubble + optionalen Zeitstempel darunter (Sprachnachrichten)
-  bubbleWrapper: {
-    maxWidth: '75%',
-  },
-  // Zeitstempel innerhalb der Chatbox (nur Text-Nachrichten, unten rechts)
-  timestampInside: {
-    fontSize: 11,
-    fontFamily: 'Manrope_400Regular',
-    marginTop: 4,
-    alignSelf: 'flex-end',
-  },
-  // Zeitstempel unter der Bubble (nur Sprachnachrichten)
-  timestampBelow: {
-    fontSize: 11,
-    fontFamily: 'Manrope_400Regular',
-    marginTop: 4,
-  },
-});

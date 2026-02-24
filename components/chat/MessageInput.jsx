@@ -1,35 +1,20 @@
 /**
- * MessageInput – Bottom Input Bar mit drei Modi
+ * MessageInput – Bottom Input Bar (Layout wie Referenz-Screenshot)
  *
- * Drei Zustaende:
- *  1. Normal: Attachment, Textfeld + Emoji, Kamera, Mikrofon / Send
- *  2. Recording: Verwerfen, Timer mit Puls, Stopp
- *  3. Preview: Verwerfen, Play/Pause + Fortschrittsbalken, Senden
+ * Normal-Modus: + | Input | Send (drei Elemente)
+ * Plus oeffnet ShareSheet mit Kamera, Sprachnachricht, Medien etc.
  *
- * Kapselt alle Audio-Recording-Hooks (useAudioRecorder, useAudioPlayer)
- * intern – der Eltern-Screen muss sich nicht um Aufnahme-Details kuemmern.
- *
- * Props:
- *  - onSendText(text): Callback wenn eine Text-Nachricht gesendet werden soll
- *  - onSendVoice(localUri, waveformData): Callback wenn eine Sprachnachricht gesendet werden soll
- *                            (Upload + DB-Eintrag macht der Parent/Store)
- *  - onOpenShareSheet: Callback fuer den PaperClip-Button
+ * Recording/Preview-Modus: Sprachnachricht-Aufnahme (unveraendert)
  */
-import { View, Text, TextInput, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
-import { useState, useEffect, Fragment } from 'react';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { useState, useEffect, Fragment, forwardRef, useImperativeHandle } from 'react';
 import { theme } from '../../constants/theme';
-import {
-  PaperClipIcon,
-  FaceSmileIcon,
-  TrashIcon,
-} from 'react-native-heroicons/outline';
+import { TrashIcon, PlusIcon } from 'react-native-heroicons/outline';
 import {
   PaperAirplaneIcon,
   PlayIcon,
   StopIcon,
   PauseIcon,
-  CameraIcon,
-  MicrophoneIcon,
 } from 'react-native-heroicons/solid';
 import {
   useAudioRecorder,
@@ -39,9 +24,16 @@ import {
   useAudioPlayer,
   useAudioPlayerStatus,
 } from 'expo-audio';
-import EmojiPicker, { emojiData } from '@hiraku-ai/react-native-emoji-picker';
+import * as ImagePicker from 'expo-image-picker';
 
-export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet }) {
+/**
+ * MessageInput – Layout wie Referenz-Screenshot: + | Input | Send
+ * Kamera und Sprachnachricht ueber ShareSheet (Plus-Button)
+ */
+const MessageInput = forwardRef(function MessageInput(
+  { onSendText, onSendVoice, onOpenShareSheet, onSendImage },
+  ref
+) {
   // ============================
   // Lokaler UI-State
   // ============================
@@ -54,8 +46,8 @@ export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet
   const [waveformSamples, setWaveformSamples] = useState([]);
   const [uploadingVoice, setUploadingVoice] = useState(false);
 
-  // Emoji-Picker: Sichtbarkeit des Modals
-  const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
+  // Kamera: Ladezustand waehrend Upload
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // expo-audio: Recorder mit Metering fuer Waveform (Lautstaerke pro Zeitscheibe)
   const recordingOptions = {
@@ -178,6 +170,83 @@ export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet
     }
   };
 
+  // ============================
+  // Kamera: Foto aufnehmen und ueber Parent-Callback senden
+  // ============================
+  const handleTakePhoto = async () => {
+    if (!onSendImage || uploadingImage) return;
+
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Kamera-Zugriff',
+          'Wir benoetigen Zugriff auf deine Kamera, um Fotos aufzunehmen.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setUploadingImage(true);
+        await onSendImage(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.error('[CAMERA] Fehler beim Aufnehmen/Senden:', err);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // ============================
+  // Medien: Bild aus Galerie waehlen und ueber Parent-Callback senden
+  // ============================
+  const handlePickFromGallery = async () => {
+    if (!onSendImage || uploadingImage) return;
+
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Fotozugriff',
+          'Wir benoetigen Zugriff auf deine Fotos, um Bilder zu teilen.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setUploadingImage(true);
+        await onSendImage(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.error('[MEDIEN] Fehler beim Auswaehlen/Senden:', err);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Imperative Handle: Kamera, Medien, Voice von ShareSheet ausloesen
+  useImperativeHandle(ref, () => ({
+    openCamera: handleTakePhoto,
+    openMediaLibrary: handlePickFromGallery,
+    startVoiceRecording: handleStartRecording,
+  }));
+
   /** Preview-Wiedergabe umschalten (Play/Pause) */
   const togglePreviewPlayback = () => {
     if (previewStatus.playing) {
@@ -191,60 +260,54 @@ export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet
   };
 
   // ============================
-  // RENDER – Drei Modi
+  // RENDER – Drei Modi (ohne Schatten, duenne Trennlinie oben wie Screenshot)
   // ============================
   return (
     <Fragment>
-    <View style={styles.inputBarWrapper}>
-    <View style={styles.inputBar}>
+    {/* Wrapper: duenne Linie oben trennt Input vom Chat, mehr Platz nach oben, clean */}
+    <View className="bg-white border-t border-gray-200 px-4 pt-5 pb-4">
+      <View className="flex-row items-center gap-3 min-h-[56px]">
       {recording ? (
         /* ========== RECORDING-MODUS ========== */
-        <View style={styles.inputRow}>
-          {/* Verwerfen-Button */}
-          <Pressable style={styles.inputAction} onPress={handleDiscardRecording}>
+        <>
+          <Pressable className="w-10 h-10 items-center justify-center" onPress={handleDiscardRecording}>
             <TrashIcon size={24} strokeWidth={2} color="#EF4444" />
           </Pressable>
-
-          {/* Timer-Anzeige mit rotem Puls-Punkt */}
-          <View style={recStyles.timerContainer}>
-            <View style={recStyles.pulseCircle} />
-            <Text style={recStyles.timerText}>
+          <View className="flex-1 flex-row items-center justify-center mx-2">
+            <View className="w-2.5 h-2.5 rounded-full bg-red-500 mr-2" />
+            <Text className="text-lg font-bold text-gray-900 mr-2" style={{ fontFamily: 'Manrope_700Bold' }}>
               {formatRecordingTime(recorderState.durationMillis)}
             </Text>
-            <Text style={recStyles.timerLabel}>Aufnahme...</Text>
+            <Text className="text-sm text-gray-500" style={{ fontFamily: 'Manrope_400Regular' }}>Aufnahme...</Text>
           </View>
-
-          {/* Stopp-Button */}
           <Pressable
-            style={[styles.sendBtn, { backgroundColor: '#EF4444' }]}
+            className="w-10 h-10 rounded-full bg-red-500 items-center justify-center"
             onPress={handleStopRecording}
           >
             <StopIcon size={18} color="#FFFFFF" />
           </Pressable>
-        </View>
+        </>
       ) : recordedUri ? (
         /* ========== PREVIEW-MODUS ========== */
-        <View style={styles.inputRow}>
-          {/* Verwerfen */}
-          <Pressable style={styles.inputAction} onPress={handleDiscardRecording}>
+        <>
+          <Pressable className="w-10 h-10 items-center justify-center" onPress={handleDiscardRecording}>
             <TrashIcon size={24} strokeWidth={2} color="#EF4444" />
           </Pressable>
-
-          {/* Play/Pause + Fortschrittsbalken */}
-          <View style={recStyles.previewContainer}>
-            <Pressable onPress={togglePreviewPlayback} style={recStyles.previewPlayBtn}>
+          <View className="flex-1 flex-row items-center bg-gray-100 rounded-3xl px-3 py-2.5 mx-2">
+            <Pressable onPress={togglePreviewPlayback} className="w-8 h-8 rounded-full bg-white items-center justify-center mr-2.5">
               {previewStatus.playing ? (
-                <PauseIcon size={16} color={theme.colors.primary.main} />
+                <PauseIcon size={16} color="#0066FF" />
               ) : (
-                <PlayIcon size={16} color={theme.colors.primary.main} />
+                <PlayIcon size={16} color="#0066FF" />
               )}
             </Pressable>
-            <View style={recStyles.previewTrack}>
-              <View style={[recStyles.previewTrackFill, {
-                width: `${previewStatus.duration > 0 ? (previewStatus.currentTime / previewStatus.duration) * 100 : 0}%`,
-              }]} />
+            <View className="flex-1 h-1 rounded bg-gray-200 overflow-hidden">
+              <View
+                className="h-full rounded bg-n8tly-blue"
+                style={{ width: `${previewStatus.duration > 0 ? (previewStatus.currentTime / previewStatus.duration) * 100 : 0}%` }}
+              />
             </View>
-            <Text style={recStyles.previewDuration}>
+            <Text className="text-xs font-semibold text-gray-600 ml-2.5 min-w-[32px]" style={{ fontFamily: 'Manrope_600SemiBold' }}>
               {formatRecordingTime(
                 previewStatus.playing || previewStatus.currentTime > 0
                   ? previewStatus.currentTime * 1000
@@ -252,10 +315,8 @@ export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet
               )}
             </Text>
           </View>
-
-          {/* Sende-Button */}
           <Pressable
-            style={[styles.sendBtn, { backgroundColor: theme.colors.primary.main }]}
+            className="w-10 h-10 rounded-full bg-n8tly-blue items-center justify-center"
             onPress={handleSendVoice}
             disabled={uploadingVoice}
           >
@@ -265,193 +326,46 @@ export default function MessageInput({ onSendText, onSendVoice, onOpenShareSheet
               <PaperAirplaneIcon size={20} strokeWidth={2.5} color="#FFFFFF" />
             )}
           </Pressable>
-        </View>
+        </>
       ) : (
-        /* ========== NORMALER MODUS – Schwebende Leiste wie im Screenshot ========== */
-        <View style={styles.inputRow}>
-          {/* Emoji-Button links */}
+        /* ========== NORMALER MODUS – Screenshot: + | Input (weiss, duenne Border) | Send ========== */
+        <>
+          {/* Plus-Button: hellgrau, circular */}
           <Pressable
-            style={styles.inputAction}
-            onPress={() => setEmojiPickerVisible(true)}
+            className="w-10 h-10 rounded-full bg-gray-200 items-center justify-center shrink-0"
+            onPress={onOpenShareSheet}
           >
-            <FaceSmileIcon size={24} strokeWidth={2} color={theme.colors.neutral.black} />
+            <PlusIcon size={22} strokeWidth={2.5} color={theme.colors.neutral.gray[800]} />
           </Pressable>
 
-          {/* Eingabefeld (Mitte) */}
+          {/* Eingabefeld: weiss, staerkere Umrandung, pill-foermig */}
           <TextInput
-            style={styles.inputField}
-            placeholder="Nachricht"
+            className="flex-1 bg-gray-50 border-2 border-gray-300 rounded-full px-4 py-3 text-base text-gray-900 max-h-[100px]"
+            placeholder="Nachricht eingeben..."
             placeholderTextColor={theme.colors.neutral.gray[400]}
             value={inputText}
             onChangeText={setInputText}
             multiline
             maxLength={2000}
+            style={{ fontFamily: 'Manrope_400Regular' }}
           />
 
-          {/* Attachment-Button */}
-          <Pressable style={styles.inputAction} onPress={onOpenShareSheet}>
-            <PaperClipIcon size={24} strokeWidth={2} color={theme.colors.neutral.black} />
+          {/* Sende-Button: dunkelgrau, circular */}
+          <Pressable
+            className={`w-10 h-10 rounded-full items-center justify-center shrink-0 ${
+              hasContent ? 'bg-gray-800' : 'bg-gray-300'
+            }`}
+            onPress={handleSend}
+            disabled={!hasContent || sending}
+          >
+            <PaperAirplaneIcon size={20} strokeWidth={2.5} color="#FFFFFF" />
           </Pressable>
-
-          {/* Kamera-Button: nur wenn kein Text */}
-          {!hasContent && (
-            <Pressable style={styles.inputAction}>
-              <CameraIcon size={24} strokeWidth={2} color={theme.colors.neutral.black} />
-            </Pressable>
-          )}
-
-          {/* Mikrofon-Button: nur wenn kein Text */}
-          {!hasContent && (
-            <Pressable style={styles.inputAction} onPress={handleStartRecording}>
-              <MicrophoneIcon size={24} strokeWidth={2} color={theme.colors.neutral.black} />
-            </Pressable>
-          )}
-
-          {/* Sende-Button: nur wenn Text vorhanden */}
-          {hasContent && (
-            <Pressable
-              style={[styles.sendBtn, { backgroundColor: theme.colors.primary.main }]}
-              onPress={handleSend}
-              disabled={sending}
-            >
-              <PaperAirplaneIcon size={20} strokeWidth={2.5} color="#FFFFFF" />
-            </Pressable>
-          )}
-        </View>
+        </>
       )}
+      </View>
     </View>
-    </View>
-
-    {/* Emoji-Picker Modal – oeffnet sich beim Tippen auf das Smiley-Icon */}
-    <EmojiPicker
-      visible={emojiPickerVisible}
-      onClose={() => setEmojiPickerVisible(false)}
-      onEmojiSelect={(emoji) => setInputText((prev) => prev + emoji)}
-      emojis={emojiData}
-      searchPlaceholder="Emoji suchen..."
-    />
     </Fragment>
   );
-}
-
-// ============================
-// Styles: Input Bar (allgemein)
-// ============================
-const styles = StyleSheet.create({
-  // Wrapper fuer schwebende Position – Abstand zu den Raendern
-  inputBarWrapper: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    paddingTop: 8,
-  },
-  // Schwebende ChatBar – eine Leiste, abgerundet, mit Schatten (dunkleres Grau fuer bessere Abhebung)
-  inputBar: {
-    backgroundColor: theme.colors.neutral.gray[200],
-    borderRadius: 24,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    minHeight: 48,
-    // Schatten fuer schwebenden Effekt
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  inputAction: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inputField: {
-    flex: 1,
-    fontSize: 15,
-    color: theme.colors.neutral.gray[900],
-    fontFamily: 'Manrope_400Regular',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    maxHeight: 100,
-  },
-  sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 });
 
-// ============================
-// Styles: Aufnahme-Modus und Preview-Modus
-// ============================
-const recStyles = StyleSheet.create({
-  timerContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 8,
-  },
-  pulseCircle: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#EF4444',
-    marginRight: 8,
-  },
-  timerText: {
-    fontSize: 18,
-    fontFamily: 'Manrope_700Bold',
-    color: theme.colors.neutral.gray[900],
-    marginRight: 8,
-  },
-  timerLabel: {
-    fontSize: 13,
-    fontFamily: 'Manrope_400Regular',
-    color: theme.colors.neutral.gray[500],
-  },
-  previewContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.neutral.gray[100],
-    borderRadius: 24,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginHorizontal: 8,
-  },
-  previewPlayBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  previewTrack: {
-    flex: 1,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.neutral.gray[200],
-    overflow: 'hidden',
-  },
-  previewTrackFill: {
-    height: '100%',
-    borderRadius: 2,
-    backgroundColor: theme.colors.primary.main,
-  },
-  previewDuration: {
-    fontSize: 12,
-    fontFamily: 'Manrope_600SemiBold',
-    color: theme.colors.neutral.gray[600],
-    marginLeft: 10,
-    minWidth: 32,
-  },
-});
+export default MessageInput;
