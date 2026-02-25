@@ -8,6 +8,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // N8TLY Brand (Electric Blue)
+        brand: '#0066FF',
         // Minimalistische Farbpalette
         primary: {
           DEFAULT: '#1F2937',

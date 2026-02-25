@@ -1,19 +1,15 @@
-import { View, Text, Pressable, Image, ActivityIndicator, ScrollView, TextInput, TouchableOpacity, Alert, Platform, StyleSheet } from "react-native";
-import { useState, useEffect } from "react";
+import { View, Text, Pressable, Image, ActivityIndicator, ScrollView, TextInput, TouchableOpacity, Alert, Platform } from "react-native";
+import { useState } from "react";
 import { useRouter, Redirect } from 'expo-router';
-import { supabase, fetchProfileWithToken } from "../lib/supabase";
-import { makeRedirectUri } from "expo-auth-session";
-import * as WebBrowser from 'expo-web-browser';
-import * as AppleAuthentication from 'expo-apple-authentication';
-import * as Crypto from 'expo-crypto';
+import { supabase } from "../lib/supabase";
+import { useOAuthHandlers } from "./hooks/useOAuthHandlers";
 import { theme } from "../constants/theme";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { EnvelopeIcon } from "react-native-heroicons/outline";
 import { EyeIcon, EyeSlashIcon } from "react-native-heroicons/outline";
-import { CheckIcon } from "react-native-heroicons/solid";
-
-// WICHTIG: Dies erlaubt dem Browser, die Auth-Session abzuschließen
-WebBrowser.maybeCompleteAuthSession();
+import AuthErrorBanner from "../components/auth/AuthErrorBanner";
+import AuthSubmitButton from "../components/auth/AuthSubmitButton";
+import AuthEmailInput from "../components/auth/AuthEmailInput";
+import AuthPasswordInput from "../components/auth/AuthPasswordInput";
 
 export default function SignUp() {
   const [email, setEmail] = useState("");
@@ -25,17 +21,16 @@ export default function SignUp() {
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("signup");
-  const [oauthRedirectTo, setOauthRedirectTo] = useState(null);
-  const [oauthProcessing, setOauthProcessing] = useState(false);
-  const [appleAuthAvailable, setAppleAuthAvailable] = useState(false);
   const router = useRouter();
 
-  // Apple Sign-In Verfügbarkeit prüfen (nur iOS)
-  useEffect(() => {
-    if (Platform.OS === 'ios') {
-      AppleAuthentication.isAvailableAsync().then(setAppleAuthAvailable);
-    }
-  }, []);
+  // OAuth-Logik zentral im Hook (Google + Apple)
+  const {
+    signInWithGoogle,
+    signInWithApple,
+    oauthProcessing,
+    oauthRedirectTo,
+    appleAuthAvailable,
+  } = useOAuthHandlers({ setErrorMsg, mode: 'signup', router });
 
   // Deklarativer Redirect nach OAuth
   if (oauthRedirectTo) {
@@ -45,9 +40,9 @@ export default function SignUp() {
   // OAuth-Overlay: Signup-Form verstecken, bis Weiterleitung
   if (oauthProcessing) {
     return (
-      <View style={styles.oauthOverlay}>
+      <View className="flex-1 bg-white justify-center items-center">
         <ActivityIndicator size="large" color={theme.colors.primary.main} />
-        <Text style={styles.oauthOverlayText}>Registrierung wird verarbeitet...</Text>
+        <Text className="mt-4 text-gray-600 text-base">Registrierung wird verarbeitet...</Text>
       </View>
     );
   }
@@ -111,214 +106,6 @@ export default function SignUp() {
     router.replace('/login');
   };
 
-  // Nonce-Generator für Apple Sign-In
-  const generateNonce = async () => {
-    const rawNonce = Crypto.randomUUID();
-    const hashedNonce = await Crypto.digestStringAsync(
-      Crypto.CryptoDigestAlgorithm.SHA256,
-      rawNonce
-    );
-    return { rawNonce, hashedNonce };
-  };
-
-  const signInWithGoogle = async () => {
-    try {
-      console.log("[SIGNUP] Google Sign-In initiated");
-      setErrorMsg("");
-      const redirectUri = makeRedirectUri({ scheme: "n8tly", path: "auth/callback" });
-      console.log("[SIGNUP] Redirect URI:", redirectUri);
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: redirectUri,
-          skipBrowserRedirect: false,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          }
-        },
-      });
-
-      if (error) {
-        console.error("[SIGNUP] OAuth initiation error:", error);
-        setErrorMsg("Google-Anmeldung fehlgeschlagen: " + error.message);
-        return;
-      }
-
-      const authUrl = data?.url;
-      if (!authUrl) {
-        setErrorMsg("Keine Auth-URL erhalten");
-        return;
-      }
-
-      console.log("[SIGNUP] Opening browser with URL:", authUrl);
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
-      console.log("[SIGNUP] Browser result:", result);
-
-      if (result.type !== "success" || !result.url) {
-        console.log("[SIGNUP] OAuth cancelled or failed");
-        return;
-      }
-
-      setOauthProcessing(true);
-
-      const url = new URL(result.url);
-      // Supabase OAuth returns tokens in the hash fragment (#), not query params (?)
-      const hashParams = url.hash ? new URLSearchParams(url.hash.substring(1)) : null;
-      const getParam = (name) => hashParams?.get(name) ?? url.searchParams.get(name);
-      const accessToken = getParam('access_token');
-      const refreshToken = getParam('refresh_token');
-
-      console.log('[SIGNUP] Parsed tokens:', { accessToken: !!accessToken, refreshToken: !!refreshToken });
-
-      if (!accessToken || !refreshToken) {
-        setOauthProcessing(false);
-        setErrorMsg("Keine Tokens erhalten");
-        console.error('[SIGNUP] No tokens in URL:', result.url);
-        return;
-      }
-
-      const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
-
-      if (sessionError || !sessionData?.session) {
-        setOauthProcessing(false);
-        setErrorMsg("Session konnte nicht gesetzt werden");
-        return;
-      }
-
-      const session = sessionData.session;
-      const uid = session.user.id;
-
-      // PRÜFUNG: Ist der User neu? (Registrierung) oder besteht bereits ein Account? (Login)
-      const userCreatedAt = new Date(session.user.created_at);
-      const now = new Date();
-      const ageInSeconds = (now - userCreatedAt) / 1000;
-
-      if (ageInSeconds > 10) {
-        // User existiert bereits - Registrierung abbrechen
-        console.log('[SIGNUP] User already exists, created at:', session.user.created_at);
-        await supabase.auth.signOut();
-        setOauthProcessing(false);
-        Alert.alert(
-          'Account existiert bereits',
-          'Dieser Account existiert bereits. Du wirst zum Login weitergeleitet.',
-          [{ text: 'OK', onPress: () => router.replace('/login') }]
-        );
-        return;
-      }
-
-      // Neuer User - weiter zum Onboarding
-      console.log('[SIGNUP] New user created:', uid);
-      const profile = await fetchProfileWithToken(session.access_token, uid);
-      console.log('[SIGNUP] Profile:', profile);
-
-      const onboardingComplete = profile?.onboarding_completed === true;
-      if (onboardingComplete) {
-        setOauthRedirectTo('/tabs');
-      } else {
-        setOauthRedirectTo('/onboarding');
-      }
-    } catch (err) {
-      console.error("[SIGNUP] Google Sign-In error:", err);
-      setOauthProcessing(false);
-      setErrorMsg("Ein Fehler ist aufgetreten: " + err.message);
-    }
-  };
-
-  const signInWithApple = async () => {
-    if (Platform.OS !== 'ios') return;
-
-    try {
-      console.log("[SIGNUP] Apple Sign-In initiated");
-      setErrorMsg("");
-      setOauthProcessing(true);
-
-      const { rawNonce, hashedNonce } = await generateNonce();
-
-      const credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-        nonce: hashedNonce,
-      });
-
-      if (!credential.identityToken) {
-        setOauthProcessing(false);
-        setErrorMsg('Apple-Anmeldung fehlgeschlagen');
-        return;
-      }
-
-      const { data, error } = await supabase.auth.signInWithIdToken({
-        provider: 'apple',
-        token: credential.identityToken,
-        nonce: rawNonce,
-      });
-
-      if (error) {
-        setOauthProcessing(false);
-        setErrorMsg('Apple-Anmeldung fehlgeschlagen: ' + error.message);
-        return;
-      }
-
-      const session = data.session;
-      const uid = session.user.id;
-
-      // PRÜFUNG: Ist der User neu? (Registrierung) oder besteht bereits ein Account? (Login)
-      const userCreatedAt = new Date(session.user.created_at);
-      const now = new Date();
-      const ageInSeconds = (now - userCreatedAt) / 1000;
-
-      if (ageInSeconds > 10) {
-        // User existiert bereits - Registrierung abbrechen
-        console.log('[SIGNUP] User already exists, created at:', session.user.created_at);
-        await supabase.auth.signOut();
-        setOauthProcessing(false);
-        Alert.alert(
-          'Account existiert bereits',
-          'Dieser Account existiert bereits. Du wirst zum Login weitergeleitet.',
-          [{ text: 'OK', onPress: () => router.replace('/login') }]
-        );
-        return;
-      }
-
-      // Neuer User - fullName speichern (falls vorhanden)
-      if (credential.fullName) {
-        const fullName = [credential.fullName.givenName, credential.fullName.familyName]
-          .filter(Boolean)
-          .join(' ');
-        if (fullName) {
-          await supabase.auth.updateUser({
-            data: { full_name: fullName }
-          });
-        }
-      }
-
-      console.log('[SIGNUP] New user created:', uid);
-      const profile = await fetchProfileWithToken(session.access_token, uid);
-      console.log('[SIGNUP] Profile:', profile);
-
-      const onboardingComplete = profile?.onboarding_completed === true;
-      if (onboardingComplete) {
-        setOauthRedirectTo('/tabs');
-      } else {
-        setOauthRedirectTo('/onboarding');
-      }
-    } catch (err) {
-      console.error("[SIGNUP] Apple Sign-In error:", err);
-      setOauthProcessing(false);
-      if (err.code === 'ERR_REQUEST_CANCELED') {
-        console.log('[SIGNUP] User cancelled Apple Sign-In');
-      } else {
-        setErrorMsg("Ein Fehler ist aufgetreten: " + err.message);
-      }
-    }
-  };
-
   return (
     <SafeAreaView className="flex-1 bg-white">
       <ScrollView className="flex-1 bg-white" contentContainerStyle={{ paddingBottom: 60 }}>
@@ -333,11 +120,11 @@ export default function SignUp() {
           </View>
 
           {/* Welcome Text */}
-          <View className="mb-6 items-center justify-center" style={{ alignItems: 'center' }}>
-            <Text className="text-3xl font-bold text-black mb-2" style={{ textAlign: 'center', fontFamily: 'Manrope_700Bold' }}>
+          <View className="mb-6 items-center justify-center">
+            <Text className="text-3xl font-bold text-black mb-2 text-center">
               Konto erstellen
             </Text>
-            <Text className="text-base text-gray-500" style={{ textAlign: 'center', fontFamily: 'Manrope_400Regular' }}>
+            <Text className="text-base text-gray-500 text-center">
               Erstelle dein Konto und leg los
             </Text>
           </View>
@@ -348,7 +135,7 @@ export default function SignUp() {
               onPress={() => router.replace("/login")}
               className={`flex-1 py-3 rounded-lg ${activeTab === "signin" ? "bg-white" : ""}`}
             >
-              <Text className={`text-center font-semibold ${activeTab === "signin" ? "text-black" : "text-gray-500"}`} style={{ fontFamily: 'Manrope_600SemiBold' }}>
+              <Text className={`text-center font-semibold ${activeTab === "signin" ? "text-black" : "text-gray-500"}`}>
                 Anmelden
               </Text>
             </Pressable>
@@ -356,77 +143,31 @@ export default function SignUp() {
               onPress={() => setActiveTab("signup")}
               className={`flex-1 py-3 rounded-lg ${activeTab === "signup" ? "bg-white" : ""}`}
             >
-              <Text className={`text-center font-semibold ${activeTab === "signup" ? "text-black" : "text-gray-500"}`} style={{ fontFamily: 'Manrope_600SemiBold' }}>
+              <Text className={`text-center font-semibold ${activeTab === "signup" ? "text-black" : "text-gray-500"}`}>
                 Registrieren
               </Text>
             </Pressable>
           </View>
 
           {/* Email Input */}
-          <View className="mb-3">
-            <View className="flex-row items-center border border-gray-300 rounded-xl px-4 bg-white" style={{ minHeight: 56, paddingVertical: 16 }}>
-              <EnvelopeIcon size={20} color={theme.colors.neutral.gray[500]} />
-              <TextInput
-                className="flex-1 ml-3 text-base text-black"
-                placeholder="E-Mail Adresse"
-                placeholderTextColor={theme.colors.neutral.gray[400]}
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                style={{ paddingVertical: 0, lineHeight: 20 }}
-              />
-              {emailValid && email.length > 0 && (
-                <CheckIcon size={20} color={theme.colors.success} />
-              )}
-            </View>
-            {submitted && !emailValid && (
-              <Text className="text-red-500 text-sm mt-1 ml-1" style={{}}>
-                Bitte gebe eine gültige Email ein.
-              </Text>
-            )}
-          </View>
+          <AuthEmailInput email={email} setEmail={setEmail} emailValid={emailValid} submitted={submitted} />
 
           {/* Password Input */}
-          <View className="mb-3">
-            <View className="flex-row items-center border border-gray-300 rounded-xl px-4 bg-white" style={{ minHeight: 56, paddingVertical: 16 }}>
-              <TextInput
-                className="flex-1 text-base text-black"
-                placeholder="Passwort"
-                placeholderTextColor={theme.colors.neutral.gray[400]}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                style={{ paddingVertical: 0, lineHeight: 20 }}
-              />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
-                {showPassword ? (
-                  <EyeSlashIcon size={20} color={theme.colors.neutral.gray[500]} />
-                ) : (
-                  <EyeIcon size={20} color={theme.colors.neutral.gray[500]} />
-                )}
-              </TouchableOpacity>
-            </View>
-            {submitted && !passwordValid && (
-              <Text className="text-red-500 text-sm mt-1 ml-1" style={{}}>
-                Passwort muss mindestens 6 Zeichen lang sein.
-              </Text>
-            )}
-          </View>
+          <AuthPasswordInput password={password} setPassword={setPassword} passwordValid={passwordValid} submitted={submitted} showPassword={showPassword} setShowPassword={setShowPassword} />
+          
 
           {/* Confirm Password Input */}
           <View className="mb-4">
-            <View className="flex-row items-center border border-gray-300 rounded-xl px-4 bg-white" style={{ minHeight: 56, paddingVertical: 16 }}>
+            <View className="flex-row items-center border border-gray-300 rounded-xl px-4 py-4 min-h-14 bg-white">
               <TextInput
-                className="flex-1 text-base text-black"
+                className="flex-1 text-base text-black py-0"
                 placeholder="Passwort bestätigen"
-                placeholderTextColor={theme.colors.neutral.gray[400]}
+                placeholderTextColor="#9CA3AF"
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry={!showConfirmPassword}
-                style={{ paddingVertical: 0, lineHeight: 20 }}
               />
-              <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={{ padding: 4 }}>
+              <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} className="p-1">
                 {showConfirmPassword ? (
                   <EyeSlashIcon size={20} color={theme.colors.neutral.gray[500]} />
                 ) : (
@@ -435,44 +176,24 @@ export default function SignUp() {
               </TouchableOpacity>
             </View>
             {submitted && !passwordMatch && (
-              <Text className="text-red-500 text-sm mt-1 ml-1" style={{}}>
+              <Text className="text-red-500 text-sm mt-1 ml-1">
                 Passwörter stimmen nicht überein.
               </Text>
             )}
           </View>
 
           {/* Error Message */}
-          {errorMsg && (
-            <View className="mb-3 p-3 bg-red-50 rounded-xl border border-red-200">
-              <Text className="text-red-600 text-sm" style={{}}>{errorMsg}</Text>
-            </View>
-          )}
+          <AuthErrorBanner message={errorMsg} className="mb-3" />
 
+          
           {/* Continue Button */}
-          <Pressable
-            onPress={handleSignUp}
-            disabled={loading}
-            className={`py-4 rounded-xl mb-5 ${loading ? "opacity-50" : ""}`}
-            style={{ backgroundColor: theme.colors.primary.main }}
-          >
-            {loading ? (
-              <View className="flex-row items-center justify-center">
-                <ActivityIndicator size="small" color="#fff" />
-                <Text className="text-white font-semibold text-center ml-2" style={{ fontFamily: 'Manrope_600SemiBold' }}>
-                  Wird geladen...
-                </Text>
-              </View>
-            ) : (
-              <Text className="text-white font-semibold text-center text-base" style={{ fontFamily: 'Manrope_600SemiBold' }}>
-                Loslegen
-              </Text>
-            )}
-          </Pressable>
+          <AuthSubmitButton title="Loslegen" onPress={handleSignUp} disabled={loading} loading={loading} />
+
 
           {/* Or Continue With */}
           <View className="flex-row items-center mb-5">
             <View className="flex-1 h-px bg-gray-300" />
-            <Text className="mx-4 text-gray-500 text-sm" style={{ fontFamily: 'Manrope_400Regular' }}>Oder weiter mit</Text>
+            <Text className="mx-4 text-gray-500 text-sm">Oder weiter mit</Text>
             <View className="flex-1 h-px bg-gray-300" />
           </View>
 
@@ -501,18 +222,3 @@ export default function SignUp() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  oauthOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  oauthOverlayText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: theme.colors.neutral.gray[600],
-    fontFamily: 'Manrope_400Regular',
-  },
-});
