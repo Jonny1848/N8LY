@@ -1,4 +1,4 @@
-import { View, Text, Pressable, StyleSheet, Animated, Easing, Image } from 'react-native'
+import { View, Text, Pressable, Animated, Easing, Image } from 'react-native'
 import React, { useEffect, useRef } from 'react'
 import { useRouter } from 'expo-router';
 
@@ -28,81 +28,33 @@ const MapEventCard = ({ selectedEvent }: any) => {
   };
 
   return (
-    <Animated.View style={[styles.cardContainer, { transform: [{ translateY }] }]}>
-    <Pressable
-      style={styles.card}
-      onPress={() =>
-        router.push(`/event/${selectedEvent.id}`)
-      }
-    >
-      {selectedEvent?.image_urls?.[0] && (
-        <View style={styles.imageWrapper}>
-          <Image
-            source={{ uri: encodeURI(selectedEvent.image_urls[0]) }}
-            style={styles.image}
-          />
-          <View style={styles.imageFade} />
-        </View>
-      )}
-      <Text style={styles.cardTitle}>
-        {selectedEvent?.title} @ {selectedEvent?.venue_name}
-      </Text>
+    <Animated.View style={{ transform: [{ translateY }] }} className="absolute bottom-[110px] left-5 right-5 z-20">
+      <Pressable
+        className="bg-white rounded-2xl p-4 shadow-black shadow-opacity-15 shadow-lg elevation-5"
+        onPress={() =>
+          router.push(`/event/${selectedEvent.id}`)
+        }
+      >
+        {selectedEvent?.image_urls?.[0] && (
+          <View className="w-full h-[140px] rounded-xl overflow-hidden mb-2.5">
+            <Image
+              source={{ uri: encodeURI(selectedEvent.image_urls[0]) }}
+              className="w-full h-full"
+            />
+            <View className="absolute inset-0 bg-black bg-opacity-15" />
+          </View>
+        )}
+        <Text className="text-lg font-extrabold">
+          {selectedEvent?.title} @ {selectedEvent?.venue_name}
+        </Text>
 
-      <Text style={styles.cardMeta}>
-        {formatEventDate(selectedEvent?.date)}
-      </Text>
+        <Text className="mt-1 text-gray-600">
+          {formatEventDate(selectedEvent?.date)}
+        </Text>
 
-    </Pressable>
-  </Animated.View>
+      </Pressable>
+    </Animated.View>
   )
 }
-
-const styles = StyleSheet.create({
-  cardContainer: {
-    position: 'absolute',
-    bottom: 110, // sits above the search bar
-    left: 20,
-    right: 20,
-    zIndex: 20,
-  },
-
-  card: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-
-  imageWrapper: {
-    width: '100%',
-    height: 140,
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
-
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-
-  imageFade: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.15)',
-  },
-
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-
-  cardMeta: {
-    marginTop: 4,
-    color: '#666',
-  }
-})
 
 export default MapEventCard
