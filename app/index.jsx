@@ -1,15 +1,15 @@
 import { StyleSheet, View, ActivityIndicator, Image } from "react-native";
-import { useIntro } from '../components/IntroContext';
 import React, { useEffect, useRef, useState } from "react";
 import 'react-native-url-polyfill/auto';
 import { theme } from '../constants/theme';
+import { useGeneralStore } from './store/generalStore';
 
 /**
  * Intro/LogoScreen – Logo einblenden, dann Übergang.
  * Navigiert NICHT zu /login – _layout übernimmt das Routing nach Auth-Check.
  */
 export default function LogoScreen() {
-  const { setIntroCompleted } = useIntro();
+  const { setIntroCompleted } = useGeneralStore();
   const hasCompletedRef = useRef(false);
   const [showLoading, setShowLoading] = useState(false);
 

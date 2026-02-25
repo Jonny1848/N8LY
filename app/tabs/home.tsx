@@ -8,9 +8,12 @@ import MapboxGL from "@rnmapbox/maps";
 import * as Location from 'expo-location';
 import { useAudioPlayer } from 'expo-audio';
 import { FilterBottomSheet } from '../../components/FilterBottomSheet';
-import { supabase } from '../../lib/supabase'; 
-import { useRouter } from 'expo-router';
-import MapEventCard from '@/components/MapEventCard';
+import { supabase } from '../../lib/supabase';
+import { useGeneralStore } from '../store/generalStore';
+import { useEventStore } from '../store/eventStore';
+import MapEventCard from '@/components/home/MapEventCard';
+import { useFilterStore } from '../store/filterStore';
+import { useFilteredEvents } from '../../hooks/useFilteredEvents';
 
 const MAPBOX_ACCESS_TOKEN = "sk.eyJ1Ijoiam9ubnkyMDA1IiwiYSI6ImNtZ3R0MDVwODA3MTMyanI3eTRiM2k0bHEifQ.JDKw4aOqKw_UNLKok4gvOQ";
 
@@ -24,16 +27,12 @@ const getMapStyleForHour = (hour: number) =>
   hour >= 6 && hour < 18 ? MAP_STYLE_LIGHT : MAP_STYLE_DARK;
 
 export default function HomeScreen() {
-  const router = useRouter();
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  // Zustand Stores
+  const { searchQuery, setSearchQuery, userLocation, setUserLocation } = useGeneralStore();
+  const { events, setEvents, loadingEvents, setLoadingEvents, selectedEvent, setSelectedEvent } = useEventStore();
+  const { filterVisible, setFilterVisible } = useFilterStore();
+  const filteredEvents = useFilteredEvents();
 
-  // ⭐ Event-States
-  const [events, setEvents] = useState<any[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterVisible, setFilterVisible] = useState(false);
   const [mapStyleUrl, setMapStyleUrl] = useState(() =>
     getMapStyleForHour(new Date().getHours())
   );
@@ -43,6 +42,18 @@ export default function HomeScreen() {
   const flightPlayer = useAudioPlayer(require('../../assets/flight.mp3'));
 
   const BERLIN_COORDS = { latitude: 52.520008, longitude: 13.404954 };
+
+  //Prefetch marker images so they appear immediately
+  useEffect(() => {
+    if (!events?.length) return;
+    events.forEach((ev) => {
+      const url = ev?.image_urls?.[0];
+      if (url) {
+        Image.prefetch(url);
+      }
+    });
+  }, [events]);
+
 
   // Map-Style: 6am–6pm Light, 6pm–6am Dark
   useEffect(() => {
@@ -102,31 +113,30 @@ export default function HomeScreen() {
   // ============================
   const fetchEventsInBounds = async (bounds: any) => {
     if (!bounds) return;
-  
+
     // bounds: [[lng1, lat1], [lng2, lat2]]
     const [[lng1, lat1], [lng2, lat2]] = bounds;
-  
+
     const swLat = Math.min(lat1, lat2);
     const neLat = Math.max(lat1, lat2);
     const swLng = Math.min(lng1, lng2);
     const neLng = Math.max(lng1, lng2);
-  
+
     setLoadingEvents(true);
-  
+
     const { data, error } = await supabase.rpc("get_events_in_bounds", {
       sw_lat: swLat,
       sw_lng: swLng,
       ne_lat: neLat,
       ne_lng: neLng,
     });
-  
+
     if (error) {
       console.error("RPC Fehler get_events_in_bounds:", error);
     } else {
-      /// console.log("Events aus Supabase:", data);
       setEvents(data ?? []);
     }
-  
+
     setLoadingEvents(false);
   };
 
@@ -141,14 +151,14 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-  if (selectedEvent) {
-    cameraRef.current?.setCamera({
-      centerCoordinate: [selectedEvent.location_lng, selectedEvent.location_lat],
-      zoomLevel: 16,
-      animationDuration: 500,
-    });
-  }
-}, [selectedEvent]);
+    if (selectedEvent) {
+      cameraRef.current?.setCamera({
+        centerCoordinate: [selectedEvent.location_lng, selectedEvent.location_lat - 0.0015],
+        zoomLevel: 15,
+        animationDuration: 500,
+      });
+    }
+  }, [selectedEvent]);
 
   // ============================
   // Fluggeräusch & Locate Button
@@ -157,7 +167,7 @@ export default function HomeScreen() {
     try {
       flightPlayer.seekTo(0);
       flightPlayer.play();
-    } catch {}
+    } catch { }
   };
 
   const handleLocatePress = () => {
@@ -201,8 +211,9 @@ export default function HomeScreen() {
 
   return (
     <View className="flex-1 bg-white">
-      
+
       {/* MAP */}
+      {/* ADD mapReady && Map (Component) */}
       <MapboxGL.MapView
         ref={mapRef}
         style={{ flex: 1 }}
@@ -230,15 +241,40 @@ export default function HomeScreen() {
         <MapboxGL.UserLocation visible={true} showsUserHeadingIndicator={true} />
 
         {/* ⭐ EVENT MARKER */}
-        {events.map((event) => (
-          <MapboxGL.PointAnnotation
+        {filteredEvents.map((event) => (
+          <MapboxGL.MarkerView
             key={event.id}
             id={event.id}
             coordinate={[event.location_lng, event.location_lat]}
-            onSelected={() => setSelectedEvent(event)}
+            allowOverlap={true}
+
           >
-            <View className="w-4 h-4 bg-red-500 rounded-full border-2 border-white" />
-          </MapboxGL.PointAnnotation>
+            <Pressable onPress={() => setSelectedEvent(event)}>
+              <View
+                style={{
+                  width: selectedEvent?.id === event.id ? 56 : 44,
+                  height: selectedEvent?.id === event.id ? 56 : 44,
+                  borderRadius: selectedEvent?.id === event.id ? 28 : 22,
+                  overflow: 'hidden',
+                  borderWidth: 2,
+                  borderColor: 'white',
+                  backgroundColor: '#eee',
+                  transform: [{ scale: selectedEvent?.id === event.id ? 1.15 : 1 }],
+                  shadowColor: '#000',
+                  shadowOpacity: selectedEvent?.id === event.id ? 0.35 : 0.2,
+                  shadowRadius: selectedEvent?.id === event.id ? 6 : 3,
+                  shadowOffset: { width: 0, height: 2 },
+                  elevation: selectedEvent?.id === event.id ? 8 : 4,
+                }}
+              >
+                <Image
+                  source={{ uri: event.image_urls?.[0] }}
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="cover"
+                />
+              </View>
+            </Pressable>
+          </MapboxGL.MarkerView>
         ))}
       </MapboxGL.MapView>
 
@@ -301,8 +337,8 @@ export default function HomeScreen() {
       <FilterBottomSheet
         visible={filterVisible}
         onClose={() => setFilterVisible(false)}
-        onApply={() => {}}
-        onReset={() => {}}
+        onApply={() => { }}
+        onReset={() => { }}
       />
     </View>
   );

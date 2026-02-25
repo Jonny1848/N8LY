@@ -1,16 +1,16 @@
 import { View, Text, Pressable, Image, StyleSheet, Alert, ScrollView } from 'react-native';
 import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { useOnboarding } from '../../components/OnboardingContext';
 import { ChevronLeftIcon, CameraIcon, PhotoIcon, UserCircleIcon, ArrowRightIcon } from 'react-native-heroicons/outline';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '../../constants/theme';
 import ProgressBar from '../../components/ProgressBar';
+import { useUserStore } from '../store/userStore';
 
 export default function Avatar() {
   const router = useRouter();
-  const { profileData, updateProfileData } = useOnboarding();
+  const { profileData, updateProfileData } = useUserStore();
   const [avatarUri, setAvatarUri] = useState(profileData.avatarUri || null);
 
   const pickImage = async () => {

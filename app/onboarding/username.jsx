@@ -1,15 +1,15 @@
 import { View, Text, Pressable, TextInput, StyleSheet } from 'react-native';
 import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { useOnboarding } from '../../components/OnboardingContext';
 import { ChevronLeftIcon, ArrowRightIcon } from 'react-native-heroicons/outline';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../../constants/theme';
 import ProgressBar from '../../components/ProgressBar';
+import { useUserStore } from '../store/userStore';
 
 export default function Username() {
   const router = useRouter();
-  const { profileData, updateProfileData } = useOnboarding();
+  const { profileData, updateProfileData } = useUserStore();
   const [username, setUsername] = useState(profileData.username || '');
   const [error, setError] = useState('');
 

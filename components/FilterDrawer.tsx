@@ -3,37 +3,31 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { XMarkIcon, CalendarIcon, MusicalNoteIcon, MapPinIcon } from 'react-native-heroicons/solid';
 import { theme } from '../constants/theme';
+import { useFilterStore } from '@/app/store/filterStore';
 
 interface FilterDrawerProps {
   onClose: () => void;
 }
 
 export function FilterDrawer({ onClose }: FilterDrawerProps) {
-  const [selectedRadius, setSelectedRadius] = React.useState('5');
-  const [selectedGenres, setSelectedGenres] = React.useState<string[]>([]);
-  const [selectedEventTypes, setSelectedEventTypes] = React.useState<string[]>([]);
-  const [selectedDate, setSelectedDate] = React.useState<string>('');
+  const { selectedRadius, setSelectedRadius, selectedMusicGenres, setSelectedMusicGenres, selectedEventTypes, setSelectedEventTypes, selectedDate, setSelectedDate } = useFilterStore();
 
   const radiusOptions = ['5 km', '10 km', '20 km', '50 km'];
   const genres = ['Techno', 'House', 'Hip-Hop', 'Electronic', 'Trance', 'R&B'];
   const eventTypes = ['Club', 'Rooftop', 'Festival', 'Bar', 'Open Air', 'Concert'];
   const dateOptions = ['Heute', 'Morgen', 'Wochenende', 'Diese Woche'];
 
-  const toggleGenre = (genre: string) => {
-    setSelectedGenres(prev =>
-      prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre]
-    );
+  const toggleMusicGenre = (genre: string) => {
+    selectedMusicGenres.includes(genre) ? setSelectedMusicGenres(selectedMusicGenres.filter(selectedGenre => selectedGenre !== genre)) : setSelectedMusicGenres([...selectedMusicGenres, genre]);
   };
 
   const toggleEventType = (type: string) => {
-    setSelectedEventTypes(prev =>
-      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-    );
+    selectedEventTypes.includes(type) ? setSelectedEventTypes(selectedEventTypes.filter(selectedType => selectedType !== type)) : setSelectedEventTypes([...selectedEventTypes, type]);
   };
 
   const handleReset = () => {
-    setSelectedRadius('5');
-    setSelectedGenres([]);
+    setSelectedRadius(5);
+    setSelectedMusicGenres([]);
     setSelectedEventTypes([]);
     setSelectedDate('');
   };
@@ -42,7 +36,7 @@ export function FilterDrawer({ onClose }: FilterDrawerProps) {
     // Hier könnten Sie die Filter-Logik implementieren
     console.log('Filter angewendet:', {
       radius: selectedRadius,
-      genres: selectedGenres,
+      genres: selectedMusicGenres,
       eventTypes: selectedEventTypes,
       date: selectedDate,
     });
@@ -73,16 +67,16 @@ export function FilterDrawer({ onClose }: FilterDrawerProps) {
               {genres.map((genre) => (
                 <Pressable
                   key={genre}
-                  onPress={() => toggleGenre(genre)}
+                  onPress={() => toggleMusicGenre(genre)}
                   style={[
                     styles.chip,
-                    selectedGenres.includes(genre) && styles.chipSelected,
+                    selectedMusicGenres.includes(genre) && styles.chipSelected,
                   ]}
                 >
                   <Text
                     style={[
                       styles.chipText,
-                      selectedGenres.includes(genre) && styles.chipTextSelected,
+                      selectedMusicGenres.includes(genre) && styles.chipTextSelected,
                     ]}
                   >
                     {genre}

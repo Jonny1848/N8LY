@@ -1,16 +1,16 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { useOnboarding } from '../../components/OnboardingContext';
 import { ChevronLeftIcon, MapPinIcon, ShieldCheckIcon, ArrowRightIcon } from 'react-native-heroicons/outline';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../../constants/theme';
 import ProgressBar from '../../components/ProgressBar';
 import * as Location from "expo-location";
+import { useUserStore } from '../store/userStore';
 
 export default function Locations() {
   const router = useRouter();
-  const { profileData, updateProfileData } = useOnboarding();
+  const { profileData, updateProfileData } = useUserStore();
   const [locationEnabled, setLocationEnabled] = useState(profileData.locationEnabled ?? false);
 
   const handleNext = async () => {

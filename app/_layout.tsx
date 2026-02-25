@@ -26,9 +26,8 @@ import { GluestackUIProvider } from '../components/ui/gluestack-ui-provider';
 import { supabase, fetchProfileWithToken } from '../lib/supabase';
 import { useEffect, useRef, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native'
-import { IntroProvider, useIntro } from '../components/IntroContext';
-import { OnboardingProvider } from '../components/OnboardingContext';
 import { useFonts, Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold } from '@expo-google-fonts/manrope';
+import { useGeneralStore } from './store/generalStore';
 
 function RootLayoutContent() {
   // Load Manrope fonts
@@ -38,10 +37,11 @@ function RootLayoutContent() {
     Manrope_600SemiBold,
     Manrope_700Bold,
   });
+  // Zustand Store
+  const { introCompleted } = useGeneralStore();
 
   const router = useRouter();
   const pathname = usePathname();
-  const { introCompleted } = useIntro();
   const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
 
   // Debug: Check if fonts are loaded
@@ -179,7 +179,6 @@ function RootLayoutContent() {
         <Stack.Screen name="tabs" options={{ animation: 'fade' }} />
         <Stack.Screen name="login" options={{ animation: 'fade' }} />
         <Stack.Screen name="signup" options={{ animation: 'fade' }} />
-        <Stack.Screen name="home" options={{ animation: 'slide_from_right' }} />
       </Stack>
     </GluestackUIProvider>
   );
@@ -187,11 +186,7 @@ function RootLayoutContent() {
 
 export default function RootLayout() {
   return (
-    <IntroProvider>
-      <OnboardingProvider>
-        <RootLayoutContent />
-      </OnboardingProvider>
-    </IntroProvider>
+    <RootLayoutContent />
   );
 }
 
