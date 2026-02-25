@@ -1,37 +1,57 @@
 /**
  * Social Screen – Chat-Uebersicht mit Stories und Konversationsliste
  *
- * Zeigt oben einen horizontalen Story-Ring, darunter eine Suchleiste
- * und eine Liste aller Konversationen des eingeloggten Users.
- * Jeder Chat-Eintrag zeigt Avatar, Name, letzte Nachricht, Zeitstempel
- * und einen Unread-Badge an.
+ * Inspiriert vom "Chats"-Screenshot: Cleanes, helles Design.
+ *
+ * LAYOUT (von oben nach unten):
+ * 1) Header: "Chats" links gross, Optionen-Icon + Lupe rechts
+ * 2) Suchleiste: Standardmaessig ausgeblendet, wird per Lupe eingeblendet
+ * 3) Stories: Kreisrunde Avatare (horizontal scrollbar) mit Profilbildern
+ * 4) Chat-Liste: Runde Avatare, Name, Nachrichtenvorschau, Zeitstempel, Unread-Badge
  *
  * Realtime: Die Chat-Liste aktualisiert sich automatisch bei neuen Nachrichten.
  */
-import { View, Text, FlatList, Pressable, Image, TextInput, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  FlatList,
+  Pressable,
+  Image,
+  TextInput,
+  ActivityIndicator,
+  LayoutAnimation,
+  UIManager,
+  Platform,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { theme } from '../../constants/theme';
-import { MagnifyingGlassIcon } from 'react-native-heroicons/outline';
-import { PencilSquareIcon } from 'react-native-heroicons/outline';
-import { UserIcon } from 'react-native-heroicons/solid';
-import { PlusIcon } from 'react-native-heroicons/solid';
-// Zustand: Globale Stores fuer Auth und Chat
+import {
+  MagnifyingGlassIcon,
+  EllipsisHorizontalCircleIcon,
+  XMarkIcon,
+} from 'react-native-heroicons/outline';
+import { UserIcon, PlusIcon } from 'react-native-heroicons/solid';
 import useAuthStore from '../../stores/useAuthStore';
 import useChatStore from '../../stores/useChatStore';
 
-export default function SocialScreen() {
-  // User-ID aus dem globalen Auth-Store
-  const userId = useAuthStore((s) => s.userId);
+// LayoutAnimation auf Android aktivieren
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
-  // Chat-State aus dem globalen Chat-Store
+export default function SocialScreen() {
+  const userId = useAuthStore((s) => s.userId);
+  const profile = useAuthStore((s) => s.profile);
   const conversations = useChatStore((s) => s.conversations);
   const loading = useChatStore((s) => s.conversationsLoading);
   const { loadConversations, subscribeChatList, unsubscribeChatList } = useChatStore();
 
-  // Lokaler State: Nur noch die Suche (rein UI-bezogen)
+  // Suchleiste ist standardmaessig versteckt
+  const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<TextInput>(null);
   const router = useRouter();
 
   // ============================
@@ -39,22 +59,29 @@ export default function SocialScreen() {
   // ============================
   useEffect(() => {
     if (!userId) return;
-
-    // Konversationen ueber den Store laden (cached und global verfuegbar)
     loadConversations(userId);
-
-    // Realtime-Abo starten (Store verwaltet den Channel intern)
     subscribeChatList(userId);
-
-    // Aufraumen beim Unmount
-    return () => {
-      unsubscribeChatList();
-    };
+    return () => unsubscribeChatList();
   }, [userId]);
 
   /**
-   * Filtert Konversationen nach Suchbegriff (lokal im State).
-   * Durchsucht den Anzeigenamen des Chats.
+   * Suchleiste ein-/ausblenden mit sanfter Animation.
+   * Beim Oeffnen wird der Fokus automatisch gesetzt,
+   * beim Schliessen wird die Suche zurueckgesetzt.
+   */
+  const toggleSearch = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (searchVisible) {
+      setSearchQuery('');
+      setSearchVisible(false);
+    } else {
+      setSearchVisible(true);
+      setTimeout(() => searchInputRef.current?.focus(), 100);
+    }
+  }, [searchVisible]);
+
+  /**
+   * Filtert Konversationen nach Suchbegriff.
    */
   const filteredConversations = conversations.filter((conv) => {
     if (!searchQuery.trim()) return true;
@@ -62,8 +89,7 @@ export default function SocialScreen() {
   });
 
   /**
-   * Formatiert den Zeitstempel der letzten Nachricht.
-   * Heute: "14:30", Gestern: "Gestern", Aelter: "12.02."
+   * Formatiert den Zeitstempel: Heute = Uhrzeit, Gestern = "Gestern", aelter = Datum.
    */
   const formatTime = (dateStr: string) => {
     if (!dateStr) return '';
@@ -73,22 +99,18 @@ export default function SocialScreen() {
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
     if (diffDays === 0) {
-      // Heute: Uhrzeit anzeigen
       return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     } else if (diffDays === 1) {
       return 'Gestern';
     } else if (diffDays < 7) {
-      // Innerhalb einer Woche: Wochentag
       return date.toLocaleDateString('de-DE', { weekday: 'short' });
     } else {
-      // Aelter: Datum
       return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
     }
   };
 
   /**
-   * Kuerzt den Vorschautext der letzten Nachricht.
-   * Bilder/Voice werden als Platzhalter angezeigt.
+   * Vorschautext der letzten Nachricht (Bilder/Voice als Platzhalter).
    */
   const getMessagePreview = (msg: any) => {
     if (!msg) return 'Noch keine Nachrichten';
@@ -100,7 +122,6 @@ export default function SocialScreen() {
       case 'system':
         return msg.content || 'Systemnachricht';
       default:
-        // Text auf 40 Zeichen kuerzen
         return msg.content?.length > 40
           ? msg.content.substring(0, 40) + '...'
           : msg.content || '';
@@ -108,192 +129,280 @@ export default function SocialScreen() {
   };
 
   /**
-   * Erstellt Story-Daten aus den geladenen Konversationen.
-   * Sammelt alle einzigartigen Chat-Partner mit ihren Profilbildern.
+   * Story-Daten aus Konversationen: einzigartige Chat-Partner mit Profilbildern.
    */
   const getStoryUsers = () => {
     const seen = new Set<string>();
     const users: any[] = [];
-
     conversations.forEach((conv) => {
       conv.conversation_participants?.forEach((p: any) => {
-        // Eigenes Profil und Duplikate ueberspringen
         if (p.user_id === userId || seen.has(p.user_id)) return;
         seen.add(p.user_id);
         users.push({
           id: p.user_id,
           username: p.profiles?.username || 'User',
           avatar_url: p.profiles?.avatar_url || null,
-          hasUnviewed: true, // TODO: Echte Story-Views integrieren
+          hasUnviewed: true,
         });
       });
     });
-
     return users;
   };
 
   // ============================
-  // Story-Ring Bereich (oben im Screen)
-  // Zeigt Chat-Partner mit echten Profilbildern
+  // HEADER: "Chats" links, Optionen + Lupe rechts
   // ============================
-  const renderStorySection = () => (
-    <View className="py-3 border-b border-gray-100">
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16 }}
-        data={[{ id: 'add', type: 'add' }, ...getStoryUsers()]}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }: { item: any }) => {
-          // "Neue Story erstellen"-Button
-          if (item.type === 'add') {
-            return (
-              <Pressable className="items-center mr-4">
-                <View
-                  className="w-16 h-16 rounded-full items-center justify-center border-2 border-dashed"
-                  style={{ borderColor: theme.colors.neutral.gray[300] }}
-                >
-                  <PlusIcon size={24} color={theme.colors.neutral.gray[400]} />
-                </View>
-                <Text
-                  className="text-xs mt-1.5 text-gray-500"
-                  style={{ fontFamily: 'Manrope_500Medium' }}
-                >
-                  Deine Story
-                </Text>
-              </Pressable>
-            );
-          }
+  const renderHeader = () => (
+    <View className="flex-row items-center justify-between px-5 pt-2 pb-1">
+      {/* Titel */}
+      <Text
+        className="text-[28px]"
+        style={{ fontFamily: 'Manrope_700Bold', color: theme.colors.neutral.gray[900] }}
+      >
+        Chats
+      </Text>
 
-          // Story-Ring eines Users mit echtem Profilbild
-          return (
-            <Pressable className="items-center mr-4">
-              <View
-                className="w-16 h-16 rounded-full items-center justify-center"
-                style={{
-                  // Ring-Farbe: Blau wenn ungesehen, Grau wenn gesehen
-                  borderWidth: 2.5,
-                  borderColor: item.hasUnviewed
-                    ? theme.colors.primary.main
-                    : theme.colors.neutral.gray[300],
-                }}
-              >
-                {/* Profilbild oder Fallback-Icon */}
-                {item.avatar_url ? (
-                  <Image
-                    source={{ uri: item.avatar_url }}
-                    className="w-[52px] h-[52px] rounded-full"
-                    style={{ backgroundColor: theme.colors.neutral.gray[100] }}
-                  />
-                ) : (
-                  <View className="w-[52px] h-[52px] rounded-full bg-gray-100 items-center justify-center">
-                    <UserIcon size={24} color={theme.colors.neutral.gray[400]} />
-                  </View>
-                )}
-              </View>
-              <Text
-                className="text-xs mt-1.5 text-gray-700"
-                style={{ fontFamily: 'Manrope_500Medium' }}
-                numberOfLines={1}
-              >
-                {item.username}
-              </Text>
-            </Pressable>
-          );
-        }}
-      />
+      {/* Icon-Gruppe rechts */}
+      <View className="flex-row items-center">
+        {/* Optionen-Button (fuer Gruppen erstellen, etc.) */}
+        <Pressable
+          className="w-10 h-10 items-center justify-center"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={() => {
+            // TODO: ActionSheet oder Modal oeffnen (Neue Gruppe, Neuer Chat, etc.)
+          }}
+        >
+          <EllipsisHorizontalCircleIcon size={26} color={theme.colors.neutral.gray[800]} />
+        </Pressable>
+
+        {/* Lupe: Blendet Suchleiste ein/aus */}
+        <Pressable
+          className="w-10 h-10 items-center justify-center ml-1"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={toggleSearch}
+        >
+          <MagnifyingGlassIcon size={24} color={theme.colors.neutral.gray[800]} />
+        </Pressable>
+      </View>
     </View>
   );
 
   // ============================
-  // Einzelne Chat-Zeile in der Liste
+  // SUCHLEISTE: Nur sichtbar wenn searchVisible = true
+  // ============================
+  const renderSearchBar = () => {
+    if (!searchVisible) return null;
+    return (
+      <View className="px-5 pb-2 pt-1">
+        <View
+          className="flex-row items-center rounded-xl px-4"
+          style={{
+            backgroundColor: theme.colors.neutral.gray[100],
+            height: 44,
+          }}
+        >
+          <MagnifyingGlassIcon size={18} color={theme.colors.neutral.gray[400]} />
+          <TextInput
+            ref={searchInputRef}
+            className="flex-1 ml-2.5 text-base"
+            placeholder="Suchen..."
+            placeholderTextColor={theme.colors.neutral.gray[400]}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            style={{
+              fontFamily: 'Manrope_400Regular',
+              paddingVertical: 0,
+              color: theme.colors.neutral.gray[900],
+            }}
+          />
+          {/* X-Button zum Schliessen der Suche */}
+          <Pressable onPress={toggleSearch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <XMarkIcon size={20} color={theme.colors.neutral.gray[500]} />
+          </Pressable>
+        </View>
+      </View>
+    );
+  };
+
+  // ============================
+  // STORY-BEREICH: Kreisrunde Avatare (horizontal scrollbar)
+  // ============================
+  const renderStorySection = () => {
+    const storyUsers = getStoryUsers();
+    const data = [{ id: 'add', type: 'add' } as any, ...storyUsers];
+
+    return (
+      <View className="pb-4 pt-2">
+        
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 20 }}
+          data={data}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }: { item: any }) => {
+            // "Neue Story erstellen" – Kreis mit gestricheltem Rand
+            if (item.type === 'add') {
+              return (
+                <Pressable className="items-center mr-5">
+                  <View
+                    className="w-16 h-16 rounded-full items-center justify-center"
+                    style={{
+                      borderWidth: 2,
+                      borderStyle: 'dashed',
+                      borderColor: theme.colors.neutral.gray[300],
+                    }}
+                  >
+                    <PlusIcon size={24} color={theme.colors.neutral.gray[400]} />
+                  </View>
+                  <Text
+                    className="text-xs mt-1.5"
+                    style={{
+                      fontFamily: 'Manrope_500Medium',
+                      color: theme.colors.neutral.gray[600],
+                    }}
+                  >
+                    Deine Story
+                  </Text>
+                </Pressable>
+              );
+            }
+
+            // Story-Ring: Kreisrunder Avatar mit farbigem Rand
+            return (
+              <Pressable className="items-center mr-5">
+                <View
+                  className="w-16 h-16 rounded-full items-center justify-center"
+                  style={{
+                    borderWidth: 2.5,
+                    borderColor: item.hasUnviewed
+                      ? theme.colors.primary.main
+                      : theme.colors.neutral.gray[300],
+                  }}
+                >
+                  {item.avatar_url ? (
+                    <Image
+                      source={{ uri: item.avatar_url }}
+                      className="w-[52px] h-[52px] rounded-full"
+                      style={{ backgroundColor: theme.colors.neutral.gray[100] }}
+                    />
+                  ) : (
+                    <View
+                      className="w-[52px] h-[52px] rounded-full items-center justify-center"
+                      style={{ backgroundColor: theme.colors.neutral.gray[100] }}
+                    >
+                      <UserIcon size={24} color={theme.colors.neutral.gray[400]} />
+                    </View>
+                  )}
+                </View>
+                <Text
+                  className="text-xs mt-1.5"
+                  style={{
+                    fontFamily: 'Manrope_500Medium',
+                    color: theme.colors.neutral.gray[700],
+                  }}
+                  numberOfLines={1}
+                >
+                  {item.username}
+                </Text>
+              </Pressable>
+            );
+          }}
+        />
+      </View>
+    );
+  };
+
+  // ============================
+  // EINZELNE CHAT-ZEILE
+  // Runder Avatar, Name, Vorschau, Zeit, Unread-Badge
   // ============================
   const renderConversationItem = ({ item }: { item: any }) => (
     <Pressable
-      className="flex-row items-center px-5 py-3.5"
+      className="flex-row items-center px-5 py-3.5 active:opacity-70"
       onPress={() => router.push(`/chat/${item.id}`)}
     >
-      {/* Avatar */}
+      {/* Runder Avatar */}
       <View className="relative">
         {item.displayAvatar ? (
           <Image
             source={{ uri: item.displayAvatar }}
-            className="w-14 h-14 rounded-full"
+            className="w-[52px] h-[52px] rounded-full"
             style={{ backgroundColor: theme.colors.neutral.gray[100] }}
           />
         ) : (
           <View
-            className="w-14 h-14 rounded-full items-center justify-center"
+            className="w-[52px] h-[52px] rounded-full items-center justify-center"
             style={{ backgroundColor: theme.colors.neutral.gray[100] }}
           >
-            <UserIcon size={28} color={theme.colors.neutral.gray[400]} />
+            <UserIcon size={26} color={theme.colors.neutral.gray[400]} />
           </View>
         )}
 
-        {/* Gruppen-Indikator: Kleines Badge fuer Gruppenchats */}
+        {/* Gruppen-Badge: Anzahl Teilnehmer */}
         {item.type === 'group' && (
           <View
             className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full items-center justify-center border-2 border-white"
             style={{ backgroundColor: theme.colors.primary.main }}
           >
-            <Text className="text-white text-[8px] font-bold">
+            <Text
+              className="text-white text-[8px]"
+              style={{ fontFamily: 'Manrope_700Bold' }}
+            >
               {item.conversation_participants?.length || 0}
             </Text>
           </View>
         )}
       </View>
 
-      {/* Chat-Info: Name, letzte Nachricht, Zeitstempel */}
+      {/* Chat-Info */}
       <View className="flex-1 ml-3.5">
         <View className="flex-row items-center justify-between mb-1">
-          {/* Chat-Name */}
+          {/* Chat-Name: Fett wenn ungelesen */}
           <Text
-            className="text-base text-gray-900 flex-1 mr-2"
+            className="text-[16px] flex-1 mr-2"
             style={{
               fontFamily: item.unreadCount > 0 ? 'Manrope_700Bold' : 'Manrope_600SemiBold',
+              color: theme.colors.neutral.gray[900],
             }}
             numberOfLines={1}
           >
             {item.displayName || 'Unbekannt'}
           </Text>
 
-          {/* Zeitstempel der letzten Nachricht */}
+          {/* Zeitstempel */}
           <Text
             className="text-xs"
             style={{
-              color: item.unreadCount > 0
-                ? theme.colors.primary.main
-                : theme.colors.neutral.gray[400],
               fontFamily: 'Manrope_400Regular',
+              color: theme.colors.neutral.gray[400],
             }}
           >
             {formatTime(item.lastMessage?.created_at)}
           </Text>
         </View>
 
-        {/* Letzte Nachricht Vorschau + Unread Badge */}
         <View className="flex-row items-center justify-between">
+          {/* Vorschau der letzten Nachricht */}
           <Text
             className="text-sm flex-1 mr-2"
             style={{
-              color: item.unreadCount > 0
-                ? theme.colors.neutral.gray[800]
-                : theme.colors.neutral.gray[500],
-              fontFamily: item.unreadCount > 0 ? 'Manrope_600SemiBold' : 'Manrope_400Regular',
+              fontFamily: item.unreadCount > 0 ? 'Manrope_500Medium' : 'Manrope_400Regular',
+              color: theme.colors.neutral.gray[500],
             }}
             numberOfLines={1}
           >
             {getMessagePreview(item.lastMessage)}
           </Text>
 
-          {/* Unread-Badge: Zeigt Anzahl ungelesener Nachrichten */}
+          {/* Unread-Badge */}
           {item.unreadCount > 0 && (
             <View
               className="min-w-[22px] h-[22px] rounded-full items-center justify-center px-1.5"
               style={{ backgroundColor: theme.colors.primary.main }}
             >
               <Text
-                className="text-white text-xs font-bold"
+                className="text-white text-[11px]"
                 style={{ fontFamily: 'Manrope_700Bold' }}
               >
                 {item.unreadCount > 99 ? '99+' : item.unreadCount}
@@ -306,25 +415,25 @@ export default function SocialScreen() {
   );
 
   // ============================
-  // Leerer Zustand (keine Chats vorhanden)
+  // LEERER ZUSTAND (keine Chats)
   // ============================
   const renderEmptyState = () => (
     <View className="flex-1 items-center justify-center py-20">
       <View
-        className="w-20 h-20 rounded-full items-center justify-center mb-4"
-        style={{ backgroundColor: `${theme.colors.primary.main}10` }}
+        className="w-16 h-16 rounded-full items-center justify-center mb-4"
+        style={{ backgroundColor: `${theme.colors.primary.main}12` }}
       >
-        <PencilSquareIcon size={36} color={theme.colors.primary.main} />
+        <MagnifyingGlassIcon size={28} color={theme.colors.primary.main} />
       </View>
       <Text
-        className="text-lg text-gray-900 mb-2"
-        style={{ fontFamily: 'Manrope_700Bold' }}
+        className="text-lg mb-1.5"
+        style={{ fontFamily: 'Manrope_700Bold', color: theme.colors.neutral.gray[900] }}
       >
         Noch keine Chats
       </Text>
       <Text
-        className="text-sm text-gray-500 text-center px-10"
-        style={{ fontFamily: 'Manrope_400Regular' }}
+        className="text-sm text-center px-12"
+        style={{ fontFamily: 'Manrope_400Regular', color: theme.colors.neutral.gray[500] }}
       >
         Starte eine Unterhaltung mit jemandem aus deiner Community
       </Text>
@@ -336,44 +445,17 @@ export default function SocialScreen() {
   // ============================
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
-      {/* Header: Titel + Neuer Chat Button */}
-      <View className="flex-row justify-between items-center px-5 pt-3 pb-2">
-        <Text
-          className="text-3xl font-bold text-gray-900"
-          style={{ fontFamily: 'Manrope_700Bold' }}
-        >
-          Chats
-        </Text>
-        <Pressable
-          className="w-10 h-10 rounded-xl items-center justify-center"
-          style={{ backgroundColor: theme.colors.neutral.gray[100] }}
-          onPress={() => {
-            // TODO: Neuen Chat erstellen (User-Suche oeffnen)
-          }}
-        >
-          <PencilSquareIcon size={22} color={theme.colors.neutral.gray[700]} />
-        </Pressable>
-      </View>
-
-      {/* Suchleiste */}
-      <View className="px-5 pb-2">
-        <View className="flex-row items-center bg-gray-100 rounded-xl px-4 py-3">
-          <MagnifyingGlassIcon size={20} color={theme.colors.neutral.gray[400]} />
-          <TextInput
-            className="flex-1 ml-2.5 text-base text-gray-900"
-            placeholder="Suchen..."
-            placeholderTextColor={theme.colors.neutral.gray[400]}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            style={{ fontFamily: 'Manrope_400Regular', paddingVertical: 0 }}
-          />
-        </View>
-      </View>
-
-      {/* Story-Ring Bereich */}
+      {renderHeader()}
+      {renderSearchBar()}
       {renderStorySection()}
 
-      {/* Chat-Liste */}
+      {/* Trennlinie zwischen Stories und Chat-Liste */}
+      <View
+        className="mx-5 mb-1"
+        style={{ height: 1, backgroundColor: theme.colors.neutral.gray[100] }}
+      />
+
+      {/* Chat-Liste mit Trennlinien zwischen den Eintraegen (nicht bis zum Rand) */}
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={theme.colors.primary.main} />
@@ -384,11 +466,20 @@ export default function SocialScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderConversationItem}
           ListEmptyComponent={renderEmptyState}
+          ItemSeparatorComponent={() => (
+            <View
+              style={{
+                height: 1,
+                backgroundColor: theme.colors.neutral.gray[200],
+                marginLeft: 20,
+                marginRight: 20,
+              }}
+            />
+          )}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={
-            filteredConversations.length === 0 ? { flex: 1 } : { paddingBottom: 20 }
+            filteredConversations.length === 0 ? { flex: 1 } : { paddingBottom: 24 }
           }
-          // Pull-to-Refresh: Konversationen ueber den Store neu laden
           onRefresh={() => userId && loadConversations(userId)}
           refreshing={loading}
         />
