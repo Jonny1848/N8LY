@@ -62,34 +62,6 @@ export function FilterDrawer({ onClose }: FilterDrawerProps) {
 
         {/* Content */}
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Radius Filter */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <MapPinIcon size={20} color={theme.colors.primary.main} />
-              <Text style={styles.sectionTitle}>Radius</Text>
-            </View>
-            <View style={styles.optionsGrid}>
-              {radiusOptions.map((radius) => (
-                <Pressable
-                  key={radius}
-                  onPress={() => setSelectedRadius(radius)}
-                  style={[
-                    styles.chip,
-                    selectedRadius === radius && styles.chipSelected,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      selectedRadius === radius && styles.chipTextSelected,
-                    ]}
-                  >
-                    {radius}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
 
           {/* Musik Genre Filter */}
           <View style={styles.section}>

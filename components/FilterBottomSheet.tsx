@@ -143,30 +143,6 @@ export function FilterBottomSheet({ visible, onClose, onApply, onReset }: Filter
 
         {/* Content */}
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            {/* Radius Slider */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Radius</Text>
-              <View style={styles.sliderContainer}>
-                <View style={styles.sliderWrapper}>
-                  <Slider
-                    minimumValue={5}
-                    maximumValue={50}
-                    step={5}
-                    value={[radius]}
-                    onValueChange={(values: number[]) => setRadius(values[0])}
-                    minimumTrackTintColor={theme.colors.primary.main}
-                    maximumTrackTintColor={theme.colors.neutral.gray[300]}
-                    thumbTintColor={theme.colors.primary.main}
-                    containerStyle={styles.slider}
-                  />
-                </View>
-                <View style={styles.radiusLabels}>
-                  <Text style={styles.radiusLabelLeft}>5 km</Text>
-                  <Text style={styles.radiusValue}>{radius} km</Text>
-                  <Text style={styles.radiusLabelRight}>50 km</Text>
-                </View>
-              </View>
-            </View>
 
             {/* Event Types */}
             <View style={styles.section}>
