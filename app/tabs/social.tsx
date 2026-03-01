@@ -19,11 +19,15 @@ import {
   Image,
   TextInput,
   ActivityIndicator,
-  LayoutAnimation,
-  UIManager,
-  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  runOnJS,
+  Easing,
+} from 'react-native-reanimated';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { theme } from '../../constants/theme';
@@ -36,10 +40,10 @@ import { UserIcon, PlusIcon } from 'react-native-heroicons/solid';
 import useAuthStore from '../../stores/useAuthStore';
 import useChatStore from '../../stores/useChatStore';
 
-// LayoutAnimation auf Android aktivieren
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+// Reanimated statt LayoutAnimation – vermeidet Crash (std::stable_sort in RN Fabric).
+// Die Suchleiste wird immer gerendert, nur Opacity/Hoehe animiert – kein Mount/Unmount.
+
+const SEARCH_BAR_HEIGHT = 56;
 
 export default function SocialScreen() {
   const userId = useAuthStore((s) => s.userId);
@@ -48,11 +52,14 @@ export default function SocialScreen() {
   const loading = useChatStore((s) => s.conversationsLoading);
   const { loadConversations, subscribeChatList, unsubscribeChatList } = useChatStore();
 
-  // Suchleiste ist standardmaessig versteckt
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<TextInput>(null);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  // Shared Value fuer Reanimated: 0 = zu, 1 = offen (kein Mount/Unmount)
+  const searchAnim = useSharedValue(0);
 
   // ============================
   // Konversationen laden und Realtime abonnieren
@@ -65,20 +72,33 @@ export default function SocialScreen() {
   }, [userId]);
 
   /**
-   * Suchleiste ein-/ausblenden mit sanfter Animation.
-   * Beim Oeffnen wird der Fokus automatisch gesetzt,
-   * beim Schliessen wird die Suche zurueckgesetzt.
+   * Suchleiste ein-/ausblenden mit Reanimated (kein LayoutAnimation = kein Crash).
+   * Beim Schliessen: Animation zuerst, dann State zuruecksetzen.
    */
+  const onSearchCloseComplete = useCallback(() => {
+    setSearchQuery('');
+    setSearchVisible(false);
+  }, []);
+
   const toggleSearch = useCallback(() => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     if (searchVisible) {
-      setSearchQuery('');
-      setSearchVisible(false);
+      // Schliessen: animieren, danach State zuruecksetzen
+      searchAnim.value = withTiming(
+        0,
+        { duration: 220, easing: Easing.out(Easing.ease) },
+        (finished) => {
+          if (finished) runOnJS(onSearchCloseComplete)();
+        }
+      );
     } else {
       setSearchVisible(true);
-      setTimeout(() => searchInputRef.current?.focus(), 100);
+      searchAnim.value = withTiming(1, {
+        duration: 220,
+        easing: Easing.out(Easing.ease),
+      });
+      setTimeout(() => searchInputRef.current?.focus(), 150);
     }
-  }, [searchVisible]);
+  }, [searchVisible, searchAnim, onSearchCloseComplete]);
 
   /**
    * Filtert Konversationen nach Suchbegriff.
@@ -150,79 +170,80 @@ export default function SocialScreen() {
   };
 
   // ============================
-  // HEADER: "Chats" links, Optionen + Lupe rechts
+  // HEADER: Suchbutton links, "Chats" Mitte, Optionen rechts
   // ============================
   const renderHeader = () => (
-    <View className="flex-row items-center justify-between px-5 pt-2 pb-1">
-      {/* Titel */}
-      <Text
-        className="text-[28px]"
-        style={{ fontFamily: 'Manrope_700Bold', color: theme.colors.neutral.gray[900] }}
+    <View className="flex-row items-center px-5 pt-2 pb-1">
+      {/* Suchbutton links */}
+      <Pressable
+        className="w-10 h-10 items-center justify-center"
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        onPress={toggleSearch}
       >
-        Chats
-      </Text>
+        <MagnifyingGlassIcon size={24} color={theme.colors.neutral.gray[800]} />
+      </Pressable>
 
-      {/* Icon-Gruppe rechts */}
-      <View className="flex-row items-center">
-        {/* Optionen-Button (fuer Gruppen erstellen, etc.) */}
-        <Pressable
-          className="w-10 h-10 items-center justify-center"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          onPress={() => {
-            // TODO: ActionSheet oder Modal oeffnen (Neue Gruppe, Neuer Chat, etc.)
-          }}
+      {/* Titel zentriert */}
+      <View className="flex-1 items-center justify-center">
+        <Text
+          className="text-[28px]"
+          style={{ fontFamily: 'Manrope_700Bold', color: theme.colors.neutral.gray[900] }}
         >
-          <EllipsisHorizontalCircleIcon size={26} color={theme.colors.neutral.gray[800]} />
-        </Pressable>
-
-        {/* Lupe: Blendet Suchleiste ein/aus */}
-        <Pressable
-          className="w-10 h-10 items-center justify-center ml-1"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          onPress={toggleSearch}
-        >
-          <MagnifyingGlassIcon size={24} color={theme.colors.neutral.gray[800]} />
-        </Pressable>
+          Chats
+        </Text>
       </View>
+
+      {/* Optionen-Button rechts */}
+      <Pressable
+        className="w-10 h-10 items-center justify-center"
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        onPress={() => {
+          // TODO: ActionSheet oder Modal oeffnen (Neue Gruppe, Neuer Chat, etc.)
+        }}
+      >
+        <EllipsisHorizontalCircleIcon size={26} color={theme.colors.neutral.gray[800]} />
+      </Pressable>
     </View>
   );
 
-  // ============================
-  // SUCHLEISTE: Nur sichtbar wenn searchVisible = true
-  // ============================
-  const renderSearchBar = () => {
-    if (!searchVisible) return null;
-    return (
-      <View className="px-5 pb-2 pt-1">
-        <View
-          className="flex-row items-center rounded-xl px-4"
+    // SUCHLEISTE: Immer gerendert, Opacity + Hoehe per Reanimated animiert
+
+  const searchBarAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: searchAnim.value,
+    maxHeight: searchAnim.value * SEARCH_BAR_HEIGHT,
+    overflow: 'hidden' as const,
+  }));
+
+  const renderSearchBar = () => (
+    <Animated.View style={[{ paddingHorizontal: 20, paddingBottom: 8, paddingTop: 4 }, searchBarAnimatedStyle]}>
+      <View
+        className="flex-row items-center rounded-xl px-4"
+        style={{
+          backgroundColor: "white",
+          height: 44,
+        }}
+      >
+        <MagnifyingGlassIcon size={18} color={theme.colors.neutral.gray[400]} />
+        <TextInput
+          ref={searchInputRef}
+          className="flex-1 ml-2.5 text-base"
+          placeholder="Suchen..."
+          placeholderTextColor={theme.colors.neutral.gray[400]}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          editable={searchVisible}
           style={{
-            backgroundColor: theme.colors.neutral.gray[100],
-            height: 44,
+            fontFamily: 'Manrope_400Regular',
+            paddingVertical: 0,
+            color: theme.colors.neutral.gray[900],
           }}
-        >
-          <MagnifyingGlassIcon size={18} color={theme.colors.neutral.gray[400]} />
-          <TextInput
-            ref={searchInputRef}
-            className="flex-1 ml-2.5 text-base"
-            placeholder="Suchen..."
-            placeholderTextColor={theme.colors.neutral.gray[400]}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            style={{
-              fontFamily: 'Manrope_400Regular',
-              paddingVertical: 0,
-              color: theme.colors.neutral.gray[900],
-            }}
-          />
-          {/* X-Button zum Schliessen der Suche */}
-          <Pressable onPress={toggleSearch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <XMarkIcon size={20} color={theme.colors.neutral.gray[500]} />
-          </Pressable>
-        </View>
+        />
+        <Pressable onPress={toggleSearch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <XMarkIcon size={20} color={theme.colors.neutral.gray[500]} />
+        </Pressable>
       </View>
-    );
-  };
+    </Animated.View>
+  );
 
   // ============================
   // STORY-BEREICH: Kreisrunde Avatare (horizontal scrollbar)
@@ -338,77 +359,60 @@ export default function SocialScreen() {
             <UserIcon size={26} color={theme.colors.neutral.gray[400]} />
           </View>
         )}
-
-        {/* Gruppen-Badge: Anzahl Teilnehmer */}
-        {item.type === 'group' && (
-          <View
-            className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full items-center justify-center border-2 border-white"
-            style={{ backgroundColor: theme.colors.primary.main }}
-          >
-            <Text
-              className="text-white text-[8px]"
-              style={{ fontFamily: 'Manrope_700Bold' }}
-            >
-              {item.conversation_participants?.length || 0}
-            </Text>
-          </View>
-        )}
       </View>
 
-      {/* Chat-Info */}
+      {/* Chat-Info: Name + Vorschau links, Zeitstempel + Unread-Badge rechts untereinander */}
       <View className="flex-1 ml-3.5">
-        <View className="flex-row items-center justify-between mb-1">
-          {/* Chat-Name: Fett wenn ungelesen */}
-          <Text
-            className="text-[16px] flex-1 mr-2"
-            style={{
-              fontFamily: item.unreadCount > 0 ? 'Manrope_700Bold' : 'Manrope_600SemiBold',
-              color: theme.colors.neutral.gray[900],
-            }}
-            numberOfLines={1}
-          >
-            {item.displayName || 'Unbekannt'}
-          </Text>
-
-          {/* Zeitstempel */}
-          <Text
-            className="text-xs"
-            style={{
-              fontFamily: 'Manrope_400Regular',
-              color: theme.colors.neutral.gray[400],
-            }}
-          >
-            {formatTime(item.lastMessage?.created_at)}
-          </Text>
-        </View>
-
-        <View className="flex-row items-center justify-between">
-          {/* Vorschau der letzten Nachricht */}
-          <Text
-            className="text-sm flex-1 mr-2"
-            style={{
-              fontFamily: item.unreadCount > 0 ? 'Manrope_500Medium' : 'Manrope_400Regular',
-              color: theme.colors.neutral.gray[500],
-            }}
-            numberOfLines={1}
-          >
-            {getMessagePreview(item.lastMessage)}
-          </Text>
-
-          {/* Unread-Badge */}
-          {item.unreadCount > 0 && (
-            <View
-              className="min-w-[22px] h-[22px] rounded-full items-center justify-center px-1.5"
-              style={{ backgroundColor: theme.colors.primary.main }}
+        <View className="flex-row items-start justify-between">
+          {/* Links: Name und Nachrichtenvorschau */}
+          <View className="flex-1 mr-3 min-w-0">
+            <Text
+              className="text-[16px] mb-0.5"
+              style={{
+                fontFamily: item.unreadCount > 0 ? 'Manrope_700Bold' : 'Manrope_600SemiBold',
+                color: theme.colors.neutral.gray[900],
+              }}
+              numberOfLines={1}
             >
-              <Text
-                className="text-white text-[11px]"
-                style={{ fontFamily: 'Manrope_700Bold' }}
+              {item.displayName || 'Unbekannt'}
+            </Text>
+            <Text
+              className="text-sm"
+              style={{
+                fontFamily: item.unreadCount > 0 ? 'Manrope_500Medium' : 'Manrope_400Regular',
+                color: theme.colors.neutral.gray[500],
+              }}
+              numberOfLines={1}
+            >
+              {getMessagePreview(item.lastMessage)}
+            </Text>
+          </View>
+
+          {/* Rechts: Zeitstempel oben, Unread-Badge darunter (wie im Screenshot) */}
+          <View className="items-end">
+            <Text
+              className="text-xs"
+              style={{
+                fontFamily: 'Manrope_400Regular',
+                color: theme.colors.neutral.gray[400],
+              }}
+            >
+              {formatTime(item.lastMessage?.created_at)}
+            </Text>
+            {item.unreadCount > 0 && (
+              <View
+                className="min-w-[22px] h-[22px] rounded-full items-center justify-center px-1.5 mt-1"
+                style={{ backgroundColor: theme.colors.primary.main }}
               >
-                {item.unreadCount > 99 ? '99+' : item.unreadCount}
-              </Text>
-            </View>
-          )}
+                <Text
+                  className="text-white text-[11px]"
+                  style={{ fontFamily: 'Manrope_700Bold' }}
+                >
+                  {item.unreadCount > 99 ? '99+' : item.unreadCount}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
       </View>
     </Pressable>
@@ -444,16 +448,28 @@ export default function SocialScreen() {
   // RENDER
   // ============================
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
-      {renderHeader()}
-      {renderSearchBar()}
-      {renderStorySection()}
-
-      {/* Trennlinie zwischen Stories und Chat-Liste */}
+    <View className="flex-1 bg-white">
+      {/* Oberer Bereich hervorgehoben: SafeArea + Header + Suchleiste + Stories (grau bis ganz oben) */}
       <View
-        className="mx-5 mb-1"
-        style={{ height: 1, backgroundColor: theme.colors.neutral.gray[100] }}
-      />
+        style={{
+          backgroundColor: theme.colors.neutral.gray[100],
+          paddingTop: insets.top,
+          borderBottomLeftRadius: 24,
+          borderBottomRightRadius: 24,
+          // Dezenter Schatten zur Hervorhebung
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.06,
+          shadowRadius: 6,
+          elevation: 4,
+        }}
+      >
+        {renderHeader()}
+        {renderSearchBar()}
+        {renderStorySection()}
+      </View>
+
+      
 
       {/* Chat-Liste mit Trennlinien zwischen den Eintraegen (nicht bis zum Rand) */}
       {loading ? (
@@ -484,6 +500,6 @@ export default function SocialScreen() {
           refreshing={loading}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
