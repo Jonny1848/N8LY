@@ -40,8 +40,6 @@ import { UserIcon, PlusIcon } from 'react-native-heroicons/solid';
 import useAuthStore from '../../stores/useAuthStore';
 import useChatStore from '../../stores/useChatStore';
 
-// Reanimated statt LayoutAnimation – vermeidet Crash (std::stable_sort in RN Fabric).
-// Die Suchleiste wird immer gerendert, nur Opacity/Hoehe animiert – kein Mount/Unmount.
 
 const SEARCH_BAR_HEIGHT = 56;
 
@@ -58,7 +56,7 @@ export default function SocialScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  // Shared Value fuer Reanimated: 0 = zu, 1 = offen (kein Mount/Unmount)
+  
   const searchAnim = useSharedValue(0);
 
   // ============================
@@ -72,8 +70,7 @@ export default function SocialScreen() {
   }, [userId]);
 
   /**
-   * Suchleiste ein-/ausblenden mit Reanimated (kein LayoutAnimation = kein Crash).
-   * Beim Schliessen: Animation zuerst, dann State zuruecksetzen.
+   * Suchleiste ein-/ausblenden mit Reanimated 
    */
   const onSearchCloseComplete = useCallback(() => {
     setSearchQuery('');
