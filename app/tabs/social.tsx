@@ -480,14 +480,7 @@ export default function SocialScreen() {
           renderItem={renderConversationItem}
           ListEmptyComponent={renderEmptyState}
           ItemSeparatorComponent={() => (
-            <View
-              style={{
-                height: 1,
-                backgroundColor: theme.colors.neutral.gray[200],
-                marginLeft: 20,
-                marginRight: 20,
-              }}
-            />
+            <View className="h-px bg-gray-200 mx-5" />
           )}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={
