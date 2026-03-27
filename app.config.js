@@ -14,7 +14,7 @@ export default {
     slug: "N8TLY_App",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/icon.png",
+    icon: "./assets/N8LY9.png",
     userInterfaceStyle: "light",
     newArchEnabled: true,
 
@@ -75,6 +75,8 @@ export default {
 
     // Plugins (Mapbox, Auth, Router etc.)
     plugins: [
+      // iOS: fmt-Pod mit neuerem Xcode/Clang (consteval-Fehler in format-inl.h umgehen)
+      "./plugins/withFmtPodConstevalFix.js",
       "expo-apple-authentication",
       "expo-router",
       "expo-video",

@@ -11,7 +11,7 @@
  */
 import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { theme } from '../../constants/theme';
-import { ChevronLeftIcon, VideoCameraIcon, PhoneIcon } from 'react-native-heroicons/outline';
+import { ChevronLeftIcon, VideoCameraIcon, PhoneIcon } from 'react-native-heroicons/solid';
 import { UserIcon } from 'react-native-heroicons/solid';
 
 export default function ChatHeader({ conversation, onBack, onOptions }) {
@@ -29,7 +29,7 @@ export default function ChatHeader({ conversation, onBack, onOptions }) {
     <View style={styles.header}>
       {/* Zurueck-Pfeil */}
       <Pressable style={styles.headerBtn} onPress={onBack}>
-        <ChevronLeftIcon size={30} color={theme.colors.neutral.gray[900]} strokeWidth={2.5} />
+        <ChevronLeftIcon size={30} color={"black"} strokeWidth={2.5} />
       </Pressable>
 
       {/* Avatar + Name + Status (tappbar fuer Profil-Info) */}
@@ -64,10 +64,10 @@ export default function ChatHeader({ conversation, onBack, onOptions }) {
       {/* Video-Anruf + Telefon Icons – groesser fuer bessere Erreichbarkeit */}
       <View className="flex-row items-center gap-2">
         <Pressable className="w-12 h-12 items-center justify-center">
-          <VideoCameraIcon size={28} strokeWidth={2} color={theme.colors.neutral.gray[700]} />
+          <VideoCameraIcon size={28} strokeWidth={2} color={"black"} />
         </Pressable>
         <Pressable className="w-12 h-12 items-center justify-center">
-          <PhoneIcon size={28} strokeWidth={2} color={theme.colors.neutral.gray[700]} />
+          <PhoneIcon size={28} strokeWidth={2} color={"black"} />
         </Pressable>
       </View>
     </View>
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
   },
   headerName: {
     fontSize: 18,
-    color: theme.colors.neutral.gray[900],
+    color: "black",
     fontFamily: 'Manrope_700Bold',
   },
   headerStatusRow: {

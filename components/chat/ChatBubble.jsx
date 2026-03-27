@@ -12,7 +12,8 @@
  *  - userId: ID des aktuellen Users
  *  - conversation: Konversation-Objekt (fuer Gruppeninfo)
  */
-import { View, Text, Image, useWindowDimensions } from 'react-native';
+import { View, Text, useWindowDimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { theme } from '../../constants/theme';
 import { UserIcon } from 'react-native-heroicons/solid';
 import VoiceMessageBubble from './VoiceMessageBubble';
@@ -106,7 +107,8 @@ export default function ChatBubble({ item, index, messages, userId, conversation
               {item.profiles?.avatar_url ? (
                 <Image
                   source={{ uri: item.profiles.avatar_url }}
-                  className="w-8 h-8 rounded-full"
+                  cachePolicy="disk"
+                  style={{ width: 32, height: 32, borderRadius: 16 }}
                 />
               ) : (
                 <View className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center">
@@ -139,9 +141,13 @@ export default function ChatBubble({ item, index, messages, userId, conversation
                 <>
                   <Image
                     source={{ uri: item.media_url }}
-                    className="aspect-[4/3] rounded-xl"
-                    style={{ width: imageWidth }}
-                    resizeMode="cover"
+                    cachePolicy="disk"
+                    style={{
+                      width: imageWidth,
+                      aspectRatio: 4 / 3,
+                      borderRadius: 12,
+                    }}
+                    contentFit="cover"
                   />
                   {item.content ? (
                     <Text
