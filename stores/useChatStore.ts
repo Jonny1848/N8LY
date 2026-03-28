@@ -109,13 +109,16 @@ interface ChatState {
   /** Sendet eine Textnachricht und fuegt sie optimistisch hinzu */
   sendTextMessage: (conversationId: string, userId: string, content: string) => Promise<void>;
 
-  /** Sendet eine Medien-Nachricht (Bild, Audio) und fuegt sie optimistisch hinzu */
+  /**
+   * Sendet eine Medien-Nachricht (Bild, Sprache, Datei) und fuegt sie optimistisch hinzu.
+   * optional: caption (z. B. Dateiname bei message_type file), waveformData nur bei voice.
+   */
   sendMediaMessage: (
     conversationId: string,
     userId: string,
     mediaUrl: string,
-    messageType: 'image' | 'voice',
-    waveformData?: number[] | null,
+    messageType: 'image' | 'voice' | 'file',
+    extra?: { caption?: string | null; waveformData?: number[] | null } | null,
   ) => Promise<Message | null>;
 
   /** Markiert eine Konversation als gelesen */
@@ -252,14 +255,17 @@ const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  sendMediaMessage: async (conversationId, userId, mediaUrl, messageType, waveformData = null) => {
+  sendMediaMessage: async (conversationId, userId, mediaUrl, messageType, extra = null) => {
     try {
+      const caption = extra?.caption ?? null;
+      const waveformData = extra?.waveformData ?? null;
+
       const msg: any = await apiSendMediaMessage(
         conversationId,
         userId,
         mediaUrl,
         messageType,
-        null, // caption
+        caption,
         waveformData,
       );
 

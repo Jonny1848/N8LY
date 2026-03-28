@@ -404,8 +404,8 @@ export async function sendMessage(conversationId, senderId, content) {
  * @param {string} conversationId – Die UUID der Konversation
  * @param {string} senderId – Die UUID des Absenders
  * @param {string} mediaUrl – Die URL des Mediums aus Supabase Storage
- * @param {'image'|'voice'} messageType – Der Typ des Mediums
- * @param {string|null} caption – Optionaler Text zur Medien-Nachricht
+ * @param {'image'|'voice'|'file'} messageType – Typ des Mediums (file: z. B. Dokument aus dem Share-Sheet)
+ * @param {string|null} caption – Optionaler Text (Bildunterschrift oder Dateiname bei file)
  * @param {number[]|null} waveformData – Optional: Amplitude-Werte (0-1) fuer Waveform bei Sprachnachrichten
  * @returns {Object} – Die gesendete Nachricht
  */

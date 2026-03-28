@@ -2,7 +2,7 @@
 import React from 'react';
 import { createMenu } from '@gluestack-ui/core/menu/creator';
 import { tva } from '@gluestack-ui/utils/nativewind-utils';
-import { styled } from 'nativewind';
+import { cssInterop } from 'nativewind';
 import { Pressable, Text, View, ViewStyle } from 'react-native';
 import {
   Motion,
@@ -14,10 +14,9 @@ import type { VariantProps } from '@gluestack-ui/utils/nativewind-utils';
 type IMotionViewProps = React.ComponentProps<typeof View> &
   MotionComponentProps<typeof View, ViewStyle, unknown, unknown, unknown>;
 
-// NativeWind 2.x exportiert kein cssInterop (Nur NW v4); Menu-Root braucht className -> styled(Motion.View)
-const MotionView = styled(Motion.View) as React.ComponentType<
-  IMotionViewProps & { className?: string }
->;
+// NativeWind v4: Motion.View (Third-Party) braucht cssInterop, damit className ankommt
+const MotionView = Motion.View as React.ComponentType<IMotionViewProps>;
+cssInterop(MotionView, { className: 'style' });
 
 // Keine Gluestack-Semantik-Tokens im N8TLY-Tailwind (background-0, outline-100, …) -> sonst keine sichtbare Fuellfarbe
 const MENU_SURFACE_BG = '#FFFFFF';
@@ -143,6 +142,11 @@ export const UIMenu = createMenu({
   AnimatePresence: AnimatePresence,
   Separator: Separator,
 });
+
+// Root / ItemLabel / Backdrop: className per cssInterop ok.
+cssInterop(UIMenu, { className: 'style' });
+cssInterop(UIMenu.ItemLabel, { className: 'style' });
+cssInterop(BackdropPressable, { className: 'style' });
 
 type IMenuProps = React.ComponentProps<typeof UIMenu> &
   VariantProps<typeof menuStyle> & {

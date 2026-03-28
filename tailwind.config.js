@@ -1,6 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  // NativeWind-v4-Preset (Interop, className-Unterstuetzung)
+  presets: [require("nativewind/preset")],
   content: [
+    './global.css',
     './app/**/*.{js,jsx,ts,tsx}',
     './components/**/*.{js,jsx,ts,tsx}',
     './node_modules/@gluestack-ui/themed/**/*.{js,jsx,ts,tsx}',

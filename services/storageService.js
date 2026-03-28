@@ -109,6 +109,63 @@ export async function uploadVoiceMessage(conversationId, uri, mimeType = 'audio/
 }
 
 /**
+ * Laedt eine beliebige Datei (Dokument) in den Chat-Media Bucket hoch.
+ *
+ * Gleiche Strategie wie bei Bild/Sprache: Base64 ueber expo-file-system, damit
+ * der Upload in React Native zuverlaessig ist (kein leerer Blob).
+ *
+ * @param {string} conversationId – Die UUID der Konversation
+ * @param {string} uri – Lokaler Dateipfad (z. B. aus expo-document-picker)
+ * @param {string} mimeType – MIME-Typ (Fallback: application/octet-stream)
+ * @param {string} [originalName=''] – Originaldateiname fuer die Dateiendung im Storage-Pfad
+ * @returns {string} – Oeffentliche URL der Datei
+ */
+export async function uploadChatFile(
+  conversationId,
+  uri,
+  mimeType = 'application/octet-stream',
+  originalName = '',
+) {
+  // Endung aus Originalnamen ableiten, sonst aus MIME (z. B. pdf), sonst generisch
+  let ext = 'bin';
+  if (originalName && originalName.includes('.')) {
+    const raw = originalName.split('.').pop() || '';
+    ext = raw.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12).toLowerCase() || 'bin';
+  } else if (mimeType?.includes('/')) {
+    ext = mimeType.split('/')[1]?.split('+')[0] || 'bin';
+    ext = ext.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12).toLowerCase() || 'bin';
+  }
+
+  const fileName = `doc_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+  const filePath = `${conversationId}/${fileName}`;
+
+  const base64 = await FileSystem.readAsStringAsync(uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  const arrayBuffer = decode(base64);
+
+  const contentType = mimeType || 'application/octet-stream';
+
+  const { data, error } = await supabase.storage
+    .from(CHAT_MEDIA_BUCKET)
+    .upload(filePath, arrayBuffer, {
+      contentType,
+      upsert: false,
+    });
+
+  if (error || !data) {
+    console.error('Fehler beim Hochladen der Chat-Datei:', error);
+    throw error;
+  }
+
+  const { data: urlData } = supabase.storage
+    .from(CHAT_MEDIA_BUCKET)
+    .getPublicUrl(filePath);
+
+  return urlData.publicUrl;
+}
+
+/**
  * Laedt ein Story-Medium (Bild oder Video) hoch.
  *
  * Der Dateipfad wird so strukturiert:

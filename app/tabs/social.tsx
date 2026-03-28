@@ -131,7 +131,12 @@ export default function SocialScreen() {
         return '📷 Bild';
       case 'voice':
         return '🎤 Sprachnachricht';
-      case 'system':
+      case 'file': {
+        const label = msg.content?.trim();
+        if (!label) return '📎 Datei';
+        return msg.content.length > 36 ? `📎 ${msg.content.substring(0, 36)}…` : `📎 ${msg.content}`;
+      }
+       case 'system':
         return msg.content || 'Systemnachricht';
       default:
         return msg.content?.length > 40

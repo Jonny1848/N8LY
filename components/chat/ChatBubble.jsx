@@ -13,10 +13,11 @@
  *  - conversation: Konversation-Objekt (fuer Gruppeninfo)
  *  - onImagePress: optional (uri) => void – Tipp auf Bildnachricht (Vorschau im Parent)
  */
-import { View, Text, useWindowDimensions, Pressable } from 'react-native';
+import { View, Text, useWindowDimensions, Pressable, Linking } from 'react-native';
 import { Image } from 'expo-image';
 import { theme } from '../../constants/theme';
 import { UserIcon } from 'react-native-heroicons/solid';
+import { PaperClipIcon } from 'react-native-heroicons/outline';
 import VoiceMessageBubble from './VoiceMessageBubble';
 
 /**
@@ -40,6 +41,29 @@ function shouldShowDateSeparator(currentMsg, nextMsg) {
 }
 
 /**
+ * Prueft ob zwei Nachrichten in derselben Minute gesendet wurden.
+ * Vergleicht Stunde + Minute des Zeitstempels.
+ */
+function sameMinute(a, b) {
+  if (!a?.created_at || !b?.created_at) return false;
+  const da = new Date(a.created_at);
+  const db = new Date(b.created_at);
+  return da.getHours() === db.getHours() && da.getMinutes() === db.getMinutes()
+    && da.toDateString() === db.toDateString();
+}
+
+/**
+ * Prueft ob die aktuelle Nachricht den Zeitstempel anzeigen soll.
+ * Nur die LETZTE Nachricht einer Gruppe (gleicher Absender, gleiche Minute)
+ * bekommt den Stempel. In der inverted FlatList ist „darunter" = index - 1.
+ */
+function shouldShowTimestamp(currentMsg, msgBelow) {
+  if (!msgBelow) return true;
+  if (currentMsg.sender_id !== msgBelow.sender_id) return true;
+  return !sameMinute(currentMsg, msgBelow);
+}
+
+/**
  * Formatiert ein Datum fuer den Separator (Heute / Gestern / volles Datum).
  */
 function formatDateSeparator(dateStr) {
@@ -58,6 +82,7 @@ export default function ChatBubble({ item, index, messages, userId, conversation
   const isSystem = item.message_type === 'system';
   const isImage = item.message_type === 'image';
   const isVoice = item.message_type === 'voice';
+  const isFile = item.message_type === 'file';
 
   // Bildbreite: max. 65% Bildschirmbreite, maximal 260px (wie vorher mit StyleSheet)
   const imageWidth = Math.min(screenWidth * 0.65, 260);
@@ -66,6 +91,12 @@ export default function ChatBubble({ item, index, messages, userId, conversation
   const nextMsg = messages[index + 1];
   const showDate = shouldShowDateSeparator(item, nextMsg);
 
+  // Zeitstempel nur bei der letzten Nachricht einer Gruppe (gleicher Sender, gleiche Minute)
+  const msgBelow = messages[index - 1];
+  const showTime = shouldShowTimestamp(item, msgBelow);
+  // Engerer Abstand wenn die naechste Bubble zur selben Gruppe gehoert
+  const isGrouped = msgBelow && msgBelow.sender_id === item.sender_id && sameMinute(item, msgBelow);
+
   // Tailwind-Klassen fuer die Bubble – dynamisch je nach Nachrichtentyp
   const bubbleBaseClasses =
     'rounded-2xl max-w-full ' +
@@ -73,7 +104,8 @@ export default function ChatBubble({ item, index, messages, userId, conversation
       ? 'bg-transparent p-0 overflow-hidden'
       : isVoice
         ? 'py-2 pl-2.5 pr-4 ' + (isOwn ? 'bg-n8tly-blue rounded-br-[4px]' : 'bg-gray-100 rounded-bl-[4px]')
-        : 'px-3.5 py-2.5 ' + (isOwn ? 'bg-n8tly-blue rounded-br-[4px]' : 'bg-gray-100 rounded-bl-[4px]'));
+        : 'px-3.5 py-2.5 ' +
+          (isOwn ? 'bg-n8tly-blue rounded-br-[4px]' : 'bg-gray-100 rounded-bl-[4px]'));
 
   return (
     <View>
@@ -101,7 +133,7 @@ export default function ChatBubble({ item, index, messages, userId, conversation
       ) : (
         /* Chatbox-Style: Bubble mit Zeitstempel innen */
         <View
-          className={`flex-row px-4 mb-5 items-end ${isOwn ? 'justify-end' : 'justify-start'}`}
+          className={`flex-row px-4 items-end ${isGrouped ? 'mb-1.5' : 'mb-5'} ${isOwn ? 'justify-end' : 'justify-start'}`}
         >
           {!isOwn && conversation?.type === 'group' && (
             <View className="mr-2.5 mb-1">
@@ -148,6 +180,27 @@ export default function ChatBubble({ item, index, messages, userId, conversation
                   waveformData={item.waveform_data}
                   isOwn={isOwn}
                 />
+              ) : isFile && item.media_url ? (
+                /* Dateianhang: Tipp oeffnet die oeffentliche Storage-URL im System (Browser / Viewer) */
+                <Pressable
+                  onPress={() => Linking.openURL(item.media_url)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Datei oeffnen"
+                  className="flex-row items-center gap-2 active:opacity-80"
+                >
+                  <PaperClipIcon
+                    size={22}
+                    strokeWidth={2}
+                    color={isOwn ? '#FFFFFF' : theme.colors.neutral.gray[700]}
+                  />
+                  <Text
+                    className={`text-[15px] leading-[21px] flex-1 ${isOwn ? 'text-white' : 'text-gray-900'}`}
+                    style={{ fontFamily: 'Manrope_500Medium' }}
+                    numberOfLines={2}
+                  >
+                    {item.content || 'Datei'}
+                  </Text>
+                </Pressable>
               ) : isImage && item.media_url ? (
                 /* Bildnachricht: Foto mit optionalem Caption – Zeitstempel unter der Bubble */
                 <>
@@ -189,13 +242,15 @@ export default function ChatBubble({ item, index, messages, userId, conversation
               )}
             </View>
 
-            {/* Zeitstempel unter der Bubble – fuer alle Nachrichtentypen (clean, aeesthetisch) */}
-            <Text
-              className={`text-xs text-gray-500 mt-1.5 ${isOwn ? 'text-right' : 'text-left'}`}
-              style={{ fontFamily: 'Manrope_400Regular' }}
-            >
-              {formatMessageTime(item.created_at)}
-            </Text>
+            {/* Zeitstempel nur bei der letzten Bubble einer Minute/Sender-Gruppe */}
+            {showTime && (
+              <Text
+                className={`text-xs text-gray-500 mt-1.5 ${isOwn ? 'text-right' : 'text-left'}`}
+                style={{ fontFamily: 'Manrope_400Regular' }}
+              >
+                {formatMessageTime(item.created_at)}
+              </Text>
+            )}
           </View>
         </View>
       )}
