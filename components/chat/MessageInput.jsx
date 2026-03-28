@@ -26,11 +26,15 @@ import {
 } from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
 
+// expo-document-picker NICHT top-level importieren: Bei fehlendem Native-Modul (z. B. alter Dev-Client)
+// koennte der Screen beim Laden brechen. Stattdessen require() innerhalb von handlePickDocument
+// (siehe dort) – kein dynamisches import(), Metro lieferte dabei oft kein getDocumentAsync.
+
 /**
  * MessageInput – Layout wie Referenz-Screenshot: + | Input | Send
  */
 const MessageInput = forwardRef(function MessageInput(
-  { onSendText, onSendVoice, onOpenShareSheet, onSendImage },
+  { onSendText, onSendVoice, onOpenShareSheet, onSendImage, onSendFile },
   ref
 ) {
   // ============================
@@ -45,8 +49,10 @@ const MessageInput = forwardRef(function MessageInput(
   const [waveformSamples, setWaveformSamples] = useState([]);
   const [uploadingVoice, setUploadingVoice] = useState(false);
 
-  // Kamera: Ladezustand waehrend Upload
+  // Kamera / Galerie: Ladezustand waehrend Upload
   const [uploadingImage, setUploadingImage] = useState(false);
+  // Dokumente: Ladezustand nach Dateiauswahl bis Upload fertig
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   // expo-audio: Recorder mit Metering fuer Waveform (Lautstaerke pro Zeitscheibe)
   const recordingOptions = {
@@ -239,11 +245,57 @@ const MessageInput = forwardRef(function MessageInput(
     }
   };
 
-  // Imperative Handle: Kamera, Medien, Voice von ShareSheet ausloesen
+  // ============================
+  // Dokumente: System-Dateiauswahl und Upload ueber Parent (Share Sheet / imperativ)
+  // ============================
+  const handlePickDocument = async () => {
+    if (!onSendFile || uploadingFile) return;
+
+    try {
+      /*
+       * Lazy require (nicht Top-Level): Chat-Screen bleibt ohne sofortigen Native-Bind.
+       * Hinweis: import('expo-document-picker') liefert unter Metro oft kein gueltiges Named-Export-
+       * Objekt → getDocumentAsync war undefined. require() im Funktionskoerper ist hier zuverlaessiger.
+       */
+      const DocumentPickerModule = require('expo-document-picker');
+      const getDocumentAsync =
+        DocumentPickerModule.getDocumentAsync ??
+        DocumentPickerModule.default?.getDocumentAsync;
+      if (typeof getDocumentAsync !== 'function') {
+        throw new Error('expo-document-picker: getDocumentAsync nicht verfuegbar');
+      }
+      const result = await getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+
+      const asset = result.assets[0];
+      setUploadingFile(true);
+      await onSendFile(asset.uri, {
+        name: asset.name,
+        mimeType: asset.mimeType,
+      });
+    } catch (err) {
+      console.error('[DOKUMENTE] Fehler beim Auswaehlen oder Senden:', err);
+      Alert.alert(
+        'Datei',
+        'Die Datei konnte nicht gesendet werden. Bitte versuche es erneut.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  // Imperative Handle: Kamera, Medien, Voice, Dokumente vom ShareSheet ausloesen
   useImperativeHandle(ref, () => ({
     openCamera: handleTakePhoto,
     openMediaLibrary: handlePickFromGallery,
     startVoiceRecording: handleStartRecording,
+    openDocumentPicker: handlePickDocument,
   }));
 
   /** Preview-Wiedergabe umschalten (Play/Pause) */
@@ -329,12 +381,17 @@ const MessageInput = forwardRef(function MessageInput(
       ) : (
         /* ========== NORMALER MODUS – Screenshot: + | Input (weiss, duenne Border) | Send ========== */
         <>
-          {/* Plus-Button: hellgrau, circular */}
+          {/* Plus-Button: hellgrau, circular (kann waehrend Dokument-Upload kurz blockiert sein) */}
           <Pressable
             className="w-10 h-10 rounded-full bg-gray-200 items-center justify-center shrink-0"
             onPress={onOpenShareSheet}
+            disabled={uploadingFile}
           >
-            <PlusIcon size={22} strokeWidth={2.5} color={theme.colors.neutral.gray[800]} />
+            {uploadingFile ? (
+              <ActivityIndicator size="small" color={theme.colors.neutral.gray[800]} />
+            ) : (
+              <PlusIcon size={22} strokeWidth={2.5} color={theme.colors.neutral.gray[800]} />
+            )}
           </Pressable>
 
           {/* Eingabefeld: weiss, staerkere Umrandung, pill-foermig */}

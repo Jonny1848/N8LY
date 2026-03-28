@@ -1,18 +1,9 @@
 /**
- * ShareSheet – "Inhalt teilen" Bottom Sheet (Slide-up Modal)
- *
- * Zeigt eine Liste von Optionen zum Teilen von Inhalten im Chat:
- * Dokumente, Umfrage (nur Gruppen), Medien, Kontakt, Standort.
- * Kamera ist NICHT enthalten – dafuer gibt es einen separaten Button in der Input Bar.
- *
- * Props:
- *  - visible: Boolean – ob das Sheet sichtbar ist
- *  - onClose: Callback zum Schliessen
- *  - conversationType: 'direct' | 'group' – steuert ob "Umfrage" angezeigt wird
- *  - onSelect: Callback mit dem Key der gewaehlten Option (z.B. 'documents', 'media')
+ * ShareSheet – „Inhalt teilen“ nach Figma-Make-Design ([Enhance-chat-UI-design](https://www.figma.com/make/pRXy4mkNb4ninERj9afr9E/Enhance-chat-UI-design)):
+ * abgerundetes Oberteil (32px), farbige Icon-Kacheln pro Option, Karten-Zeilen mit Abstand statt durchgehende Trennlinien,
+ * dezenter Chevron. Weiterhin Gluestack Actionsheet und gleiche Public API (visible, onClose, conversationType, onSelect).
  */
-import { View, Text, Pressable, Modal, Animated, Dimensions } from 'react-native';
-import { useRef, useEffect } from 'react';
+import { View, Text, Pressable } from 'react-native';
 import { theme } from '../../constants/theme';
 import {
   XMarkIcon,
@@ -22,168 +13,169 @@ import {
   MapPinIcon,
   CameraIcon,
   MicrophoneIcon,
+  ChevronRightIcon,
 } from 'react-native-heroicons/outline';
 import { UserGroupIcon } from 'react-native-heroicons/solid';
+import {
+  Actionsheet,
+  ActionsheetBackdrop,
+  ActionsheetContent,
+  ActionsheetDragIndicator,
+  ActionsheetDragIndicatorWrapper,
+  ActionsheetItem,
+  ActionsheetItemText,
+  ActionsheetScrollView,
+} from '../../components/ui/actionsheet';
 
-// Bildschirmhoehe fuer die Slide-Animation
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-
-// Share-Optionen mit Icon, Label und optionalem Gruppen-Flag
+// Farben orientieren am Make-Export (Tailwind blue/purple/amber/pink/emerald/red); Umfrage: Indigo als zusaetzliche Gruppen-Option.
 const SHARE_OPTIONS = [
   {
     key: 'camera',
-    icon: <CameraIcon size={24} strokeWidth={1.8} color={theme.colors.neutral.gray[700]} />,
+    Icon: CameraIcon,
     label: 'Kamera',
     subtitle: 'Foto aufnehmen',
+    iconBgClass: 'bg-blue-50',
+    iconColor: '#2563EB',
   },
   {
     key: 'voice',
-    icon: <MicrophoneIcon size={24} strokeWidth={1.8} color={theme.colors.neutral.gray[700]} />,
+    Icon: MicrophoneIcon,
     label: 'Sprachnachricht',
     subtitle: 'Audio aufnehmen',
+    iconBgClass: 'bg-purple-50',
+    iconColor: '#9333EA',
   },
   {
     key: 'documents',
-    icon: <DocumentIcon size={24} strokeWidth={1.8} color={theme.colors.neutral.gray[700]} />,
+    Icon: DocumentIcon,
     label: 'Dokumente',
     subtitle: 'Dateien teilen',
+    iconBgClass: 'bg-amber-50',
+    iconColor: '#D97706',
   },
   {
     key: 'poll',
-    icon: <ChartBarIcon size={24} strokeWidth={1.8} color={theme.colors.neutral.gray[700]} />,
+    Icon: ChartBarIcon,
     label: 'Umfrage erstellen',
     subtitle: 'Frage an die Gruppe stellen',
+    iconBgClass: 'bg-indigo-50',
+    iconColor: '#4F46E5',
     groupOnly: true,
   },
   {
     key: 'media',
-    icon: <PhotoIcon size={24} strokeWidth={1.8} color={theme.colors.neutral.gray[700]} />,
+    Icon: PhotoIcon,
     label: 'Medien',
     subtitle: 'Fotos und Videos teilen',
+    iconBgClass: 'bg-pink-50',
+    iconColor: '#DB2777',
   },
   {
     key: 'contact',
-    icon: <UserGroupIcon size={24} color={theme.colors.neutral.gray[700]} />,
+    Icon: UserGroupIcon,
     label: 'Kontakt',
     subtitle: 'Kontakte teilen',
+    iconBgClass: 'bg-emerald-50',
+    iconColor: '#059669',
+    iconSolid: true,
   },
   {
     key: 'location',
-    icon: <MapPinIcon size={24} strokeWidth={1.8} color={theme.colors.neutral.gray[700]} />,
+    Icon: MapPinIcon,
     label: 'Standort',
     subtitle: 'Standort teilen',
+    iconBgClass: 'bg-red-50',
+    iconColor: '#DC2626',
   },
 ];
 
 export default function ShareSheet({ visible, onClose, conversationType, onSelect }) {
-  // Slide-up Animation (0 = versteckt, 1 = sichtbar)
-  const slideAnim = useRef(new Animated.Value(0)).current;
-
-  // Animation starten wenn visible sich aendert
-  useEffect(() => {
-    if (visible) {
-      Animated.spring(slideAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-        tension: 65,
-        friction: 11,
-      }).start();
-    }
-  }, [visible]);
-
-  /** Sheet nach unten ausblenden und dann Modal schliessen */
-  const handleClose = () => {
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => {
-      onClose();
-    });
-  };
-
-  /** Option auswaehlen, Sheet schliessen, Callback aufrufen */
+  /** Option waehlen: Sheet schliessen, dann Callback an Eltern. */
   const handleSelect = (key) => {
-    handleClose();
+    onClose();
     if (onSelect) onSelect(key);
   };
 
-  // Optionen filtern: "Umfrage" nur bei Gruppenchats
   const filteredOptions = SHARE_OPTIONS.filter((opt) => {
     if (opt.groupOnly && conversationType !== 'group') return false;
     return true;
   });
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
-      {/* Halbtransparenter Hintergrund – Tippen schliesst das Sheet */}
-      <Pressable
-        className="flex-1 justify-end bg-black/35"
-        onPress={handleClose}
-      >
-        <Animated.View
-          className="bg-white rounded-t-3xl pb-10 max-h-[80%]"
-          style={{
-            transform: [
-              {
-                translateY: slideAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [SCREEN_HEIGHT, 0],
-                }),
-              },
-            ],
-          }}
-        >
-          {/* Tippen innerhalb des Sheets soll nicht schliessen */}
-          <Pressable onPress={(e) => e.stopPropagation()}>
-            {/* Header: X-Button + Titel */}
-            <View className="flex-row items-center justify-between px-4 pt-5 pb-4 border-b border-gray-100">
-              <Pressable className="w-10 h-10 items-center justify-center" onPress={handleClose}>
-                <XMarkIcon size={24} strokeWidth={2} color={theme.colors.neutral.gray[700]} />
-              </Pressable>
-              <Text
-                className="text-lg text-gray-900"
-                style={{ fontFamily: 'Manrope_700Bold' }}
-              >
-                Inhalt teilen
-              </Text>
-              {/* Platzhalter fuer symmetrisches Layout */}
-              <View className="w-10 h-10 items-center justify-center" />
-            </View>
+    <Actionsheet isOpen={visible} onClose={onClose}>
+      <ActionsheetBackdrop />
+      <ActionsheetContent className="w-full max-h-[85%] items-stretch bg-white px-0 pt-0 border-0 border-t border-slate-200 rounded-t-[32px] shadow-none">
+        <ActionsheetDragIndicatorWrapper>
+          {/* Handle wie im Make-Design: schmales Slate-Pill */}
+          <ActionsheetDragIndicator className="w-10 h-1 bg-slate-300 rounded-full" />
+        </ActionsheetDragIndicatorWrapper>
 
-            {/* Optionsliste */}
-            {filteredOptions.map((opt) => (
-              <Pressable
-                key={opt.key}
-                className="flex-row items-center px-5 py-4 border-b border-gray-50"
-                onPress={() => handleSelect(opt.key)}
-              >
-                {/* Rundes Icon-Container */}
-                <View className="w-12 h-12 rounded-full bg-gray-100 items-center justify-center mr-4">
-                  {opt.icon}
-                </View>
-                {/* Label + Untertitel */}
-                <View className="flex-1">
-                  <Text
-                    className="text-base text-gray-900"
-                    style={{ fontFamily: 'Manrope_700Bold' }}
-                  >
-                    {opt.label}
-                  </Text>
-                  {opt.subtitle && (
-                    <Text
-                      className="text-[13px] text-gray-500 mt-0.5"
-                      style={{ fontFamily: 'Manrope_400Regular' }}
-                    >
-                      {opt.subtitle}
-                    </Text>
-                  )}
-                </View>
-              </Pressable>
-            ))}
+        {/* Header: Schliessen absolut links, Titel zentriert, Unterstrich slate-100 */}
+        <View className="relative border-b border-slate-100 pb-4 pt-2 px-4">
+          <Pressable
+            className="absolute left-4 top-2 w-10 h-10 items-center justify-center rounded-full active:bg-slate-100"
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Schliessen"
+          >
+            <XMarkIcon size={20} strokeWidth={2} color={theme.colors.neutral.gray[600]} />
           </Pressable>
-        </Animated.View>
-      </Pressable>
-    </Modal>
+          <Text
+            className="text-center text-lg text-slate-900 pt-0.5"
+            style={{ fontFamily: 'Manrope_600SemiBold' }}
+          >
+            Inhalt teilen
+          </Text>
+        </View>
+
+        <ActionsheetScrollView
+          className="max-h-[60vh] w-full px-4 py-6 pb-8"
+          showsVerticalScrollIndicator={false}
+        >
+          <View className="gap-2">
+            {filteredOptions.map((opt) => {
+              const IconComp = opt.Icon;
+              return (
+                <ActionsheetItem
+                  key={opt.key}
+                  onPress={() => handleSelect(opt.key)}
+                  className="min-h-0 flex-row items-center gap-4 rounded-2xl border-0 bg-transparent px-4 py-4 active:bg-slate-50"
+                >
+                  <View className={`p-3 rounded-2xl ${opt.iconBgClass} items-center justify-center`}>
+                    {opt.iconSolid ? (
+                      <IconComp size={24} color={opt.iconColor} />
+                    ) : (
+                      <IconComp size={24} strokeWidth={1.8} color={opt.iconColor} />
+                    )}
+                  </View>
+                  <View className="flex-1">
+                    <ActionsheetItemText
+                      bold
+                      size="md"
+                      className="text-slate-900"
+                      style={{ fontFamily: 'Manrope_600SemiBold', fontSize: 15 }}
+                    >
+                      {opt.label}
+                    </ActionsheetItemText>
+                    {opt.subtitle ? (
+                      <Text
+                        className="text-sm text-slate-500 mt-0.5"
+                        style={{ fontFamily: 'Manrope_400Regular' }}
+                      >
+                        {opt.subtitle}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {/* Chevron: auf Touch-Geraeten dauerhaft leicht sichtbar (ohne Hover) */}
+                  <View className="w-8 h-8 rounded-full bg-slate-100 items-center justify-center opacity-70">
+                    <ChevronRightIcon size={16} strokeWidth={2} color={theme.colors.neutral.gray[600]} />
+                  </View>
+                </ActionsheetItem>
+              );
+            })}
+          </View>
+        </ActionsheetScrollView>
+      </ActionsheetContent>
+    </Actionsheet>
   );
 }

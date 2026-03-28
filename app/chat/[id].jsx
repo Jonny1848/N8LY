@@ -9,20 +9,21 @@
  *  - ChatHeader: Zurueck-Pfeil, Avatar, Name, Online-Status
  *  - ChatBubble: Nachrichten-Bubbles mit Datumsseparator
  *  - MessageInput: 3-Modi Input Bar (Normal, Recording, Preview)
- *  - ShareSheet: "Inhalt teilen" Bottom Sheet
+ *  - ShareSheet: "Inhalt teilen" Bottom Sheet (bei Offenheit Unschaerfe ueber Chat, wie Figma-Make)
  *  - ImagePreviewModal: Vollbild beim Tippen auf eine Bildnachricht
  *
  * Route: /chat/[id] – Die ID ist die conversation_id aus Supabase.
  */
-import { FlatList, KeyboardAvoidingView, Platform, View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Platform, View, Text, ActivityIndicator, StyleSheet, Animated } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 // Zustand: Globale Stores fuer Auth und Chat
 import useAuthStore from '../../stores/useAuthStore';
 import useChatStore from '../../stores/useChatStore';
-import { uploadVoiceMessage, uploadChatImage } from '../../services/storageService';
+import { uploadVoiceMessage, uploadChatImage, uploadChatFile } from '../../services/storageService';
 
 // Wiederverwendbare Chat-Komponenten
 import ChatHeader from '../../components/chat/ChatHeader';
@@ -31,6 +32,16 @@ import MessageInput from '../../components/chat/MessageInput';
 import ShareSheet from '../../components/chat/ShareSheet';
 import ImagePreviewModal from '../../components/chat/ImagePreviewModal';
 import { theme } from '../../constants/theme';
+
+import {
+  Actionsheet,
+  ActionsheetContent,
+  ActionsheetItem,
+  ActionsheetItemText,
+  ActionsheetDragIndicator,
+  ActionsheetDragIndicatorWrapper,
+  ActionsheetBackdrop,
+} from '../../components/ui/actionsheet';
 
 // Stabiler Fallback – verhindert Update-Loop bei leerem messagesByConversation
 const EMPTY_MESSAGES = [];
@@ -56,6 +67,19 @@ export default function ChatDetailScreen() {
   const flatListRef = useRef(null);
   const messageInputRef = useRef(null);
   const insets = useSafeAreaInsets();
+
+  /**
+   * Blur-Opacity parallel zum Gluestack-Actionsheet (timing 200ms im Creator),
+   * damit keine harte Kante zwischen voller Unschaerfe und noch nicht animiertem Overlay entsteht.
+   */
+  const shareSheetBlurOpacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(shareSheetBlurOpacity, {
+      toValue: shareSheetVisible ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [shareSheetVisible, shareSheetBlurOpacity]);
 
   // Reduzierter Abstand unten: max. 12px statt vollem Safe-Area-Inset (34px+)
   const bottomPadding = Math.min(insets.bottom, 12);
@@ -100,7 +124,7 @@ export default function ChatDetailScreen() {
       userId,
       publicUrl,
       'voice',
-      waveformData,
+      { waveformData },
     );
   }, [conversationId, userId]);
 
@@ -116,7 +140,32 @@ export default function ChatDetailScreen() {
     );
   }, [conversationId, userId]);
 
-  /** Share Sheet Optionsauswahl – Kamera, Medien, Sprachnachricht an MessageInput weiterleiten */
+  /**
+   * Dokument aus dem System-Dateiauswahldialog hochladen und als Datei-Nachricht senden.
+   * Der angezeigte Name kommt in content (Caption), die URL in media_url.
+   */
+  const handleSendFile = useCallback(
+    async (localUri, { name, mimeType } = {}) => {
+      if (!userId || !localUri) return;
+      const displayName = (name && String(name).trim()) || 'Datei';
+      const publicUrl = await uploadChatFile(
+        conversationId,
+        localUri,
+        mimeType || 'application/octet-stream',
+        displayName,
+      );
+      await useChatStore.getState().sendMediaMessage(
+        conversationId,
+        userId,
+        publicUrl,
+        'file',
+        { caption: displayName },
+      );
+    },
+    [conversationId, userId],
+  );
+
+  /** Share Sheet Optionsauswahl – Kamera, Medien, Sprachnachricht, Dokumente an MessageInput */
   const handleShareSelect = useCallback((key) => {
     if (key === 'camera') {
       setTimeout(() => messageInputRef.current?.openCamera?.(), 300);
@@ -124,6 +173,8 @@ export default function ChatDetailScreen() {
       setTimeout(() => messageInputRef.current?.openMediaLibrary?.(), 300);
     } else if (key === 'voice') {
       setTimeout(() => messageInputRef.current?.startVoiceRecording?.(), 300);
+    } else if (key === 'documents') {
+      setTimeout(() => messageInputRef.current?.openDocumentPicker?.(), 300);
     } else {
       console.log('[SHARE] Option gewaehlt:', key);
     }
@@ -162,55 +213,75 @@ export default function ChatDetailScreen() {
   // RENDER
   // ============================
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
-      >
-        {/* Header: Avatar, Name, Online-Status, Optionen */}
-        <ChatHeader
-          conversation={conversation}
-          onBack={() => router.back()}
-        />
-
-        {/* Nachrichten-Liste (inverted FlatList – neueste unten) */}
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item, index }) => (
-            <ChatBubble
-              item={item}
-              index={index}
-              messages={messages}
-              userId={userId}
+    /*
+     * Aeusserer Container: Blur als Geschwister von SafeAreaView mit absoluteFill deckt den
+     * kompletten Bildschirm inkl. Statusleiste/Notch ab (SafeAreaView puffert nur den Chat-Inhalt).
+     */
+    <View className="flex-1 bg-white">
+      <SafeAreaView className="flex-1 bg-white" edges={['top']}>
+        <View className="flex-1 overflow-hidden">
+          <KeyboardAvoidingView
+            className="flex-1"
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={0}
+          >
+            {/* Header: Avatar, Name, Online-Status, Optionen */}
+            <ChatHeader
               conversation={conversation}
-              onImagePress={handleImagePress}
+              onBack={() => router.back()}
             />
-          )}
-          inverted
-          contentContainerStyle={[
-            styles.listContent,
-            messages.length === 0 && styles.listContentEmpty,
-          ]}
-          showsVerticalScrollIndicator={false}
-          style={styles.list}
-          ListEmptyComponent={renderEmptyList}
-        />
 
-        {/* Input Bar: + | Input | Send (wie Screenshot) – Kamera/Voice ueber ShareSheet */}
-        <MessageInput
-          ref={messageInputRef}
-          onSendText={handleSendText}
-          onSendVoice={handleSendVoice}
-          onSendImage={handleSendImage}
-          onOpenShareSheet={() => setShareSheetVisible(true)}
-        />
+            {/* Nachrichten-Liste (inverted FlatList – neueste unten) */}
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item, index }) => (
+                <ChatBubble
+                  item={item}
+                  index={index}
+                  messages={messages}
+                  userId={userId}
+                  conversation={conversation}
+                  onImagePress={handleImagePress}
+                />
+              )}
+              inverted
+              contentContainerStyle={[
+                styles.listContent,
+                messages.length === 0 && styles.listContentEmpty,
+              ]}
+              showsVerticalScrollIndicator={false}
+              style={styles.list}
+              ListEmptyComponent={renderEmptyList}
+            />
 
-        {/* Reduzierter Abstand unten (statt vollem Safe-Area-Inset) */}
-        <View style={{ height: bottomPadding, backgroundColor: '#FFFFFF' }} />
-      </KeyboardAvoidingView>
+            {/* Input Bar: + | Input | Send (wie Screenshot) – Kamera/Voice ueber ShareSheet */}
+            <MessageInput
+              ref={messageInputRef}
+              onSendText={handleSendText}
+              onSendVoice={handleSendVoice}
+              onSendImage={handleSendImage}
+              onSendFile={handleSendFile}
+              onOpenShareSheet={() => setShareSheetVisible(true)}
+            />
+
+            {/* Reduzierter Abstand unten (statt vollem Safe-Area-Inset) */}
+            <View style={{ height: bottomPadding, backgroundColor: '#FFFFFF' }} />
+          </KeyboardAvoidingView>
+        </View>
+      </SafeAreaView>
+
+      {/*
+        Unschaerfe ueber dem gesamten Screen (inkl. Top-Safe-Area), animiert wie Sheet (200ms).
+        Liegt unter dem Actionsheet; pointerEvents none.
+      */}
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFillObject, { opacity: shareSheetBlurOpacity }]}
+      >
+        <BlurView intensity={50} tint="light" style={StyleSheet.absoluteFillObject} />
+      </Animated.View>
 
       {/* "Inhalt teilen" Bottom Sheet */}
       <ShareSheet
@@ -225,7 +296,7 @@ export default function ChatDetailScreen() {
         imageUri={imagePreviewUri}
         onClose={() => setImagePreviewUri(null)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
