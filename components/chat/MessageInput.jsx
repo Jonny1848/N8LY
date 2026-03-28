@@ -28,7 +28,6 @@ import * as ImagePicker from 'expo-image-picker';
 
 /**
  * MessageInput – Layout wie Referenz-Screenshot: + | Input | Send
- * Kamera und Sprachnachricht ueber ShareSheet (Plus-Button)
  */
 const MessageInput = forwardRef(function MessageInput(
   { onSendText, onSendVoice, onOpenShareSheet, onSendImage },

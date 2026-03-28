@@ -10,6 +10,7 @@
  *  - ChatBubble: Nachrichten-Bubbles mit Datumsseparator
  *  - MessageInput: 3-Modi Input Bar (Normal, Recording, Preview)
  *  - ShareSheet: "Inhalt teilen" Bottom Sheet
+ *  - ImagePreviewModal: Vollbild beim Tippen auf eine Bildnachricht
  *
  * Route: /chat/[id] – Die ID ist die conversation_id aus Supabase.
  */
@@ -28,6 +29,7 @@ import ChatHeader from '../../components/chat/ChatHeader';
 import ChatBubble from '../../components/chat/ChatBubble';
 import MessageInput from '../../components/chat/MessageInput';
 import ShareSheet from '../../components/chat/ShareSheet';
+import ImagePreviewModal from '../../components/chat/ImagePreviewModal';
 import { theme } from '../../constants/theme';
 
 // Stabiler Fallback – verhindert Update-Loop bei leerem messagesByConversation
@@ -50,6 +52,7 @@ export default function ChatDetailScreen() {
   // Lokaler UI-State
   // ============================
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
+  const [imagePreviewUri, setImagePreviewUri] = useState(null);
   const flatListRef = useRef(null);
   const messageInputRef = useRef(null);
   const insets = useSafeAreaInsets();
@@ -126,6 +129,14 @@ export default function ChatDetailScreen() {
     }
   }, []);
 
+  /**
+   * Callback fuer ChatBubble: Bild antippen oeffnet die Vorschau.
+   * HIER wird das Callback gesetzt und an jede Bubble durchgereicht (renderItem).
+   */
+  const handleImagePress = useCallback((uri) => {
+    if (uri) setImagePreviewUri(uri);
+  }, []);
+
   // Empty-State mit Schatten: Loading oder freundlicher Hinweis bei leerem Chat
   const renderEmptyList = () => {
     const content = loading ? (
@@ -175,6 +186,7 @@ export default function ChatDetailScreen() {
               messages={messages}
               userId={userId}
               conversation={conversation}
+              onImagePress={handleImagePress}
             />
           )}
           inverted
@@ -206,6 +218,12 @@ export default function ChatDetailScreen() {
         onClose={() => setShareSheetVisible(false)}
         conversationType={conversation?.type}
         onSelect={handleShareSelect}
+      />
+
+      <ImagePreviewModal
+        visible={!!imagePreviewUri}
+        imageUri={imagePreviewUri}
+        onClose={() => setImagePreviewUri(null)}
       />
     </SafeAreaView>
   );

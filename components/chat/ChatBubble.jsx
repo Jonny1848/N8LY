@@ -11,8 +11,9 @@
  *  - messages: Gesamtes Messages-Array (fuer Datumsseparator-Check)
  *  - userId: ID des aktuellen Users
  *  - conversation: Konversation-Objekt (fuer Gruppeninfo)
+ *  - onImagePress: optional (uri) => void – Tipp auf Bildnachricht (Vorschau im Parent)
  */
-import { View, Text, useWindowDimensions } from 'react-native';
+import { View, Text, useWindowDimensions, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { theme } from '../../constants/theme';
 import { UserIcon } from 'react-native-heroicons/solid';
@@ -51,7 +52,7 @@ function formatDateSeparator(dateStr) {
   return date.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-export default function ChatBubble({ item, index, messages, userId, conversation }) {
+export default function ChatBubble({ item, index, messages, userId, conversation, onImagePress }) {
   const { width: screenWidth } = useWindowDimensions();
   const isOwn = item.sender_id === userId;
   const isSystem = item.message_type === 'system';
@@ -120,8 +121,19 @@ export default function ChatBubble({ item, index, messages, userId, conversation
 
           {/* Wrapper fuer Bubble + Zeitstempel – max. 75% Chat-Breite */}
           <View className={`max-w-[75%] ${isOwn ? 'items-end' : 'items-start'}`}>
+            {/* Absendername bei Bildnachrichten AUSSERHALB der Bubble, damit overflow-hidden ihn nicht abschneidet */}
+            {!isOwn && conversation?.type === 'group' && item.profiles?.username && isImage && (
+              <Text
+                className="text-xs mb-1 text-n8tly-blue"
+                style={{ fontFamily: 'Manrope_600SemiBold' }}
+              >
+                {item.profiles.username}
+              </Text>
+            )}
+
             <View className={bubbleBaseClasses}>
-              {!isOwn && conversation?.type === 'group' && item.profiles?.username && (
+              {/* Absendername bei Nicht-Bild-Nachrichten innerhalb der Bubble */}
+              {!isOwn && conversation?.type === 'group' && item.profiles?.username && !isImage && (
                 <Text
                   className="text-xs mb-0.5 text-n8tly-blue"
                   style={{ fontFamily: 'Manrope_600SemiBold' }}
@@ -139,16 +151,24 @@ export default function ChatBubble({ item, index, messages, userId, conversation
               ) : isImage && item.media_url ? (
                 /* Bildnachricht: Foto mit optionalem Caption – Zeitstempel unter der Bubble */
                 <>
-                  <Image
-                    source={{ uri: item.media_url }}
-                    cachePolicy="disk"
-                    style={{
-                      width: imageWidth,
-                      aspectRatio: 4 / 3,
-                      borderRadius: 12,
-                    }}
-                    contentFit="cover"
-                  />
+                  {/* Tipp oeffnet Vollbild; Callback kommt vom Chat-Screen (imagePreviewUri) */}
+                  <Pressable
+                    onPress={() => onImagePress?.(item.media_url)}
+                    disabled={!onImagePress}
+                    accessibilityRole="imagebutton"
+                    accessibilityLabel="Bild in Vollbild anzeigen"
+                  >
+                    <Image
+                      source={{ uri: item.media_url }}
+                      cachePolicy="disk"
+                      style={{
+                        width: imageWidth,
+                        aspectRatio: 4 / 3,
+                        borderRadius: 12,
+                      }}
+                      contentFit="cover"
+                    />
+                  </Pressable>
                   {item.content ? (
                     <Text
                       className={`text-sm mt-1.5 leading-5 ${isOwn ? 'text-white' : 'text-gray-900'}`}

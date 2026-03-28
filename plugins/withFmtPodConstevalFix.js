@@ -1,14 +1,5 @@
 /**
  * Expo Config Plugin: iOS-Pod «fmt» und Apple Clang (C++20 consteval)
- *
- * Symptom in Xcode: "Call to consteval function 'fmt::basic_format_string<...>' is not a constant expression"
- * kommt von fmt zusammen mit neueren Clang-Versionen (RCT-Folly liefert fmt als Pod).
- *
- * Loesung: C++-Standard NUR fuer das fmt-Pod auf C++17 herunterstufen.
- * base.h prueft «FMT_CPLUSPLUS < 201709L» und setzt dann FMT_USE_CONSTEVAL=0.
- *
- * WICHTIG: Der Block wird am ENDE von post_install eingefuegt, NACH react_native_post_install,
- * da dieses den C++-Standard global auf C++20 setzt und unsere Einstellung sonst ueberschreibt.
  */
 const { withPodfile } = require("@expo/config-plugins");
 
