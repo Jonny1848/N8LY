@@ -1,15 +1,5 @@
 /**
  * Social Screen – Chat-Uebersicht mit Stories und Konversationsliste
- *
- * Inspiriert vom "Chats"-Screenshot: Cleanes, helles Design.
- *
- * LAYOUT (von oben nach unten):
- * 1) Header: "Chats" links gross, Optionen-Icon + Lupe rechts
- * 2) Suchleiste: Standardmaessig ausgeblendet, wird per Lupe eingeblendet
- * 3) Stories: Kreisrunde Avatare (horizontal scrollbar) mit Profilbildern
- * 4) Chat-Liste: Runde Avatare, Name, Nachrichtenvorschau, Zeitstempel, Unread-Badge
- *
- * Realtime: Die Chat-Liste aktualisiert sich automatisch bei neuen Nachrichten.
  */
 import {
   View,
@@ -27,8 +17,8 @@ import Animated, {
   runOnJS,
   Easing,
 } from 'react-native-reanimated';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { theme } from '../../constants/theme';
 import {
@@ -36,10 +26,15 @@ import {
   EllipsisHorizontalCircleIcon,
   XMarkIcon,
 } from 'react-native-heroicons/outline';
-import { UserIcon, PlusIcon } from 'react-native-heroicons/solid';
+import { UserIcon, PlusIcon,UserGroupIcon, Cog6ToothIcon } from 'react-native-heroicons/solid';
 import useAuthStore from '../../stores/useAuthStore';
 import useChatStore from '../../stores/useChatStore';
-
+import {
+  Menu,
+  MenuItem,
+  MenuItemLabel,
+  MenuSeparator,
+} from '../../components/ui/menu';
 
 const SEARCH_BAR_HEIGHT = 56;
 
@@ -148,6 +143,21 @@ export default function SocialScreen() {
   /**
    * Story-Daten aus Konversationen: einzigartige Chat-Partner mit Profilbildern.
    */
+  /**
+   * Aktionen aus dem Chats-Optionsmenue (Schluessel entsprechen MenuItem key).
+   * Navigation kann hier spaeter angebunden werden.
+   */
+  const onChatsHeaderMenuAction = useCallback((key: React.Key) => {
+    const k = String(key);
+    if (k === 'new-chat') {
+      // Spaeter: z. B. Kontaktauswahl / neuer Einzelchat
+    } else if (k === 'new-group') {
+      // Spaeter: Flow „Neue Gruppe“
+    } else if (k === 'chat-settings') {
+      // Spaeter: globale Chat-Einstellungen
+    }
+  }, []);
+
   const getStoryUsers = () => {
     const seen = new Set<string>();
     const users: any[] = [];
@@ -190,16 +200,34 @@ export default function SocialScreen() {
         </Text>
       </View>
 
-      {/* Optionen-Button rechts */}
-      <Pressable
-        className="w-10 h-10 items-center justify-center"
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        onPress={() => {
-          // TODO: ActionSheet oder Modal oeffnen (Neue Gruppe, Neuer Chat, etc.)
-        }}
+      {/* Optionen: useRNModal=true nutzt RN-Modal als Overlay (robust ueber Listen/SafeArea) */}
+      <Menu
+        placement="bottom right"
+        useRNModal
+        onAction={onChatsHeaderMenuAction}
+        trigger={(triggerProps) => (
+          <Pressable
+            className="w-10 h-10 items-center justify-center"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            {...triggerProps}
+          >
+            <EllipsisHorizontalCircleIcon size={26} color={theme.colors.neutral.gray[800]} />
+          </Pressable>
+        )}
       >
-        <EllipsisHorizontalCircleIcon size={26} color={theme.colors.neutral.gray[800]} />
-      </Pressable>
+        <MenuItem key="new-chat" textValue="Neuer Chat">
+          <PlusIcon size={20} color={theme.colors.primary.main} />
+          <MenuItemLabel>Neuer Chat</MenuItemLabel>
+        </MenuItem>
+        <MenuItem key="new-group" textValue="Gruppe erstellen">
+          <UserGroupIcon size={20} color={theme.colors.primary.main} />
+          <MenuItemLabel>Neue Gruppe</MenuItemLabel>
+        </MenuItem>
+        <MenuItem key="chat-settings" textValue="Einstellungen">
+          <Cog6ToothIcon size={20} color={theme.colors.primary.main} />
+          <MenuItemLabel>Einstellungen</MenuItemLabel>
+        </MenuItem>
+      </Menu>
     </View>
   );
 
@@ -441,9 +469,8 @@ export default function SocialScreen() {
     </View>
   );
 
-  // ============================
-  // RENDER
-  // ============================
+
+
   return (
     <View className="flex-1 bg-white">
       {/* Oberer Bereich hervorgehoben: SafeArea + Header + Suchleiste + Stories (grau bis ganz oben) */}
