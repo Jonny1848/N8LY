@@ -13,9 +13,9 @@ import {
   MapPinIcon,
   CameraIcon,
   MicrophoneIcon,
-  ChevronRightIcon,
+  UserGroupIcon,
 } from 'react-native-heroicons/outline';
-import { UserGroupIcon } from 'react-native-heroicons/solid';
+
 import {
   Actionsheet,
   ActionsheetBackdrop,
@@ -27,7 +27,7 @@ import {
   ActionsheetScrollView,
 } from '../../components/ui/actionsheet';
 
-// Farben orientieren am Make-Export (Tailwind blue/purple/amber/pink/emerald/red); Umfrage: Indigo als zusaetzliche Gruppen-Option.
+// Farben orientieren am Make-Export (Tailwind blue/purple/amber/pink/emerald/red);
 const SHARE_OPTIONS = [
   {
     key: 'camera',
@@ -54,15 +54,6 @@ const SHARE_OPTIONS = [
     iconColor: '#D97706',
   },
   {
-    key: 'poll',
-    Icon: ChartBarIcon,
-    label: 'Umfrage erstellen',
-    subtitle: 'Frage an die Gruppe stellen',
-    iconBgClass: 'bg-indigo-50',
-    iconColor: '#4F46E5',
-    groupOnly: true,
-  },
-  {
     key: 'media',
     Icon: PhotoIcon,
     label: 'Medien',
@@ -78,7 +69,8 @@ const SHARE_OPTIONS = [
     iconBgClass: 'bg-emerald-50',
     iconColor: '#059669',
     iconSolid: true,
-  },
+  }
+  /*
   {
     key: 'location',
     Icon: MapPinIcon,
@@ -86,7 +78,7 @@ const SHARE_OPTIONS = [
     subtitle: 'Standort teilen',
     iconBgClass: 'bg-red-50',
     iconColor: '#DC2626',
-  },
+  },*/
 ];
 
 export default function ShareSheet({ visible, onClose, conversationType, onSelect }) {
@@ -103,23 +95,27 @@ export default function ShareSheet({ visible, onClose, conversationType, onSelec
 
   return (
     <Actionsheet isOpen={visible} onClose={onClose}>
-      <ActionsheetBackdrop />
-      <ActionsheetContent className="w-full max-h-[85%] items-stretch bg-white px-0 pt-0 border-0 border-t border-slate-200 rounded-t-[32px] shadow-none">
+      {/* Eigener Backdrop transparent: der BlurView im Chat-Screen uebernimmt die Abdunklung */}
+      <ActionsheetBackdrop className="bg-transparent" />
+      {/* Sheet: starker Schatten + Rundung erzeugt klare Abhebung vom Blur-Hintergrund (Referenz-Design) */}
+      <ActionsheetContent
+        className="w-full max-h-[85%] items-stretch bg-white px-0 pt-0 border-0 rounded-t-[32px]"
+        style={{
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -8 },
+          shadowOpacity: 0.15,
+          shadowRadius: 24,
+          elevation: 24,
+        }}
+      >
         <ActionsheetDragIndicatorWrapper>
-          {/* Handle wie im Make-Design: schmales Slate-Pill */}
-          <ActionsheetDragIndicator className="w-10 h-1 bg-slate-300 rounded-full" />
+          {/* Drag-Indicator in Primaerfarbe (blau) wie im Referenz-Design */}
+          <ActionsheetDragIndicator className="w-10 h-1 rounded-full" style={{ backgroundColor: "black" }} />
         </ActionsheetDragIndicatorWrapper>
 
         {/* Header: Schliessen absolut links, Titel zentriert, Unterstrich slate-100 */}
         <View className="relative border-b border-slate-100 pb-4 pt-2 px-4">
-          <Pressable
-            className="absolute left-4 top-2 w-10 h-10 items-center justify-center rounded-full active:bg-slate-100"
-            onPress={onClose}
-            accessibilityRole="button"
-            accessibilityLabel="Schliessen"
-          >
-            <XMarkIcon size={20} strokeWidth={2} color={theme.colors.neutral.gray[600]} />
-          </Pressable>
+          
           <Text
             className="text-center text-lg text-slate-900 pt-0.5"
             style={{ fontFamily: 'Manrope_600SemiBold' }}
@@ -165,10 +161,6 @@ export default function ShareSheet({ visible, onClose, conversationType, onSelec
                         {opt.subtitle}
                       </Text>
                     ) : null}
-                  </View>
-                  {/* Chevron: auf Touch-Geraeten dauerhaft leicht sichtbar (ohne Hover) */}
-                  <View className="w-8 h-8 rounded-full bg-slate-100 items-center justify-center opacity-70">
-                    <ChevronRightIcon size={16} strokeWidth={2} color={theme.colors.neutral.gray[600]} />
                   </View>
                 </ActionsheetItem>
               );

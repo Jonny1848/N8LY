@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { theme } from '../../constants/theme';
 import ProgressBar from '../../components/ProgressBar';
 
+
 export default function Avatar() {
   const router = useRouter();
   const { profileData, updateProfileData } = useOnboarding();

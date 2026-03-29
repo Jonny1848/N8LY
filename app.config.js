@@ -89,6 +89,13 @@ export default {
         },
       ],
       [
+        "expo-contacts",
+        {
+          contactsPermission:
+            "N8TLY benoetigt Zugriff auf deine Kontakte fuer den Kontakt-Teilen-Dialog.",
+        },
+      ],
+      [
         "@rnmapbox/maps",
         {
           RNMapboxMapsImpl: "mapbox",

@@ -6,7 +6,7 @@
  *
  * Recording/Preview-Modus: Sprachnachricht-Aufnahme (unveraendert)
  */
-import { View, Text, TextInput, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useState, useEffect, Fragment, forwardRef, useImperativeHandle } from 'react';
 import { theme } from '../../constants/theme';
 import { TrashIcon, PlusIcon } from 'react-native-heroicons/outline';
@@ -26,15 +26,15 @@ import {
 } from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
 
-// expo-document-picker NICHT top-level importieren: Bei fehlendem Native-Modul (z. B. alter Dev-Client)
-// koennte der Screen beim Laden brechen. Stattdessen require() innerhalb von handlePickDocument
-// (siehe dort) – kein dynamisches import(), Metro lieferte dabei oft kein getDocumentAsync.
+
+// expo-document-picker / expo-contacts: NICHT top-level importieren – fehlendes Native-Modul
+// wuerde den Screen brechen. require() in handlePickDocument / handlePickContacts mit Fallback-Alert.
 
 /**
  * MessageInput – Layout wie Referenz-Screenshot: + | Input | Send
  */
 const MessageInput = forwardRef(function MessageInput(
-  { onSendText, onSendVoice, onOpenShareSheet, onSendImage, onSendFile },
+  { onSendText, onSendVoice, onOpenShareSheet, onSendImage, onSendFile, onSendContact },
   ref
 ) {
   // ============================
@@ -53,6 +53,8 @@ const MessageInput = forwardRef(function MessageInput(
   const [uploadingImage, setUploadingImage] = useState(false);
   // Dokumente: Ladezustand nach Dateiauswahl bis Upload fertig
   const [uploadingFile, setUploadingFile] = useState(false);
+  // Kontakt: nach Auswahl bis Text-Nachricht gesendet
+  const [uploadingContact, setUploadingContact] = useState(false);
 
   // expo-audio: Recorder mit Metering fuer Waveform (Lautstaerke pro Zeitscheibe)
   const recordingOptions = {
@@ -251,19 +253,32 @@ const MessageInput = forwardRef(function MessageInput(
   const handlePickDocument = async () => {
     if (!onSendFile || uploadingFile) return;
 
+    /*
+     * Schritt 1: Native-Modul laden.
+     * require() in einem eigenen try/catch: wenn ExpoDocumentPicker nicht im
+     * Dev-Client-Build enthalten ist, faengt das den "Cannot find native module"-
+     * Fehler ab und zeigt dem User eine hilfreiche Meldung statt eines Red-Screen.
+     */
+    let getDocumentAsync;
     try {
-      /*
-       * Lazy require (nicht Top-Level): Chat-Screen bleibt ohne sofortigen Native-Bind.
-       * Hinweis: import('expo-document-picker') liefert unter Metro oft kein gueltiges Named-Export-
-       * Objekt → getDocumentAsync war undefined. require() im Funktionskoerper ist hier zuverlaessiger.
-       */
-      const DocumentPickerModule = require('expo-document-picker');
-      const getDocumentAsync =
-        DocumentPickerModule.getDocumentAsync ??
-        DocumentPickerModule.default?.getDocumentAsync;
-      if (typeof getDocumentAsync !== 'function') {
-        throw new Error('expo-document-picker: getDocumentAsync nicht verfuegbar');
-      }
+      const mod = require('expo-document-picker');
+      getDocumentAsync = mod.getDocumentAsync ?? mod.default?.getDocumentAsync;
+    } catch {
+      // Native-Modul fehlt im Build
+    }
+
+    if (typeof getDocumentAsync !== 'function') {
+      Alert.alert(
+        'Nicht verfuegbar',
+        'Der Dokumenten-Picker ist in diesem Build nicht enthalten. '
+        + 'Bitte erstelle einen neuen Dev-Client mit „npx expo run:ios" bzw. „npx expo run:android".',
+        [{ text: 'OK' }],
+      );
+      return;
+    }
+
+    // Schritt 2: Datei auswaehlen und hochladen
+    try {
       const result = await getDocumentAsync({
         type: '*/*',
         copyToCacheDirectory: true,
@@ -283,10 +298,86 @@ const MessageInput = forwardRef(function MessageInput(
       Alert.alert(
         'Datei',
         'Die Datei konnte nicht gesendet werden. Bitte versuche es erneut.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
     } finally {
       setUploadingFile(false);
+    }
+  };
+
+  // ============================
+  // Kontakte: nativer Picker (presentContactPickerAsync), Senden ueber Parent
+  // ============================
+  const handlePickContacts = async () => {
+    if (!onSendContact || uploadingContact) return;
+
+    /** Telefonnummer aus expo-contacts-Objekt (Primaernummer bevorzugt). */
+    const pickPhoneFromContact = (contact) => {
+      const nums = contact?.phoneNumbers;
+      if (!nums?.length) return null;
+      const primary = nums.find((p) => p.isPrimary) ?? nums[0];
+      const raw = primary?.number?.trim() || primary?.digits;
+      return raw || null;
+    };
+
+    /** Anzeigename aus Kontakt (name oder Vor-/Nachname). */
+    const displayNameFromContact = (contact) => {
+      if (contact.name?.trim()) return contact.name.trim();
+      const parts = [contact.firstName, contact.lastName].filter(Boolean);
+      const joined = parts.join(' ').trim();
+      return joined || 'Kontakt';
+    };
+
+    let Contacts;
+    try {
+      Contacts = require('expo-contacts');
+    } catch {
+      Contacts = null;
+    }
+    if (!Contacts?.presentContactPickerAsync) {
+      Alert.alert(
+        'Nicht verfuegbar',
+        'Kontakte sind in diesem Build nicht eingebunden. Bitte App neu bauen (expo run:ios / android).',
+        [{ text: 'OK' }],
+      );
+      return;
+    }
+
+    try {
+      // Android: READ_CONTACTS fuer den Picker noetig; iOS oeffnet den Picker ohne vollstaendigen Adressbuch-Zugriff
+      if (Platform.OS === 'android') {
+        const { status } = await Contacts.requestPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            'Kontakt-Zugriff',
+            'Wir benoetigen Zugriff auf deine Kontakte, um einen Kontakt auszuwaehlen.',
+            [{ text: 'OK' }],
+          );
+          return;
+        }
+      }
+
+      const contact = await Contacts.presentContactPickerAsync();
+      if (!contact) return;
+
+      const phone = pickPhoneFromContact(contact);
+      if (!phone) {
+        Alert.alert('Keine Telefonnummer', 'Dieser Kontakt hat keine gespeicherte Nummer.', [{ text: 'OK' }]);
+        return;
+      }
+
+      const name = displayNameFromContact(contact);
+      setUploadingContact(true);
+      await onSendContact({ displayName: name, phone });
+    } catch (err) {
+      console.error('[KONTAKTE] Fehler beim Auswaehlen oder Senden:', err);
+      Alert.alert(
+        'Kontakt',
+        'Der Kontakt konnte nicht gesendet werden. Bitte versuche es erneut.',
+        [{ text: 'OK' }],
+      );
+    } finally {
+      setUploadingContact(false);
     }
   };
 
@@ -296,6 +387,7 @@ const MessageInput = forwardRef(function MessageInput(
     openMediaLibrary: handlePickFromGallery,
     startVoiceRecording: handleStartRecording,
     openDocumentPicker: handlePickDocument,
+    openContactsPicker: handlePickContacts,
   }));
 
   /** Preview-Wiedergabe umschalten (Play/Pause) */

@@ -33,16 +33,6 @@ import ShareSheet from '../../components/chat/ShareSheet';
 import ImagePreviewModal from '../../components/chat/ImagePreviewModal';
 import { theme } from '../../constants/theme';
 
-import {
-  Actionsheet,
-  ActionsheetContent,
-  ActionsheetItem,
-  ActionsheetItemText,
-  ActionsheetDragIndicator,
-  ActionsheetDragIndicatorWrapper,
-  ActionsheetBackdrop,
-} from '../../components/ui/actionsheet';
-
 // Stabiler Fallback – verhindert Update-Loop bei leerem messagesByConversation
 const EMPTY_MESSAGES = [];
 
@@ -165,6 +155,19 @@ export default function ChatDetailScreen() {
     [conversationId, userId],
   );
 
+  /**
+   * Kontakt aus dem Share-Sheet: als Text-Nachricht (Name + Nummer) – spaeter ggf. eigenes message_type.
+   */
+  const handleSendContact = useCallback(
+    async ({ displayName, phone }) => {
+      if (!userId || !phone?.trim()) return;
+      const label = (displayName && String(displayName).trim()) || 'Kontakt';
+      const body = `Kontakt: ${label}\n${phone.trim()}`;
+      await useChatStore.getState().sendTextMessage(conversationId, userId, body);
+    },
+    [conversationId, userId],
+  );
+
   /** Share Sheet Optionsauswahl – Kamera, Medien, Sprachnachricht, Dokumente an MessageInput */
   const handleShareSelect = useCallback((key) => {
     if (key === 'camera') {
@@ -175,7 +178,10 @@ export default function ChatDetailScreen() {
       setTimeout(() => messageInputRef.current?.startVoiceRecording?.(), 300);
     } else if (key === 'documents') {
       setTimeout(() => messageInputRef.current?.openDocumentPicker?.(), 300);
-    } else {
+    } else if (key === 'contact') {
+      setTimeout(() => messageInputRef.current?.openContactsPicker?.(), 300); 
+    } 
+    else {
       console.log('[SHARE] Option gewaehlt:', key);
     }
   }, []);
@@ -263,6 +269,7 @@ export default function ChatDetailScreen() {
               onSendVoice={handleSendVoice}
               onSendImage={handleSendImage}
               onSendFile={handleSendFile}
+              onSendContact={handleSendContact}
               onOpenShareSheet={() => setShareSheetVisible(true)}
             />
 
@@ -280,7 +287,8 @@ export default function ChatDetailScreen() {
         pointerEvents="none"
         style={[StyleSheet.absoluteFillObject, { opacity: shareSheetBlurOpacity }]}
       >
-        <BlurView intensity={50} tint="light" style={StyleSheet.absoluteFillObject} />
+        {/* Kraeftiger Blur mit dunklem Tint: klarer Kontrast zum weissen Sheet (wie Referenz-Design) */}
+        <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFillObject} />
       </Animated.View>
 
       {/* "Inhalt teilen" Bottom Sheet */}
