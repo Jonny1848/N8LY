@@ -1,5 +1,6 @@
 /**
- * Social Screen – Chat-Uebersicht mit Stories und Konversationsliste
+ * Social Screen – Chat-Uebersicht mit Stories (Supabase storyService) und Konversationsliste.
+ * Menue: Neuer Chat / Neue Gruppe / Einstellungen (Profil-Tab); Story-Ring laedt bei Tab-Fokus neu.
  */
 import {
   View,
@@ -10,6 +11,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -29,12 +31,8 @@ import {
 import { UserIcon, PlusIcon,UserGroupIcon, Cog6ToothIcon } from 'react-native-heroicons/solid';
 import useAuthStore from '../../stores/useAuthStore';
 import useChatStore from '../../stores/useChatStore';
-import {
-  Menu,
-  MenuItem,
-  MenuItemLabel,
-  MenuSeparator,
-} from '../../components/ui/menu';
+import { Menu, MenuItem, MenuItemLabel } from '../../components/ui/menu';
+import { getActiveStories } from '../../services/storyService';
 
 const SEARCH_BAR_HEIGHT = 56;
 
@@ -48,6 +46,9 @@ export default function SocialScreen() {
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<TextInput>(null);
+  /** Story-Ring: Gruppen aus getActiveStories (eigene + andere Nutzer) */
+  const [storyGroups, setStoryGroups] = useState<any[]>([]);
+  const [storiesLoading, setStoriesLoading] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -63,6 +64,29 @@ export default function SocialScreen() {
     subscribeChatList(userId);
     return () => unsubscribeChatList();
   }, [userId]);
+
+  /** Stories bei jedem Tab-Fokus neu laden (Ring aktuell nach Upload / Ablauf) */
+  useFocusEffect(
+    useCallback(() => {
+      if (!userId) return;
+      let active = true;
+      (async () => {
+        setStoriesLoading(true);
+        try {
+          const data = await getActiveStories(userId);
+          if (active) setStoryGroups(data || []);
+        } catch (e) {
+          console.error('[SOCIAL] Stories laden:', e);
+          if (active) setStoryGroups([]);
+        } finally {
+          if (active) setStoriesLoading(false);
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [userId]),
+  );
 
   /**
    * Suchleiste ein-/ausblenden mit Reanimated 
@@ -146,40 +170,18 @@ export default function SocialScreen() {
   };
 
   /**
-   * Story-Daten aus Konversationen: einzigartige Chat-Partner mit Profilbildern.
-   */
-  /**
-   * Aktionen aus dem Chats-Optionsmenue (Schluessel entsprechen MenuItem key).
-   * Navigation kann hier spaeter angebunden werden.
+   * Aktionen aus dem Chats-Optionsmenue (Schluessel = MenuItem key).
    */
   const onChatsHeaderMenuAction = useCallback((key: React.Key) => {
     const k = String(key);
     if (k === 'new-chat') {
-      // Spaeter: z. B. Kontaktauswahl / neuer Einzelchat
+      router.push('/new-chat');
     } else if (k === 'new-group') {
-      // Spaeter: Flow „Neue Gruppe“
+      router.push('/new-group');
     } else if (k === 'chat-settings') {
-      // Spaeter: globale Chat-Einstellungen
+      router.push('/tabs/profile');
     }
-  }, []);
-
-  const getStoryUsers = () => {
-    const seen = new Set<string>();
-    const users: any[] = [];
-    conversations.forEach((conv) => {
-      conv.conversation_participants?.forEach((p: any) => {
-        if (p.user_id === userId || seen.has(p.user_id)) return;
-        seen.add(p.user_id);
-        users.push({
-          id: p.user_id,
-          username: p.profiles?.username || 'User',
-          avatar_url: p.profiles?.avatar_url || null,
-          hasUnviewed: true,
-        });
-      });
-    });
-    return users;
-  };
+  }, [router]);
 
   // ============================
   // HEADER: Suchbutton links, "Chats" Mitte, Optionen rechts
@@ -279,39 +281,104 @@ export default function SocialScreen() {
   // STORY-BEREICH: Kreisrunde Avatare (horizontal scrollbar)
   // ============================
   const renderStorySection = () => {
-    const storyUsers = getStoryUsers();
-    const data = [{ id: 'add', type: 'add' } as any, ...storyUsers];
+    const ownBundle = storyGroups.find((g) => g.isOwn);
+    const others = storyGroups.filter((g) => !g.isOwn);
+    const storyRowItems: any[] = [
+      {
+        id: 'self',
+        type: 'self',
+        bundle: ownBundle,
+      },
+      ...others.map((g, idx) => ({
+        id: g.user?.id ?? `story-other-${idx}`,
+        type: 'other',
+        bundle: g,
+      })),
+    ];
 
     return (
       <View className="pb-4 pt-2">
-        
+        {storiesLoading && storyGroups.length === 0 ? (
+          <View className="py-4 items-center">
+            <ActivityIndicator size="small" color={theme.colors.primary.main} />
+          </View>
+        ) : null}
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 20 }}
-          data={data}
+          data={storyRowItems}
           keyExtractor={(item) => item.id}
           renderItem={({ item }: { item: any }) => {
-            // "Neue Story erstellen" – Kreis mit gestricheltem Rand
-            if (item.type === 'add') {
+            // Erste Kachel: eigene Story (Ring wenn aktiv) oder „Deine Story“ zum Erstellen
+            if (item.type === 'self') {
+              const hasOwnStories = item.bundle?.stories?.length > 0;
+              const ringActive = item.bundle?.hasUnviewed;
+              if (!hasOwnStories) {
+                return (
+                  <Pressable
+                    className="items-center mr-5"
+                    onPress={() => router.push('/stories/create')}
+                  >
+                    <View
+                      className="w-16 h-16 rounded-full items-center justify-center"
+                      style={{
+                        borderWidth: 2,
+                        borderStyle: 'dashed',
+                        borderColor: theme.colors.neutral.gray[300],
+                      }}
+                    >
+                      <PlusIcon size={24} color={theme.colors.neutral.gray[400]} />
+                    </View>
+                    <Text
+                      className="text-xs mt-1.5"
+                      style={{
+                        fontFamily: 'Manrope_500Medium',
+                        color: theme.colors.neutral.gray[600],
+                      }}
+                    >
+                      Deine Story
+                    </Text>
+                  </Pressable>
+                );
+              }
+              const u = item.bundle.user;
               return (
-                <Pressable className="items-center mr-5">
+                <Pressable
+                  className="items-center mr-5"
+                  onPress={() => userId && router.push(`/stories/${userId}`)}
+                >
                   <View
                     className="w-16 h-16 rounded-full items-center justify-center"
                     style={{
-                      borderWidth: 2,
-                      borderStyle: 'dashed',
-                      borderColor: theme.colors.neutral.gray[300],
+                      borderWidth: 2.5,
+                      borderColor: ringActive
+                        ? theme.colors.primary.main
+                        : theme.colors.neutral.gray[300],
                     }}
                   >
-                    <PlusIcon size={24} color={theme.colors.neutral.gray[400]} />
+                    {u?.avatar_url ? (
+                      <Image
+                        source={{ uri: u.avatar_url }}
+                        className="w-[52px] h-[52px] rounded-full"
+                        style={{ backgroundColor: theme.colors.neutral.gray[100] }}
+                      />
+                    ) : (
+                      <View
+                        className="w-[52px] h-[52px] rounded-full items-center justify-center"
+                        style={{ backgroundColor: theme.colors.neutral.gray[100] }}
+                      >
+                        <UserIcon size={24} color={theme.colors.neutral.gray[400]} />
+                      </View>
+                    )}
                   </View>
                   <Text
                     className="text-xs mt-1.5"
                     style={{
                       fontFamily: 'Manrope_500Medium',
-                      color: theme.colors.neutral.gray[600],
+                      color: theme.colors.neutral.gray[700],
                     }}
+                    numberOfLines={1}
                   >
                     Deine Story
                   </Text>
@@ -319,21 +386,25 @@ export default function SocialScreen() {
               );
             }
 
-            // Story-Ring: Kreisrunder Avatar mit farbigem Rand
+            const g = item.bundle;
+            const u = g?.user;
             return (
-              <Pressable className="items-center mr-5">
+              <Pressable
+                className="items-center mr-5"
+                onPress={() => u?.id && router.push(`/stories/${u.id}`)}
+              >
                 <View
                   className="w-16 h-16 rounded-full items-center justify-center"
                   style={{
                     borderWidth: 2.5,
-                    borderColor: item.hasUnviewed
+                    borderColor: g?.hasUnviewed
                       ? theme.colors.primary.main
                       : theme.colors.neutral.gray[300],
                   }}
                 >
-                  {item.avatar_url ? (
+                  {u?.avatar_url ? (
                     <Image
-                      source={{ uri: item.avatar_url }}
+                      source={{ uri: u.avatar_url }}
                       className="w-[52px] h-[52px] rounded-full"
                       style={{ backgroundColor: theme.colors.neutral.gray[100] }}
                     />
@@ -347,14 +418,14 @@ export default function SocialScreen() {
                   )}
                 </View>
                 <Text
-                  className="text-xs mt-1.5"
+                  className="text-xs mt-1.5 max-w-[64px]"
                   style={{
                     fontFamily: 'Manrope_500Medium',
                     color: theme.colors.neutral.gray[700],
                   }}
                   numberOfLines={1}
                 >
-                  {item.username}
+                  {u?.username || 'Story'}
                 </Text>
               </Pressable>
             );

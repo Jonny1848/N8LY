@@ -33,6 +33,8 @@ import {
   unsubscribeFromMessages,
   subscribeToChatList,
   markConversationAsRead as apiMarkAsRead,
+  createDirectConversation,
+  createGroupConversation,
 } from '../services/chatService';
 import { supabase } from '../lib/supabase';
 
@@ -123,6 +125,23 @@ interface ChatState {
 
   /** Markiert eine Konversation als gelesen */
   markAsRead: (conversationId: string, userId: string) => Promise<void>;
+
+  /**
+   * Erstellt Einzelchat (oder nutzt bestehenden) und aktualisiert die Liste.
+   * @returns conversation_id oder null bei Fehler
+   */
+  createDirectChat: (currentUserId: string, otherUserId: string) => Promise<string | null>;
+
+  /**
+   * Erstellt Gruppenchat und aktualisiert die Konversationsliste.
+   * @param memberIds – UUIDs weiterer Mitglieder (ohne Ersteller)
+   */
+  createGroupChat: (
+    currentUserId: string,
+    groupName: string,
+    memberIds: string[],
+    avatarUrl?: string | null,
+  ) => Promise<string | null>;
 
   /** Startet das Realtime-Abo fuer Nachrichten einer Konversation */
   subscribeMessages: (conversationId: string, userId: string) => void;
@@ -283,6 +302,33 @@ const useChatStore = create<ChatState>((set, get) => ({
       await apiMarkAsRead(conversationId, userId);
     } catch (err) {
       console.error('[CHAT STORE] Fehler beim Markieren als gelesen:', err);
+    }
+  },
+
+  createDirectChat: async (currentUserId, otherUserId) => {
+    try {
+      const conv: any = await createDirectConversation(currentUserId, otherUserId);
+      await get().loadConversations(currentUserId);
+      return conv?.id ?? null;
+    } catch (err) {
+      console.error('[CHAT STORE] Fehler beim Erstellen des Einzelchats:', err);
+      return null;
+    }
+  },
+
+  createGroupChat: async (currentUserId, groupName, memberIds, avatarUrl = null) => {
+    try {
+      const conv: any = await createGroupConversation(
+        currentUserId,
+        groupName,
+        memberIds,
+        avatarUrl ?? null,
+      );
+      await get().loadConversations(currentUserId);
+      return conv?.id ?? null;
+    } catch (err) {
+      console.error('[CHAT STORE] Fehler beim Erstellen der Gruppe:', err);
+      return null;
     }
   },
 
