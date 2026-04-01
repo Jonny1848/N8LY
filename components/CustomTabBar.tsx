@@ -90,9 +90,8 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
           ? iconMap[route.name]?.solid 
           : iconMap[route.name]?.outline;
 
-        const color = isFocused 
-          ? theme.colors.primary.main 
-          : theme.colors.neutral.gray[400];
+        // Tab-Icons einheitlich schwarz; Untätige Tabs wirken durch iconColorStyle-Opacity (0,5) heller
+        const color = theme.colors.primary.main2;
 
         const badge =
           route.name === 'social' && totalUnread > 0

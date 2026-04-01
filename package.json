@@ -59,7 +59,7 @@
     "expo-status-bar": "~2.0.1",
     "expo-video": "~2.0.6",
     "lucide-react": "^0.544.0",
-    "lucide-react-native": "^0.544.0",
+    "lucide-react-native": "^0.510.0",
     "nativewind": "^4.2.3",
     "react": "~18.3.1",
     "react-dom": "~18.3.1",

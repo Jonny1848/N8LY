@@ -25,13 +25,11 @@ import { useRouter } from 'expo-router';
 import { theme } from '../../constants/theme';
 import {
   MagnifyingGlassIcon,
-  EllipsisHorizontalCircleIcon,
   XMarkIcon,
 } from 'react-native-heroicons/outline';
-import { UserIcon, PlusIcon,UserGroupIcon, Cog6ToothIcon } from 'react-native-heroicons/solid';
+import { UserIcon, PlusIcon } from 'react-native-heroicons/solid';
 import useAuthStore from '../../stores/useAuthStore';
 import useChatStore from '../../stores/useChatStore';
-import { Menu, MenuItem, MenuItemLabel } from '../../components/ui/menu';
 import { getActiveStories } from '../../services/storyService';
 
 const SEARCH_BAR_HEIGHT = 56;
@@ -169,18 +167,9 @@ export default function SocialScreen() {
     }
   };
 
-  /**
-   * Aktionen aus dem Chats-Optionsmenue (Schluessel = MenuItem key).
-   */
-  const onChatsHeaderMenuAction = useCallback((key: React.Key) => {
-    const k = String(key);
-    if (k === 'new-chat') {
-      router.push('/new-chat');
-    } else if (k === 'new-group') {
-      router.push('/new-group');
-    } else if (k === 'chat-settings') {
-      router.push('/tabs/profile');
-    }
+  /** Plus-Button: oeffnet den kombinierten Neuer-Chat/Neue-Gruppe Screen */
+  const onNewChatPress = useCallback(() => {
+    router.push('/new-group');
   }, [router]);
 
   // ============================
@@ -207,34 +196,15 @@ export default function SocialScreen() {
         </Text>
       </View>
 
-      {/* Optionen: useRNModal=true nutzt RN-Modal als Overlay (robust ueber Listen/SafeArea) */}
-      <Menu
-        placement="bottom right"
-        useRNModal
-        onAction={onChatsHeaderMenuAction}
-        trigger={(triggerProps) => (
-          <Pressable
-            className="w-10 h-10 items-center justify-center"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            {...triggerProps}
-          >
-            <EllipsisHorizontalCircleIcon size={26} color={theme.colors.neutral.gray[800]} />
-          </Pressable>
-        )}
+      {/* Plus-Button: blauer Kreis mit weissem Plus */}
+      <Pressable
+        onPress={onNewChatPress}
+        className="w-10 h-10 items-center justify-center rounded-full"
+        style={{ backgroundColor: theme.colors.primary.main }}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <MenuItem key="new-chat" textValue="Neuer Chat">
-          <PlusIcon size={20} color={theme.colors.primary.main} />
-          <MenuItemLabel>Neuer Chat</MenuItemLabel>
-        </MenuItem>
-        <MenuItem key="new-group" textValue="Gruppe erstellen">
-          <UserGroupIcon size={20} color={theme.colors.primary.main} />
-          <MenuItemLabel>Neue Gruppe</MenuItemLabel>
-        </MenuItem>
-        <MenuItem key="chat-settings" textValue="Einstellungen">
-          <Cog6ToothIcon size={20} color={theme.colors.primary.main} />
-          <MenuItemLabel>Einstellungen</MenuItemLabel>
-        </MenuItem>
-      </Menu>
+        <PlusIcon size={22} color="#fff" />
+      </Pressable>
     </View>
   );
 

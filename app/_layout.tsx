@@ -194,6 +194,7 @@ function RootLayoutContent() {
         <Stack.Screen name="chat/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="new-chat" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="new-group" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="new-group-details" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="stories/create" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="stories/[userId]" options={{ animation: 'fade' }} />
       </Stack>

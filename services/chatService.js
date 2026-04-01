@@ -651,3 +651,47 @@ export async function searchUsers(query, currentUserId, limit = 20) {
 
   return data || [];
 }
+
+/**
+ * Alle bekannten Kontakte laden: User, mit denen der aktuelle User
+ * mindestens eine Konversation teilt. Gibt eindeutige Profile zurueck.
+ *
+ * @param {string} currentUserId – UUID des eingeloggten Users
+ * @returns {Array} – Liste der bekannten Profile { id, username, avatar_url }
+ */
+export async function getKnownContacts(currentUserId) {
+  if (!currentUserId) return [];
+
+  // Schritt 1: Alle Konversations-IDs des aktuellen Users
+  const { data: myChats, error: chatErr } = await supabase
+    .from('conversation_participants')
+    .select('conversation_id')
+    .eq('user_id', currentUserId);
+
+  if (chatErr || !myChats?.length) return [];
+
+  const chatIds = myChats.map((c) => c.conversation_id);
+
+  // Schritt 2: Alle anderen Teilnehmer dieser Konversationen laden
+  const { data: others, error: othersErr } = await supabase
+    .from('conversation_participants')
+    .select('user_id, profiles:user_id ( id, username, avatar_url )')
+    .in('conversation_id', chatIds)
+    .neq('user_id', currentUserId);
+
+  if (othersErr || !others?.length) return [];
+
+  // Duplikate entfernen (ein User kann in mehreren Chats sein)
+  const seen = new Set();
+  const unique = [];
+  for (const row of others) {
+    const profile = row.profiles;
+    if (profile && !seen.has(profile.id)) {
+      seen.add(profile.id);
+      unique.push({ id: profile.id, username: profile.username, avatar_url: profile.avatar_url });
+    }
+  }
+  // Alphabetisch nach Username sortieren
+  unique.sort((a, b) => (a.username || '').localeCompare(b.username || ''));
+  return unique;
+}
