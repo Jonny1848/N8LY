@@ -395,7 +395,17 @@ export default function NewGroupSelectScreen() {
                 {/* Checkbox: nur visuell, Toggle ueber die umgebende Pressable */}
                 <View pointerEvents="none">
                   <Checkbox value={item.id} isChecked={selected} size="lg">
-                    <CheckboxIndicator className="rounded-lg border-2 border-outline-300 data-[checked=true]:bg-emerald-500 data-[checked=true]:border-emerald-500">
+                    <CheckboxIndicator
+                      className="rounded-lg border-2 border-outline-300"
+                      style={
+                        selected
+                          ? {
+                              backgroundColor: theme.colors.primary.main3,
+                              borderColor: theme.colors.primary.main3,
+                            }
+                          : undefined
+                      }
+                    >
                       <CheckboxIcon as={Check} className="text-white" />
                     </CheckboxIndicator>
                   </Checkbox>

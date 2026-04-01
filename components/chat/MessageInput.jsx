@@ -8,6 +8,12 @@
  */
 import { View, Text, TextInput, Pressable, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useState, useEffect, Fragment, forwardRef, useImperativeHandle } from 'react';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolateColor,
+} from 'react-native-reanimated';
 import { theme } from '../../constants/theme';
 import { TrashIcon, PlusIcon } from 'react-native-heroicons/outline';
 import {
@@ -70,6 +76,23 @@ const MessageInput = forwardRef(function MessageInput(
 
   // Sende-Button nur anzeigen wenn Text vorhanden ist
   const hasContent = inputText.trim().length > 0;
+  /** Visuell „aktiv“ auch waehrend sending — sonst graut der Button sofort aus (Text wird geleert) */
+  const sendLooksActive = hasContent || sending;
+
+  /** Sanfter Uebergang inaktiv ↔ aktiv (Hintergrundfarbe + leichte Skalierung) */
+  const sendActive = useSharedValue(0);
+  useEffect(() => {
+    sendActive.value = withTiming(sendLooksActive ? 1 : 0, { duration: 260 });
+  }, [sendLooksActive]);
+
+  const sendBtnAnimStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      sendActive.value,
+      [0, 1],
+      [theme.colors.neutral.gray[300], theme.colors.neutral.gray[800]],
+    ),
+    transform: [{ scale: sendActive.value * 0.06 + 0.94 }],
+  }));
 
   // Metering waehrend der Aufnahme sammeln (fuer Waveform-Anzeige)
   // recorderState.metering: dB-Wert (-160 bis 0), wird alle 200ms aktualisiert
@@ -498,15 +521,22 @@ const MessageInput = forwardRef(function MessageInput(
             style={{ fontFamily: 'Manrope_400Regular' }}
           />
 
-          {/* Sende-Button: dunkelgrau, circular */}
+          {/* Sende-Button: animierter Uebergang inaktiv (hellgrau) → aktiv (dunkelgrau) */}
           <Pressable
-            className={`w-10 h-10 rounded-full items-center justify-center shrink-0 ${
-              hasContent ? 'bg-gray-800' : 'bg-gray-300'
-            }`}
             onPress={handleSend}
             disabled={!hasContent || sending}
+            className="shrink-0"
           >
-            <PaperAirplaneIcon size={20} strokeWidth={2.5} color="#FFFFFF" />
+            <Animated.View
+              className="w-10 h-10 rounded-full items-center justify-center"
+              style={sendBtnAnimStyle}
+            >
+              {sending ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <PaperAirplaneIcon size={20} strokeWidth={2.5} color="#FFFFFF" />
+              )}
+            </Animated.View>
           </Pressable>
         </>
       )}

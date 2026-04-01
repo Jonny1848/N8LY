@@ -40,6 +40,9 @@ export default {
 
     // Android-spezifische Einstellungen
     android: {
+      // Fenster verkleinert sich bei geoeffneter Tastatur (adjustResize) — wichtig damit die Chat-Eingabe
+      // nicht unter der Tastatur liegt; passt zu KeyboardAvoidingView nur auf iOS im Chat-Screen.
+      softwareKeyboardLayoutMode: "resize",
       permissions: [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -93,6 +96,16 @@ export default {
         {
           contactsPermission:
             "N8TLY benoetigt Zugriff auf deine Kontakte fuer den Kontakt-Teilen-Dialog.",
+        },
+      ],
+      [
+        "expo-camera",
+        {
+          cameraPermission:
+            "N8TLY benoetigt die Kamera, um Fotos und Videos fuer deine Story aufzunehmen.",
+          microphonePermission:
+            "N8TLY benoetigt das Mikrofon fuer Video-Stories.",
+          recordAudioAndroid: true,
         },
       ],
       [

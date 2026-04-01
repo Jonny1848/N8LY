@@ -14,7 +14,8 @@
  *
  * Route: /chat/[id] – Die ID ist die conversation_id aus Supabase.
  */
-import { FlatList, KeyboardAvoidingView, Platform, View, Text, ActivityIndicator, StyleSheet, Animated } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Platform, View, Text, ActivityIndicator, StyleSheet, Animated as RNAnimated } from 'react-native';
+import Reanimated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -59,12 +60,22 @@ export default function ChatDetailScreen() {
   const insets = useSafeAreaInsets();
 
   /**
+   * iOS: Tastatur-Hoehe als animierter Shared Value — folgt der nativen Keyboard-Kurve
+   * (weicher als KeyboardAvoidingView/padding allein). Android bleibt bei resize/KAV.
+   */
+  const keyboard = useAnimatedKeyboard();
+  const keyboardLiftStyle = useAnimatedStyle(() => ({
+    // paddingBottom schiebt Liste + Eingabezeile stufenlos nach oben, sync mit System-Animation
+    paddingBottom: keyboard.height.value,
+  }));
+
+  /**
    * Blur-Opacity parallel zum Gluestack-Actionsheet (timing 200ms im Creator),
    * damit keine harte Kante zwischen voller Unschaerfe und noch nicht animiertem Overlay entsteht.
    */
-  const shareSheetBlurOpacity = useRef(new Animated.Value(0)).current;
+  const shareSheetBlurOpacity = useRef(new RNAnimated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(shareSheetBlurOpacity, {
+    RNAnimated.timing(shareSheetBlurOpacity, {
       toValue: shareSheetVisible ? 1 : 0,
       duration: 200,
       useNativeDriver: true,
@@ -215,6 +226,46 @@ export default function ChatDetailScreen() {
     return <View style={styles.emptyWrapper}>{content}</View>;
   };
 
+  // Liste + Eingabe: einmal definiert, iOS/Android nur Wrapper unterschiedlich (Keyboard-Animation vs. resize)
+  const chatListAndInput = (
+    <>
+      <FlatList
+        ref={flatListRef}
+        data={messages}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item, index }) => (
+          <ChatBubble
+            item={item}
+            index={index}
+            messages={messages}
+            userId={userId}
+            conversation={conversation}
+            onImagePress={handleImagePress}
+          />
+        )}
+        inverted
+        contentContainerStyle={[
+          styles.listContent,
+          messages.length === 0 && styles.listContentEmpty,
+        ]}
+        showsVerticalScrollIndicator={false}
+        style={styles.list}
+        keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={renderEmptyList}
+      />
+      <MessageInput
+        ref={messageInputRef}
+        onSendText={handleSendText}
+        onSendVoice={handleSendVoice}
+        onSendImage={handleSendImage}
+        onSendFile={handleSendFile}
+        onSendContact={handleSendContact}
+        onOpenShareSheet={() => setShareSheetVisible(true)}
+      />
+      <View style={{ height: bottomPadding, backgroundColor: '#FFFFFF' }} />
+    </>
+  );
+
   // ============================
   // RENDER
   // ============================
@@ -225,57 +276,34 @@ export default function ChatDetailScreen() {
      */
     <View className="flex-1 bg-white">
       <SafeAreaView className="flex-1 bg-white" edges={['top']}>
-        <View className="flex-1 overflow-hidden">
-          <KeyboardAvoidingView
-            className="flex-1"
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={0}
-          >
-            {/* Header: Avatar, Name, Online-Status, Optionen */}
-            <ChatHeader
-              conversation={conversation}
-              onBack={() => router.back()}
-            />
+        {/*
+         * Kein overflow-hidden um den KeyboardAvoidingView: Auf iOS (und teils Android)
+         * kann clipping am Parent verhindern, dass das Layout korrekt nach oben geschoben wird,
+         * wenn die Tastatur erscheint — dann liegt das Eingabefeld visuell / interaktiv unter der Tastatur.
+         */}
+        <View className="flex-1">
+          {/* Header ausserhalb des Keyboard-Wrappers: bleibt oben fix, darunter animiert nur Chat + Input */}
+          <ChatHeader
+            conversation={conversation}
+            onBack={() => router.back()}
+          />
 
-            {/* Nachrichten-Liste (inverted FlatList – neueste unten) */}
-            <FlatList
-              ref={flatListRef}
-              data={messages}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item, index }) => (
-                <ChatBubble
-                  item={item}
-                  index={index}
-                  messages={messages}
-                  userId={userId}
-                  conversation={conversation}
-                  onImagePress={handleImagePress}
-                />
-              )}
-              inverted
-              contentContainerStyle={[
-                styles.listContent,
-                messages.length === 0 && styles.listContentEmpty,
-              ]}
-              showsVerticalScrollIndicator={false}
-              style={styles.list}
-              ListEmptyComponent={renderEmptyList}
-            />
-
-            {/* Input Bar: + | Input | Send (wie Screenshot) – Kamera/Voice ueber ShareSheet */}
-            <MessageInput
-              ref={messageInputRef}
-              onSendText={handleSendText}
-              onSendVoice={handleSendVoice}
-              onSendImage={handleSendImage}
-              onSendFile={handleSendFile}
-              onSendContact={handleSendContact}
-              onOpenShareSheet={() => setShareSheetVisible(true)}
-            />
-
-            {/* Reduzierter Abstand unten (statt vollem Safe-Area-Inset) */}
-            <View style={{ height: bottomPadding, backgroundColor: '#FFFFFF' }} />
-          </KeyboardAvoidingView>
+          {Platform.OS === 'ios' ? (
+            /*
+             * iOS: Reanimated useAnimatedKeyboard — gleiche Timing-Kurve wie die System-Tastatur
+             * (eleganter Aufschub als reines KeyboardAvoidingView).
+             */
+            <Reanimated.View style={[{ flex: 1 }, keyboardLiftStyle]}>{chatListAndInput}</Reanimated.View>
+          ) : (
+            <KeyboardAvoidingView
+              style={{ flex: 1 }}
+              // Android: Fenster-resize (adjustResize) — kein zusaetzliches behavior noetig
+              behavior={undefined}
+              keyboardVerticalOffset={0}
+            >
+              {chatListAndInput}
+            </KeyboardAvoidingView>
+          )}
         </View>
       </SafeAreaView>
 
@@ -283,13 +311,13 @@ export default function ChatDetailScreen() {
         Unschaerfe ueber dem gesamten Screen (inkl. Top-Safe-Area), animiert wie Sheet (200ms).
         Liegt unter dem Actionsheet; pointerEvents none.
       */}
-      <Animated.View
+      <RNAnimated.View
         pointerEvents="none"
         style={[StyleSheet.absoluteFillObject, { opacity: shareSheetBlurOpacity }]}
       >
         {/* Kraeftiger Blur mit dunklem Tint: klarer Kontrast zum weissen Sheet (wie Referenz-Design) */}
         <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFillObject} />
-      </Animated.View>
+      </RNAnimated.View>
 
       {/* "Inhalt teilen" Bottom Sheet */}
       <ShareSheet
@@ -313,6 +341,7 @@ export default function ChatDetailScreen() {
 // ============================
 const styles = StyleSheet.create({
   list: {
+    flex: 1,
     backgroundColor: '#FFFFFF',
   },
   listContent: {

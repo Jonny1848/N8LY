@@ -1,5 +1,6 @@
 /**
  * Story-Viewer – zeigt alle aktiven Stories eines Nutzers, markiert Aufrufe in story_views.
+ * Videos: expo-video (VideoView); Bilder: expo-image.
  */
 import {
   View,
@@ -11,13 +12,39 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { XMarkIcon } from 'react-native-heroicons/outline';
 import { Image } from 'expo-image';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import useAuthStore from '../../stores/useAuthStore';
 import { getActiveStories, markStoryAsViewed } from '../../services/storyService';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+
+/** Ein Video pro Slide: eigener Hook-Aufruf (Regeln von React). */
+function StoryVideoBody({ uri, storyId, isOwn, onMarkViewed, width, height }) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = true;
+    p.play();
+  });
+
+  useEffect(() => {
+    // Sobald die Slide sichtbar ist, als gesehen zaehlen (ohne komplexes Status-Event)
+    const t = setTimeout(() => {
+      onMarkViewed(storyId, isOwn);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [storyId, isOwn, onMarkViewed]);
+
+  return (
+    <VideoView
+      player={player}
+      style={{ width, height }}
+      contentFit="contain"
+      nativeControls
+    />
+  );
+}
 
 export default function StoryViewerScreen() {
   const raw = useLocalSearchParams().userId;
@@ -29,6 +56,14 @@ export default function StoryViewerScreen() {
   const [loading, setLoading] = useState(true);
   const [stories, setStories] = useState([]);
   const [headerName, setHeaderName] = useState('');
+
+  const onMarkViewed = useCallback(
+    async (storyId, isOwn) => {
+      if (!currentUserId || isOwn) return;
+      await markStoryAsViewed(storyId, currentUserId);
+    },
+    [currentUserId]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -55,12 +90,6 @@ export default function StoryViewerScreen() {
     };
   }, [authorUserId, currentUserId]);
 
-  /** Beim Anzeigen einer Story als gesehen markieren (eigene Stories auslassen) */
-  const onStoryLayout = async (storyId, isOwn) => {
-    if (!currentUserId || isOwn) return;
-    await markStoryAsViewed(storyId, currentUserId);
-  };
-
   if (loading) {
     return (
       <View className="flex-1 bg-black items-center justify-center">
@@ -81,6 +110,7 @@ export default function StoryViewerScreen() {
   }
 
   const isOwn = authorUserId === currentUserId;
+  const slideHeight = SCREEN_H - insets.top - insets.bottom - 56;
 
   return (
     <View className="flex-1 bg-black">
@@ -114,19 +144,24 @@ export default function StoryViewerScreen() {
         {stories.map((story) => (
           <View
             key={story.id}
-            style={{ width: SCREEN_W, height: SCREEN_H - insets.top - insets.bottom - 56 }}
+            style={{ width: SCREEN_W, height: slideHeight }}
             className="justify-center"
           >
             {story.media_type === 'video' ? (
-              <Text className="text-white text-center px-4">
-                Video-Stories werden in einer spaeteren Version abgespielt.
-              </Text>
+              <StoryVideoBody
+                uri={story.media_url}
+                storyId={story.id}
+                isOwn={isOwn}
+                onMarkViewed={onMarkViewed}
+                width={SCREEN_W}
+                height={slideHeight}
+              />
             ) : (
               <Image
                 source={{ uri: story.media_url }}
                 style={{ width: SCREEN_W, flex: 1 }}
                 contentFit="contain"
-                onLoad={() => onStoryLayout(story.id, isOwn)}
+                onLoad={() => onMarkViewed(story.id, isOwn)}
               />
             )}
             {story.caption ? (
