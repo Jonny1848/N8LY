@@ -1,18 +1,23 @@
 /**
  * Vollbild-Kamera fuer Story-Capture: Foto, Video (recordAsync/stopRecording),
- * Front/Rueck, Blitz, Galerie-Shortcut ueber Callback.
+ * Front/Rueck, Blitz, Galerie mit letztem Medien-Vorschaubild, Lang-Druck = Video.
  */
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import {
   CameraView,
   useCameraPermissions,
   useMicrophonePermissions,
 } from 'expo-camera';
+import * as MediaLibrary from 'expo-media-library';
+import { Image } from 'expo-image';
+import { useFocusEffect } from 'expo-router';
 import { ArrowPathRoundedSquareIcon } from 'react-native-heroicons/outline';
 
 // Max. Video-Laenge in Millisekunden (60s – typisch fuer Stories)
 const MAX_VIDEO_MS = 60000;
+/** Ab dieser Dauer zaehlt der Shutter als „Gedrueckthalten“ und startet Video-Aufnahme */
+const LONG_PRESS_MS = 450;
 
 /**
  * @param {{ onCaptured: (payload: { uri: string, kind: 'photo'|'video', mimeType: string }) => void, onOpenGallery: () => void, onClose: () => void }} props
@@ -21,7 +26,7 @@ export default function StoryCamera({ onCaptured, onOpenGallery, onClose }) {
   const cameraRef = useRef(null);
   const [facing, setFacing] = useState('back');
   const [flash, setFlash] = useState('off');
-  /** 'picture' | 'video' */
+  /** 'picture' | 'video' (TAB) – Kurz-Tap im Video-Tab toggelt; Lang-Druck immer Video bis Loslassen */
   const [mode, setMode] = useState('picture');
   const [cameraReady, setCameraReady] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -29,26 +34,89 @@ export default function StoryCamera({ onCaptured, onOpenGallery, onClose }) {
   const recordingPromiseRef = useRef(null);
   const [recording, setRecording] = useState(false);
 
+  /** Letztes Foto aus der Mediathek fuer die Galerie-Kachel (nur Anzeige) */
+  const [galleryThumbUri, setGalleryThumbUri] = useState(null);
+
+  /** Shutter: Lang-Druck / Loslassen (Foto-Modus + gemeinsames Video-Halten) */
+  const pressStartRef = useRef(0);
+  const longPressTimerRef = useRef(null);
+  const holdRecordRef = useRef(false);
+  /** Nach Video per Loslassen: einen folgenden onPress im Video-Tab unterdruecken */
+  const suppressNextVideoPressRef = useRef(false);
+
   const [camPerm, requestCamPerm] = useCameraPermissions();
   const [micPerm, requestMicPerm] = useMicrophonePermissions();
 
-  const ensurePermissions = useCallback(async () => {
+  /**
+   * Fuer reine Fotos: nur Kamera.
+   * Fuer Video (egal welcher TAB oder Lang-Druck): immer Mikrofon mit anfragen.
+   */
+  const ensurePhotoPermissions = useCallback(async () => {
     if (!camPerm?.granted) {
       const r = await requestCamPerm();
       if (!r.granted) {
-        Alert.alert('Kamera', 'Bitte erlaube Kamerazugriff fuer Stories.', [{ text: 'OK' }]);
-        return false;
-      }
-    }
-    if (mode === 'video' && !micPerm?.granted) {
-      const r = await requestMicPerm();
-      if (!r.granted) {
-        Alert.alert('Mikrofon', 'Fuer Video-Stories wird das Mikrofon benoetigt.', [{ text: 'OK' }]);
+        Alert.alert('Kamera', 'Bitte erlaube Kamerazugriff für Stories.', [{ text: 'OK' }]);
         return false;
       }
     }
     return true;
-  }, [camPerm?.granted, micPerm?.granted, mode, requestCamPerm, requestMicPerm]);
+  }, [camPerm?.granted, requestCamPerm]);
+
+  const ensureVideoPermissions = useCallback(async () => {
+    const camOk = await ensurePhotoPermissions();
+    if (!camOk) return false;
+    if (!micPerm?.granted) {
+      const r = await requestMicPerm();
+      if (!r.granted) {
+        Alert.alert('Mikrofon', 'Für Video-Stories wird das Mikrofon benötigt.', [{ text: 'OK' }]);
+        return false;
+      }
+    }
+    return true;
+  }, [ensurePhotoPermissions, micPerm?.granted, requestMicPerm]);
+
+  /** Neuestes Bild aus der Bibliothek laden (Sortierung: creationTime absteigend) */
+  const loadLatestGalleryThumbnail = useCallback(async () => {
+    try {
+      const perm = await MediaLibrary.getPermissionsAsync();
+      let status = perm.status;
+      if (status !== 'granted') {
+        const req = await MediaLibrary.requestPermissionsAsync();
+        status = req.status;
+      }
+      if (status !== 'granted') {
+        setGalleryThumbUri(null);
+        return;
+      }
+      const page = await MediaLibrary.getAssetsAsync({
+        first: 1,
+        mediaType: MediaLibrary.MediaType.photo,
+        sortBy: [[MediaLibrary.SortBy.creationTime, false]],
+      });
+      const asset = page.assets[0];
+      if (!asset?.uri) {
+        setGalleryThumbUri(null);
+        return;
+      }
+      // Auf iOS liefert getAssetInfoAsync oft eine ladefreundlichere file://-URI
+      const info = await MediaLibrary.getAssetInfoAsync(asset);
+      setGalleryThumbUri(info.localUri || asset.uri);
+    } catch (e) {
+      console.warn('[StoryCamera] Galerie-Vorschau', e);
+      setGalleryThumbUri(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadLatestGalleryThumbnail();
+  }, [loadLatestGalleryThumbnail]);
+
+  // Bei Rueckkehr zur Kamera Vorschau aktualisieren (neues Foto in der Bibliothek)
+  useFocusEffect(
+    useCallback(() => {
+      loadLatestGalleryThumbnail();
+    }, [loadLatestGalleryThumbnail])
+  );
 
   const toggleFacing = () => {
     setFacing((prev) => (prev === 'back' ? 'front' : 'back'));
@@ -59,8 +127,8 @@ export default function StoryCamera({ onCaptured, onOpenGallery, onClose }) {
   };
 
   const takePhoto = async () => {
-    if (!cameraRef.current || !cameraReady || busy) return;
-    const ok = await ensurePermissions();
+    if (!cameraRef.current || !cameraReady || busy || recording) return;
+    const ok = await ensurePhotoPermissions();
     if (!ok) return;
     try {
       setBusy(true);
@@ -77,8 +145,8 @@ export default function StoryCamera({ onCaptured, onOpenGallery, onClose }) {
   };
 
   const startVideo = async () => {
-    if (!cameraRef.current || !cameraReady || busy) return;
-    const ok = await ensurePermissions();
+    if (!cameraRef.current || !cameraReady || busy || recordingPromiseRef.current) return;
+    const ok = await ensureVideoPermissions();
     if (!ok) return;
     try {
       setBusy(true);
@@ -90,6 +158,7 @@ export default function StoryCamera({ onCaptured, onOpenGallery, onClose }) {
       console.error('[StoryCamera] Video start', e);
       setBusy(false);
       setRecording(false);
+      recordingPromiseRef.current = null;
       Alert.alert('Kamera', 'Video konnte nicht gestartet werden.', [{ text: 'OK' }]);
     }
   };
@@ -111,18 +180,51 @@ export default function StoryCamera({ onCaptured, onOpenGallery, onClose }) {
     } finally {
       setBusy(false);
       setRecording(false);
+      recordingPromiseRef.current = null;
+    }
+  };
+
+  const onShutterPressIn = () => {
+    if (recording) return;
+    pressStartRef.current = Date.now();
+    longPressTimerRef.current = setTimeout(() => {
+      holdRecordRef.current = true;
+      startVideo();
+    }, LONG_PRESS_MS);
+  };
+
+  const onShutterPressOut = () => {
+    clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = null;
+
+    if (holdRecordRef.current) {
+      stopVideo();
+      holdRecordRef.current = false;
+      suppressNextVideoPressRef.current = true;
+      return;
+    }
+
+    const elapsed = Date.now() - pressStartRef.current;
+    if (mode === 'picture' && elapsed < LONG_PRESS_MS && !recordingPromiseRef.current) {
+      takePhoto();
     }
   };
 
   const onShutterPress = () => {
-    if (mode === 'picture') {
-      takePhoto();
-    } else if (recording) {
+    if (mode !== 'video') return;
+    if (suppressNextVideoPressRef.current) {
+      suppressNextVideoPressRef.current = false;
+      return;
+    }
+    if (recording) {
       stopVideo();
     } else {
       startVideo();
     }
   };
+
+  // Vorschau auf Video umschalten sobald aufgenommen wird (auch im Foto-Tab per Lang-Druck)
+  const cameraPreviewMode = mode === 'video' || recording ? 'video' : 'picture';
 
   if (!camPerm) {
     return (
@@ -153,7 +255,7 @@ export default function StoryCamera({ onCaptured, onOpenGallery, onClose }) {
         style={StyleSheet.absoluteFill}
         facing={facing}
         flash={flash}
-        mode={mode === 'video' ? 'video' : 'picture'}
+        mode={cameraPreviewMode}
         onCameraReady={() => setCameraReady(true)}
         mirror={facing === 'front'}
       />
@@ -183,18 +285,29 @@ export default function StoryCamera({ onCaptured, onOpenGallery, onClose }) {
         </Pressable>
       </View>
 
-      {/* Unten: Galerie + Shutter */}
+      {/* Unten: Galerie-Vorschau + Shutter (Lang-Druck = Video) */}
       <View style={styles.bottomBar}>
         <Pressable onPress={onOpenGallery} style={styles.galleryThumb}>
-          <Text style={styles.galleryLabel}>Galerie</Text>
+          {galleryThumbUri ? (
+            <Image
+              source={{ uri: galleryThumbUri }}
+              style={styles.galleryImage}
+              contentFit="cover"
+              transition={150}
+            />
+          ) : (
+            <Text style={styles.galleryLabel}>Galerie</Text>
+          )}
         </Pressable>
 
         <Pressable
+          onPressIn={onShutterPressIn}
+          onPressOut={onShutterPressOut}
           onPress={onShutterPress}
           disabled={!cameraReady}
-          style={[styles.shutter, mode === 'video' && recording && styles.shutterRecording]}
+          style={[styles.shutter, recording && styles.shutterRecording]}
         >
-          <View style={[styles.shutterInner, mode === 'video' && recording && styles.shutterInnerSquare]} />
+          <View style={[styles.shutterInner, recording && styles.shutterInnerSquare]} />
         </Pressable>
 
         <View style={{ width: 64 }} />
@@ -206,7 +319,6 @@ export default function StoryCamera({ onCaptured, onOpenGallery, onClose }) {
         </View>
       ) : null}
     </View>
-   
   );
 }
 
@@ -277,6 +389,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  galleryImage: {
+    width: '100%',
+    height: '100%',
   },
   galleryLabel: { color: '#fff', fontSize: 11, fontFamily: 'Manrope_600SemiBold' },
   shutter: {

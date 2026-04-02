@@ -30,18 +30,14 @@ import { useEffect, useRef, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native'
 import { IntroProvider, useIntro } from '../components/IntroContext';
 import { OnboardingProvider } from '../components/OnboardingContext';
-import { useFonts, Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold } from '@expo-google-fonts/manrope';
+import { useFonts } from 'expo-font';
+import { storyEditorFontAssets } from '../lib/storyEditorFontAssets';
 // Zustand: Globaler Auth-Store (ersetzt lokale getSession()-Aufrufe)
 import useAuthStore from '../stores/useAuthStore';
 
 function RootLayoutContent() {
-  // Load Manrope fonts
-  const [fontsLoaded, fontError] = useFonts({
-    Manrope_400Regular,
-    Manrope_500Medium,
-    Manrope_600SemiBold,
-    Manrope_700Bold,
-  });
+  // Manrope + Story-Editor-Google-Fonts (siehe lib/storyEditorFontAssets)
+  const [fontsLoaded, fontError] = useFonts(storyEditorFontAssets);
 
   const router = useRouter();
   const pathname = usePathname();

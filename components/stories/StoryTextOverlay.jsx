@@ -1,20 +1,41 @@
 /**
  * Verschiebbare Text-Bloecke auf der Story (PanResponder).
+ * Tap ohne Bewegung waehlt den Block (Schrift/Groesse/Farbe in der Style-Leiste).
  */
 import { useRef } from 'react';
 import { View, Text, PanResponder, StyleSheet } from 'react-native';
+import { storyFontFamilyForKey } from '../../constants/storyEditorFonts';
 
 /**
- * @param {{ items: Array<{ id: string, text: string, x: number, y: number, color: string }>, onItemChange: (id: string, patch: object) => void, canvasW: number, canvasH: number }} props
+ * @param {{
+ *   items: Array<{
+ *     id: string,
+ *     text: string,
+ *     x: number,
+ *     y: number,
+ *     color: string,
+ *     fontSize?: number,
+ *     fontKey?: string,
+ *     textAlign?: 'left'|'center'|'right',
+ *     pillColor?: string|null,
+ *   }>,
+ *   onItemChange: (id: string, patch: object) => void,
+ *   selectedId: string|null,
+ *   onSelect: (id: string) => void,
+ *   canvasW: number,
+ *   canvasH: number,
+ * }} props
  */
-export default function StoryTextOverlay({ items, onItemChange, canvasW, canvasH }) {
+export default function StoryTextOverlay({ items, onItemChange, selectedId, onSelect, canvasW, canvasH }) {
   return (
     <>
       {items.map((item) => (
         <DraggableTextBlock
           key={item.id}
           item={item}
+          selected={selectedId === item.id}
           onChange={(patch) => onItemChange(item.id, patch)}
+          onSelectBlock={() => onSelect(item.id)}
           canvasW={canvasW}
           canvasH={canvasH}
         />
@@ -23,23 +44,63 @@ export default function StoryTextOverlay({ items, onItemChange, canvasW, canvasH
   );
 }
 
-function DraggableTextBlock({ item, onChange, canvasW, canvasH }) {
+function DraggableTextBlock({ item, selected, onChange, onSelectBlock, canvasW, canvasH }) {
   const start = useRef({ x: 0, y: 0 });
+  const moved = useRef(false);
+
+  const fontSize = item.fontSize ?? 22;
+  const fontFamily = storyFontFamilyForKey(item.fontKey ?? 'manropeBold');
+  const textAlign = item.textAlign ?? 'left';
+  const pillColor = item.pillColor ?? null;
+
+  // Grobe Blockhoehe fuer Clamp (eine Zeile Minimum; mehrzeilig bleibt innerhalb maxWidth).
+  const blockH = Math.max(28, fontSize * 1.35);
+  const blockW = Math.min(canvasW - 16, canvasW - item.x);
 
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
+        moved.current = false;
         start.current = { x: item.x, y: item.y };
       },
       onPanResponderMove: (_, gestureState) => {
-        const nx = Math.max(0, Math.min(canvasW - 40, start.current.x + gestureState.dx));
-        const ny = Math.max(0, Math.min(canvasH - 24, start.current.y + gestureState.dy));
+        if (Math.abs(gestureState.dx) > 4 || Math.abs(gestureState.dy) > 4) moved.current = true;
+        const nx = Math.max(0, Math.min(canvasW - 32, start.current.x + gestureState.dx));
+        const ny = Math.max(0, Math.min(canvasH - blockH, start.current.y + gestureState.dy));
         onChange({ x: nx, y: ny });
+      },
+      onPanResponderRelease: () => {
+        if (!moved.current) onSelectBlock();
       },
     })
   ).current;
+
+  const textStyle = [
+    styles.txt,
+    {
+      color: item.color,
+      fontSize,
+      fontFamily,
+      textAlign,
+    },
+  ];
+
+  const inner = pillColor ? (
+    <View
+      style={[
+        styles.pill,
+        {
+          backgroundColor: pillColor,
+        },
+      ]}
+    >
+      <Text style={textStyle}>{item.text}</Text>
+    </View>
+  ) : (
+    <Text style={textStyle}>{item.text}</Text>
+  );
 
   return (
     <View
@@ -49,20 +110,33 @@ function DraggableTextBlock({ item, onChange, canvasW, canvasH }) {
           left: item.x,
           top: item.y,
           maxWidth: canvasW - 16,
+          zIndex: 5,
         },
+        selected && styles.selectedRing,
       ]}
       {...pan.panHandlers}
     >
-      <Text style={[styles.txt, { color: item.color }]}>{item.text}</Text>
+      {inner}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  abs: { position: 'absolute', zIndex: 5 },
+  abs: { position: 'absolute' },
+  selectedRing: {
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: 'rgba(255,255,255,0.75)',
+    borderRadius: 10,
+    padding: 2,
+  },
+  pill: {
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+  },
   txt: {
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 22,
     textShadowColor: 'rgba(0,0,0,0.65)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,

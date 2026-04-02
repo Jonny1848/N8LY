@@ -1,10 +1,11 @@
 /**
  * Story-Editor: Foto mit Text, Sticker, Stift (Flatten per view-shot) oder Video mit Caption.
+ * Layout orientiert an Instagram: X oben links, hohe 9:16-Karte, Werkzeuge rechts vertikal.
  *
  * Phase C (spaeter): Video mit eingebrannten Overlays erfordert zusaetzliche Pipeline
  * (z. B. serverseitig FFmpeg oder JSON-Overlay + angepasster Viewer) – siehe Plan.
  */
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,7 +13,6 @@ import {
   Modal,
   TextInput,
   Alert,
-  ScrollView,
   ActivityIndicator,
   StyleSheet,
   Dimensions,
@@ -21,20 +21,33 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { LinearGradient } from 'expo-linear-gradient';
+import { XMarkIcon, ArrowRightIcon } from 'react-native-heroicons/outline';
+import { EmojiPickerModal, emojiData } from '@hiraku-ai/react-native-emoji-picker';
+import { theme } from '../../../constants/theme';
 import StoryEditorCanvas from '../../../components/stories/StoryEditorCanvas';
 import StoryTextOverlay from '../../../components/stories/StoryTextOverlay';
-import StoryStickerLayer, { STORY_STICKER_EMOJIS } from '../../../components/stories/StoryStickerLayer';
+import StoryStickerLayer from '../../../components/stories/StoryStickerLayer';
 import StoryDrawLayer from '../../../components/stories/StoryDrawLayer';
-import StoryToolbar from '../../../components/stories/StoryToolbar';
+import StoryEditorSidebar from '../../../components/stories/StoryEditorSidebar';
+import StoryEditorStyleBar from '../../../components/stories/StoryEditorStyleBar';
 import { useStoryDraftStore } from '../../../stores/useStoryDraftStore';
 
-const { width: SCREEN_W } = Dimensions.get('window');
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+
+/** Abgerundete Ecken der Story-Karte (gleicher Wert wie StoryEditorCanvas) */
+const STORY_CARD_RADIUS = 18;
+/** Seitenabstand der Preview */
+const PREVIEW_SIDE_MARGIN = 8;
+/** Platz fuer unteren „Weiter“-Bereich (kleiner als zuvor = hoehere Karte) */
+const BOTTOM_ACTION_RESERVE = 76;
 
 function cloneState(s) {
   return {
     texts: s.texts.map((t) => ({ ...t })),
     stickers: s.stickers.map((x) => ({ ...x })),
     paths: s.paths.map((p) => ({ ...p })),
+    imageEffect: s.imageEffect ?? 'none',
   };
 }
 
@@ -61,7 +74,6 @@ export default function StoryEditorScreen() {
   const clipId = Array.isArray(rawId) ? rawId[0] : rawId;
 
   const updateClip = useStoryDraftStore((s) => s.updateClip);
-  // Selector: Clip aus Liste, damit TextInput/Caption bei updateClip neu rendert
   const clip = useStoryDraftStore((s) => s.clips.find((c) => c.id === clipId));
 
   const shotRef = useRef(null);
@@ -71,16 +83,26 @@ export default function StoryEditorScreen() {
   const [stickers, setStickers] = useState([]);
   const [paths, setPaths] = useState([]);
   const [history, setHistory] = useState([]);
+  /** Farb-Overlay vor dem Flatten (IG-Filter-light) */
+  const [imageEffect, setImageEffect] = useState('none');
+  /** Auswahl fuer Style-Leiste: Text, Sticker oder Effekt-Palette */
+  const [selectedTextId, setSelectedTextId] = useState(null);
+  const [selectedStickerId, setSelectedStickerId] = useState(null);
+  const [effectsTrayOpen, setEffectsTrayOpen] = useState(false);
   const [textModal, setTextModal] = useState(false);
   const [draftText, setDraftText] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const previewW = SCREEN_W;
-  const previewH = Math.min(previewW * (16 / 9), Dimensions.get('window').height - insets.top - insets.bottom - 220);
+  const previewW = SCREEN_W - PREVIEW_SIDE_MARGIN * 2;
+  // Maximale Hoehe: 9:16; wenig Reserve oben (X liegt wie bei IG ueber der Ecke) → wirkt weiter oben
+  const previewH = Math.min(
+    previewW * (16 / 9),
+    SCREEN_H - insets.top - insets.bottom - BOTTOM_ACTION_RESERVE - 4
+  );
 
   const pushHistory = useCallback(() => {
-    setHistory((h) => [...h.slice(-19), cloneState({ texts, stickers, paths })]);
-  }, [texts, stickers, paths]);
+    setHistory((h) => [...h.slice(-19), cloneState({ texts, stickers, paths, imageEffect })]);
+  }, [texts, stickers, paths, imageEffect]);
 
   const undo = useCallback(() => {
     setHistory((h) => {
@@ -89,6 +111,7 @@ export default function StoryEditorScreen() {
       setTexts(prev.texts);
       setStickers(prev.stickers);
       setPaths(prev.paths);
+      setImageEffect(prev.imageEffect ?? 'none');
       return h.slice(0, -1);
     });
   }, []);
@@ -114,14 +137,24 @@ export default function StoryEditorScreen() {
     const id = `st_${Date.now()}`;
     setStickers((s) => [
       ...s,
-      { id, emoji, x: previewW / 2 - 24, y: previewH / 2 - 24 },
+      { id, emoji, x: previewW / 2 - 24, y: previewH / 2 - 24, scale: 1 },
     ]);
     setMode('none');
+    setSelectedStickerId(id);
+    setSelectedTextId(null);
+    setEffectsTrayOpen(false);
   };
 
   const openTextModal = () => {
     setDraftText('');
     setTextModal(true);
+  };
+
+  /** Aa in Sidebar: Modus Text + Eingabe */
+  const handleOpenText = () => {
+    setMode('text');
+    setEffectsTrayOpen(false);
+    openTextModal();
   };
 
   const confirmText = () => {
@@ -134,13 +167,86 @@ export default function StoryEditorScreen() {
     const id = `tx_${Date.now()}`;
     setTexts((items) => [
       ...items,
-      { id, text: t, x: Math.max(16, previewW / 2 - 80), y: previewH / 2, color: strokeColor },
+      {
+        id,
+        text: t,
+        x: Math.max(16, previewW / 2 - 100),
+        y: previewH / 2,
+        color: strokeColor,
+        fontSize: 24,
+        fontKey: 'inter700',
+        textAlign: 'center',
+        pillColor: null,
+      },
     ]);
     setTextModal(false);
     setMode('none');
+    setSelectedTextId(id);
+    setSelectedStickerId(null);
   };
 
-  /** Flatten Foto und Metadaten in den Draft schreiben, dann Review */
+  const clearOverlaySelection = () => {
+    setSelectedTextId(null);
+    setSelectedStickerId(null);
+    setEffectsTrayOpen(false);
+  };
+
+  /** Leerer Bildbereich: Auswahl schliessen (nicht beim Zeichnen stoeren) */
+  const onCanvasBackdropPress = () => {
+    if (mode === 'draw') return;
+    clearOverlaySelection();
+  };
+
+  const toggleEffectsTray = () => {
+    setEffectsTrayOpen((open) => {
+      const next = !open;
+      if (next) {
+        setSelectedTextId(null);
+        setSelectedStickerId(null);
+      }
+      return next;
+    });
+  };
+
+  const onSelectText = (id) => {
+    setSelectedTextId(id);
+    setSelectedStickerId(null);
+    setEffectsTrayOpen(false);
+  };
+
+  const onSelectSticker = (id) => {
+    setSelectedStickerId(id);
+    setSelectedTextId(null);
+    setEffectsTrayOpen(false);
+  };
+
+  const selectedText = texts.find((t) => t.id === selectedTextId);
+  const selectedSticker = stickers.find((s) => s.id === selectedStickerId);
+
+  /** Ein Push pro Slider-Geste: erster onValueChange sichert den Zustand vor dem Ziehen */
+  const fontSizeSlideRef = useRef(false);
+  const stickerScaleSlideRef = useRef(false);
+  useEffect(() => {
+    fontSizeSlideRef.current = false;
+  }, [selectedTextId]);
+  useEffect(() => {
+    stickerScaleSlideRef.current = false;
+  }, [selectedStickerId]);
+
+  const patchSelectedText = (patch) => {
+    if (!selectedTextId) return;
+    changeTextItem(selectedTextId, patch);
+  };
+
+  const styleBarVisible = effectsTrayOpen || selectedTextId != null || selectedStickerId != null;
+  const styleBarVariant = effectsTrayOpen
+    ? 'effects'
+    : selectedStickerId
+      ? 'sticker'
+      : selectedTextId
+        ? 'text'
+        : 'effects';
+
   const proceedPhoto = async () => {
     if (!clip || !shotRef.current) return;
     try {
@@ -177,18 +283,34 @@ export default function StoryEditorScreen() {
 
   if (clip.kind === 'video') {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()}>
-            <Text style={styles.headerLink}>Zurueck</Text>
-          </Pressable>
-          <Text style={styles.headerTitle}>Video</Text>
-          <View style={{ width: 56 }} />
+      <View style={[styles.root, { paddingTop: 0 }]}>
+        <Pressable
+          onPress={() => router.back()}
+          style={[styles.closeFabWrap, { top: insets.top + 6, left: 14 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Schliessen"
+        >
+          <View style={styles.closeFabCircle}>
+            <XMarkIcon size={20} color="#fff" />
+          </View>
+        </Pressable>
+
+        <View style={[styles.mainStage, { paddingTop: insets.top + 4 }]}>
+          <View
+            style={[
+              styles.videoCard,
+              {
+                width: previewW,
+                height: previewH,
+                borderRadius: STORY_CARD_RADIUS,
+              },
+            ]}
+          >
+            <StoryVideoPreview uri={clip.localUri} width={previewW} height={previewH} />
+          </View>
         </View>
-        <View style={{ width: previewW, height: previewH, alignSelf: 'center' }}>
-          <StoryVideoPreview uri={clip.localUri} width={previewW} height={previewH} />
-        </View>
-        <View style={styles.pad}>
+
+        <View style={[styles.pad, { paddingBottom: insets.bottom + 8 }]}>
           <Text style={styles.label}>Caption (optional)</Text>
           <TextInput
             value={clip.caption || ''}
@@ -202,8 +324,23 @@ export default function StoryEditorScreen() {
             Hinweis Phase C: Zeichnung/Sticker auf Video sind hier noch nicht ins Material
             eingebrannt; dafuer waere FFmpeg oder ein Overlay-JSON im Viewer noetig.
           </Text>
-          <Pressable onPress={proceedVideo} style={styles.primary}>
-            <Text style={styles.primaryTxt}>Weiter</Text>
+        </View>
+
+        <View
+          style={[
+            styles.storyNextFabHost,
+            { bottom: Math.max(insets.bottom, 20) + 8, right: 20 },
+          ]}
+        >
+          <Pressable onPress={proceedVideo} accessibilityRole="button" accessibilityLabel="Weiter">
+            <LinearGradient
+              colors={[theme.colors.primary.main, theme.colors.primary.main2]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.roundGradientButton}
+            >
+              <ArrowRightIcon size={28} color="#fff" />
+            </LinearGradient>
           </Pressable>
         </View>
       </View>
@@ -211,68 +348,163 @@ export default function StoryEditorScreen() {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Text style={styles.headerLink}>Zurueck</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>Bearbeiten</Text>
-        <View style={{ width: 56 }} />
-      </View>
+    <View style={[styles.root, { paddingTop: 0 }]}>
+      <Pressable
+        onPress={() => router.back()}
+        style={[styles.closeFabWrap, { top: insets.top + 6, left: 14 }]}
+        accessibilityRole="button"
+        accessibilityLabel="Schliessen"
+      >
+        <View style={styles.closeFabCircle}>
+          <XMarkIcon size={20} color="#fff" />
+        </View>
+      </Pressable>
 
-      <StoryEditorCanvas width={previewW} height={previewH} shotRef={shotRef} imageUri={clip.localUri}>
-        <StoryTextOverlay
-          items={texts}
-          onItemChange={(id, patch) => changeTextItem(id, patch)}
-          canvasW={previewW}
-          canvasH={previewH}
-        />
-        <StoryStickerLayer
-          stickers={stickers}
-          onStickerChange={(id, patch) => changeStickerItem(id, patch)}
-          canvasW={previewW}
-          canvasH={previewH}
-        />
-        <StoryDrawLayer
+      <View style={[styles.mainStage, { paddingTop: insets.top + 4 }]}>
+        <StoryEditorCanvas
           width={previewW}
           height={previewH}
-          paths={paths}
-          onAddStroke={onAddStroke}
-          active={mode === 'draw'}
+          shotRef={shotRef}
+          imageUri={clip.localUri}
+          borderRadius={STORY_CARD_RADIUS}
+          effectId={imageEffect}
+          onBackdropPress={onCanvasBackdropPress}
+        >
+          <StoryTextOverlay
+            items={texts}
+            onItemChange={(id, patch) => changeTextItem(id, patch)}
+            selectedId={selectedTextId}
+            onSelect={onSelectText}
+            canvasW={previewW}
+            canvasH={previewH}
+          />
+          <StoryStickerLayer
+            stickers={stickers}
+            onStickerChange={(id, patch) => changeStickerItem(id, patch)}
+            selectedId={selectedStickerId}
+            onSelect={onSelectSticker}
+            canvasW={previewW}
+            canvasH={previewH}
+          />
+          <StoryDrawLayer
+            width={previewW}
+            height={previewH}
+            paths={paths}
+            onAddStroke={onAddStroke}
+            active={mode === 'draw'}
+            strokeColor={strokeColor}
+            strokeWidth={4}
+          />
+        </StoryEditorCanvas>
+      </View>
+
+      {/* Rechte Leiste, vertikal zentriert im Bereich unter der Statusleiste */}
+      <View
+        pointerEvents="box-none"
+        style={[
+          styles.sideRail,
+          {
+            top: insets.top + 48,
+            bottom: BOTTOM_ACTION_RESERVE + insets.bottom,
+          },
+        ]}
+      >
+        <StoryEditorSidebar
+          mode={mode}
+          onModeChange={setMode}
+          onOpenText={handleOpenText}
           strokeColor={strokeColor}
-          strokeWidth={4}
+          onColorChange={setStrokeColor}
+          onUndo={undo}
+          canUndo={history.length > 0}
+          onOpenEffects={toggleEffectsTray}
+          effectsActive={effectsTrayOpen}
         />
-      </StoryEditorCanvas>
+      </View>
 
-      {mode === 'sticker' ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stickerStrip}>
-          {STORY_STICKER_EMOJIS.map((e) => (
-            <Pressable key={e} onPress={() => addStickerEmoji(e)} style={styles.stickerPick}>
-              <Text style={styles.stickerPickTxt}>{e}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      ) : null}
-
-      <StoryToolbar
-        mode={mode}
-        onModeChange={(m) => {
-          setMode(m);
-          if (m === 'text') openTextModal();
-        }}
-        strokeColor={strokeColor}
-        onColorChange={setStrokeColor}
-        onUndo={undo}
-        canUndo={history.length > 0}
+      {/* Vollstaendiger Emoji-Katalog sobald Sticker-Modus aktiv (Smiley in Sidebar) */}
+      <EmojiPickerModal
+        visible={mode === 'sticker'}
+        onClose={() => setMode('none')}
+        onEmojiSelect={(emoji) => addStickerEmoji(emoji)}
+        emojis={emojiData}
+        darkMode
+        modalTitle="Emoji waehlen"
+        searchPlaceholder="Emoji suchen…"
+        modalHeightPercentage={72}
       />
 
-      <Pressable onPress={proceedPhoto} disabled={saving} style={styles.primary}>
-        {saving ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.primaryTxt}>Weiter</Text>
-        )}
-      </Pressable>
+      <StoryEditorStyleBar
+        visible={styleBarVisible}
+        variant={styleBarVariant}
+        textSelectionKey={selectedTextId}
+        liftAboveFooterPx={Math.max(insets.bottom, 20) + 76}
+        fontKey={selectedText?.fontKey ?? 'inter700'}
+        onFontKeyChange={(key) => {
+          pushHistory();
+          patchSelectedText({ fontKey: key });
+        }}
+        fontSize={selectedText?.fontSize ?? 24}
+        onFontSizeChange={(n) => {
+          if (!fontSizeSlideRef.current) {
+            pushHistory();
+            fontSizeSlideRef.current = true;
+          }
+          patchSelectedText({ fontSize: n });
+        }}
+        onFontSizeCommit={() => {
+          fontSizeSlideRef.current = false;
+        }}
+        textColor={selectedText?.color ?? '#ffffff'}
+        onTextColorChange={(c) => {
+          pushHistory();
+          patchSelectedText({ color: c });
+        }}
+        stickerScale={selectedSticker?.scale ?? 1}
+        onStickerScaleChange={(n) => {
+          if (!selectedStickerId) return;
+          if (!stickerScaleSlideRef.current) {
+            pushHistory();
+            stickerScaleSlideRef.current = true;
+          }
+          changeStickerItem(selectedStickerId, { scale: n });
+        }}
+        onStickerScaleCommit={() => {
+          stickerScaleSlideRef.current = false;
+        }}
+        effectId={imageEffect}
+        onEffectChange={(id) => {
+          pushHistory();
+          setImageEffect(id);
+        }}
+      />
+
+      <View
+        style={[
+          styles.storyNextFabHost,
+          { bottom: Math.max(insets.bottom, 20) + 8, right: 20 },
+        ]}
+      >
+        <Pressable
+          onPress={proceedPhoto}
+          disabled={saving}
+          accessibilityRole="button"
+          accessibilityLabel="Weiter zur Story"
+        >
+          <LinearGradient
+            colors={[theme.colors.primary.main, theme.colors.primary.main2]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.roundGradientButton}
+          >
+            {saving ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <ArrowRightIcon size={28} color="#fff" />
+            )}
+          </LinearGradient>
+        </Pressable>
+      </View>
 
       <Modal visible={textModal} transparent animationType="fade">
         <View style={styles.modalBg}>
@@ -288,7 +520,13 @@ export default function StoryEditorScreen() {
               autoFocus
             />
             <View style={styles.modalRow}>
-              <Pressable onPress={() => setTextModal(false)} style={styles.modalBtn}>
+              <Pressable
+                onPress={() => {
+                  setTextModal(false);
+                  setMode('none');
+                }}
+                style={styles.modalBtn}
+              >
                 <Text style={styles.modalBtnTxt}>Abbrechen</Text>
               </Pressable>
               <Pressable onPress={confirmText} style={[styles.modalBtn, styles.modalBtnPrimary]}>
@@ -303,20 +541,46 @@ export default function StoryEditorScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#111' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111' },
+  root: { flex: 1, backgroundColor: '#000' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' },
   muted: { color: '#888', fontFamily: 'Manrope_400Regular' },
   btn: { marginTop: 16, padding: 12 },
   btnTxt: { color: '#6ea8ff', fontFamily: 'Manrope_600SemiBold' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  /** Pressable ohne eigenen Kreis – der sichtbare Kreis sitzt im Kind-View (zuverlaessiger auf iOS) */
+  closeFabWrap: {
+    position: 'absolute',
+    zIndex: 20,
   },
-  headerLink: { color: '#7eb6ff', fontFamily: 'Manrope_600SemiBold', fontSize: 15 },
-  headerTitle: { color: '#fff', fontFamily: 'Manrope_700Bold', fontSize: 16 },
+  /** Halbtransparenter Kreis um das X wie bei Instagram */
+  closeFabCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.52)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  /** Vorschau oben ausrichten (nicht vertikal zentrieren) – wirkt naeher an der Statusleiste */
+  mainStage: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  /** Rechte Werkzeugleiste vertikal zwischen Statusleiste und unterem FAB zentriert */
+  sideRail: {
+    position: 'absolute',
+    right: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 15,
+    width: 48,
+  },
+  videoCard: {
+    overflow: 'hidden',
+    backgroundColor: '#111',
+  },
   pad: { padding: 16 },
   label: { color: '#ccc', marginBottom: 6, fontFamily: 'Manrope_500Medium' },
   input: {
@@ -334,24 +598,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Manrope_400Regular',
   },
-  primary: {
-    marginHorizontal: 16,
-    marginBottom: 20,
-    backgroundColor: '#5b8cff',
-    paddingVertical: 14,
-    borderRadius: 12,
+  /** Wie Onboarding age.jsx: runder Gradient-„Weiter“-Button unten rechts */
+  storyNextFabHost: {
+    position: 'absolute',
+    zIndex: 25,
+  },
+  roundGradientButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: theme.colors.primary.main,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  primaryTxt: { color: '#fff', fontFamily: 'Manrope_700Bold', fontSize: 16 },
-  stickerStrip: { maxHeight: 56, marginVertical: 6, paddingHorizontal: 8 },
-  stickerPick: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginHorizontal: 4,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
-  },
-  stickerPickTxt: { fontSize: 28 },
   modalBg: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.65)',

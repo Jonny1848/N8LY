@@ -109,6 +109,15 @@ export default {
         },
       ],
       [
+        "expo-media-library",
+        {
+          photosPermission:
+            "N8TLY zeigt dein zuletzt aufgenommenes Foto als Galerie-Vorschau für Stories.",
+          savePhotosPermission:
+            "N8TLY kann optional Aufnahmen in deiner Mediathek speichern.",
+        },
+      ],
+      [
         "@rnmapbox/maps",
         {
           RNMapboxMapsImpl: "mapbox",
