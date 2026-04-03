@@ -1,14 +1,36 @@
-import { View, Text, Pressable, Image, TextInput, Keyboard } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  View,
+  Pressable,
+  Image,
+  TextInput,
+  Keyboard,
+  useWindowDimensions,
+  Platform,
+  StyleSheet,
+} from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useRef, useEffect } from 'react';
-import { MapPinIcon, MagnifyingGlassIcon } from 'react-native-heroicons/solid';
-import { AdjustmentsHorizontalIcon as AdjustmentsHorizontalIconOutline } from 'react-native-heroicons/outline';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
+import { MapPinIcon } from 'react-native-heroicons/solid';
+import {
+  AdjustmentsHorizontalIcon as AdjustmentsHorizontalIconOutline,
+  XMarkIcon as XMarkIconOutline,
+} from 'react-native-heroicons/outline';
+import {MagnifyingGlassIcon} from 'react-native-heroicons/solid';
 import { theme } from '../../constants/theme';
 import MapboxGL from "@rnmapbox/maps";
 import * as Location from 'expo-location';
 import { useAudioPlayer } from 'expo-audio';
 import { FilterBottomSheet } from '../../components/FilterBottomSheet';
-import { supabase } from '../../lib/supabase'; 
+import { supabase } from '../../lib/supabase';
+import { BlurView } from 'expo-blur';
+import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 
 // Mapbox Access Token aus Umgebungsvariable lesen (definiert in .env)
 const MAPBOX_ACCESS_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
@@ -24,25 +46,109 @@ const MAP_STYLE_LIGHT = "mapbox://styles/mapbox/light-v11";
 const getMapStyleForHour = (hour: number) =>
   hour >= 6 && hour < 18 ? MAP_STYLE_LIGHT : MAP_STYLE_DARK;
 
-export default function HomeScreen() {
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+/**
+ * Abstand vom unteren Rand bis unter die Suchleiste (volle schwebende Tab-Pille + Labels + iOS-Abstand).
+ * Zu klein → Suche verschwindet unter der nativen Tab-Bar (die liegt immer über RN).
+ */
+const FLOATING_TAB_CLEARANCE_PT = 118;
 
-  // ⭐ Event-States
+const ICON_W = 22;
+const SEARCH_HORIZONTAL_PAD = 20; // entspricht px-5
+
+/** Spring: weich ineinander, nicht abrupt */
+const SEARCH_SPRING = { damping: 20, stiffness: 260, mass: 0.9 } as const;
+
+/** Standort & zugeklappte Suche: gleicher Kreisdurchmesser (beide „perfekt rund“) */
+const LOCATE_BTN_SIZE = 56;
+/** Sichtbarer Abstand zwischen den zwei getrennten GlassViews (kein Liquid-Merge) */
+const GAP_LOCATE_SEARCH = 14;
+/** Suchzeile aufgeklappt: Höhe der Kapsel */
+const SEARCH_MORPH_EXPANDED_H = 52;
+
+export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  /**
+   * Map-Chrome links bündig zum Rand (nur Safe-Area), rechts klassisches Padding —
+   * max. Suchbreite = Display minus diese Ränder.
+   */
+  const mapChromePadLeft = insets.left + 12;
+  const mapChromePadRight = SEARCH_HORIZONTAL_PAD;
+  const searchExpandedWidth = Math.max(
+    0,
+    windowWidth - mapChromePadLeft - mapChromePadRight
+  );
+  /** Such-Morph aufgeklappt: bis zum rechten Padding, nicht breiter als Fenster */
+  const searchMorphMaxWidth = Math.max(LOCATE_BTN_SIZE, searchExpandedWidth);
+  const canLiquidGlass = Platform.OS === 'ios' && isGlassEffectAPIAvailable();
+
+  /** Unterkante Such-UI: Safe Area + geschätzte Tab-Pille (schwebend) */
+  const bottomInsetAboveTabBar = insets.bottom + FLOATING_TAB_CLEARANCE_PT;
+  const [searchExpanded, setSearchExpanded] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [events, setEvents] = useState<any[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
-
   const [searchQuery, setSearchQuery] = useState('');
   const [filterVisible, setFilterVisible] = useState(false);
   const [mapStyleUrl, setMapStyleUrl] = useState(() =>
     getMapStyleForHour(new Date().getHours())
   );
+  const mapIsLight = mapStyleUrl === MAP_STYLE_LIGHT;
+
+  /** 0 = Kreis, 1 = Leiste — steuert Morph-Grenzen */
+  const searchMorph = useSharedValue(0);
 
   const cameraRef = useRef<MapboxGL.Camera>(null);
   const mapRef = useRef<MapboxGL.MapView>(null);
-  // Options-Objekt (kein Raw-Zahl-Argument): zweites Arg ist AudioPlayerOptions, siehe expo-audio
+  const searchInputRef = useRef<TextInput>(null);
   const flightPlayer = useAudioPlayer(require('../../assets/flight.mp3'), { updateInterval: 16 });
 
-  
+  /**
+   * Zweites GlassView: zugeklappt gleicher Kreis wie Standort (56×56), aufgeklappt Kapsel.
+   * borderRadius = min(w,h)/2 → Kreis bzw. Stadium-Enden.
+   */
+  const morphContainerStyle = useAnimatedStyle(() => {
+    const w = interpolate(
+      searchMorph.value,
+      [0, 1],
+      [LOCATE_BTN_SIZE, searchMorphMaxWidth],
+      Extrapolation.CLAMP
+    );
+    const h = interpolate(
+      searchMorph.value,
+      [0, 1],
+      [LOCATE_BTN_SIZE, SEARCH_MORPH_EXPANDED_H],
+      Extrapolation.CLAMP
+    );
+    const r = Math.min(w, h) / 2;
+    return { width: w, height: h, borderRadius: r };
+  }, [searchMorphMaxWidth]);
+
+  const iconLeadStyle = useAnimatedStyle(() => ({
+    marginLeft: interpolate(
+      searchMorph.value,
+      [0, 1],
+      [(LOCATE_BTN_SIZE - ICON_W) / 2, 12],
+      Extrapolation.CLAMP
+    ),
+  }));
+
+  const inputSlotStyle = useAnimatedStyle(() => ({
+    flexGrow: interpolate(searchMorph.value, [0, 1], [0, 1], Extrapolation.CLAMP),
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    opacity: interpolate(searchMorph.value, [0, 0.22, 1], [0, 0, 1], Extrapolation.CLAMP),
+  }));
+
+  const xSlotStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(searchMorph.value, [0, 0.35, 1], [0, 0, 1], Extrapolation.CLAMP),
+    transform: [
+      {
+        scale: interpolate(searchMorph.value, [0, 1], [0.65, 1], Extrapolation.CLAMP),
+      },
+    ],
+  }));
 
   const BERLIN_COORDS = { latitude: 52.520008, longitude: 13.404954 };
 
@@ -56,6 +162,28 @@ export default function HomeScreen() {
     const id = setInterval(updateStyle, 60000); // jede Minute prüfen
     return () => clearInterval(id);
   }, []);
+
+  // Suchfeld nach Aufklappen fokussieren
+  useEffect(() => {
+    if (!searchExpanded) return;
+    const t = setTimeout(() => searchInputRef.current?.focus(), 60);
+    return () => clearTimeout(t);
+  }, [searchExpanded]);
+
+  /**
+   * Suche zuklappen (X oder nach abgeschlossener Ortssuche).
+   */
+  const collapseSearch = () => {
+    searchMorph.value = withSpring(0, SEARCH_SPRING);
+    setSearchExpanded(false);
+    setSearchQuery('');
+    Keyboard.dismiss();
+  };
+
+  const expandSearch = () => {
+    searchMorph.value = withSpring(1, SEARCH_SPRING);
+    setSearchExpanded(true);
+  };
 
   // ============================
   // Nutzerposition holen
@@ -186,11 +314,72 @@ export default function HomeScreen() {
     });
 
     Keyboard.dismiss();
+    searchMorph.value = withSpring(0, SEARCH_SPRING);
+    setSearchExpanded(false);
+    setSearchQuery('');
   };
 
   // ==================================
   // RENDER
   // ==================================
+
+  /** Inhalt des Such-GlassViews (Morph) — gleiche Zeile für Liquid-Glass und Blur */
+  const mapSearchMorphInner = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={searchExpanded ? undefined : 'Suche öffnen'}
+      style={{ flex: 1 }}
+      pointerEvents={searchExpanded ? 'box-none' : 'auto'}
+      onPress={() => {
+        if (!searchExpanded) expandSearch();
+      }}
+    >
+      <View
+        style={{
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+        }}
+      >
+        <Animated.View style={iconLeadStyle}>
+          <MagnifyingGlassIcon size={ICON_W} color="white" />
+        </Animated.View>
+        <Animated.View style={inputSlotStyle}>
+          <TextInput
+            ref={searchInputRef}
+            className="text-base text-white placeholder:text-gray-400"
+            placeholder="Wohin möchtest du?"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            editable={searchExpanded}
+            pointerEvents={searchExpanded ? 'auto' : 'none'}
+            onSubmitEditing={() => {
+              const q = searchQuery.trim();
+              if (q) searchCity(q);
+            }}
+            style={{
+              fontFamily: 'Manrope_400Regular',
+              paddingVertical: 6,
+              marginRight: 4,
+              minWidth: 0,
+            }}
+          />
+        </Animated.View>
+        <Animated.View style={[xSlotStyle, { marginRight: 4 }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Suche schließen"
+            hitSlop={12}
+            onPress={collapseSearch}
+            className="p-1"
+          >
+            <XMarkIconOutline size={22} color={theme.colors.neutral.gray[600]} />
+          </Pressable>
+        </Animated.View>
+      </View>
+    </Pressable>
+  );
 
   return (
     <View className="flex-1 bg-white">
@@ -254,37 +443,131 @@ export default function HomeScreen() {
         </View>
       </SafeAreaView>
 
-      {/* Locate Button */}
-      <View className="absolute bottom-32 left-5" style={{ zIndex: 10 }}>
-        <Pressable
-          className="w-14 h-14 rounded-full justify-center items-center shadow-xl"
-          style={{ backgroundColor: theme.colors.primary.main2 }}
-          onPress={handleLocatePress}
-        >
-          <MapPinIcon size={24} color="#fff" />
-        </Pressable>
-      </View>
-
-      {/* Suche */}
-      <SafeAreaView edges={['bottom']} className="absolute bottom-0 left-0 right-0" style={{ zIndex: 5 }}>
-        <View className="px-5 pb-2 mb-1">
-          <View className="flex-row items-center bg-white rounded-full px-5 py-4 shadow-xl space-x-10">
-            <MagnifyingGlassIcon size={22} color={theme.colors.neutral.gray[500]} />
-            <TextInput
-              className="flex-1 ml-3 text-base text-gray-900"
-              placeholder="Wohin möchtest du?"
-              placeholderTextColor={theme.colors.neutral.gray[400]}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              onSubmitEditing={() => {
-                searchCity(searchQuery);
-                setSearchQuery('');
+      {/* Zwei getrennte runde GlassViews + Abstand — kein GlassContainer (sonst Liquid-Blob) */}
+      <View
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: bottomInsetAboveTabBar,
+          zIndex: 10,
+          paddingLeft: mapChromePadLeft,
+          paddingRight: mapChromePadRight,
+          paddingBottom: 8,
+          alignItems: 'flex-start',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.18,
+          shadowRadius: 10,
+          elevation: 8,
+        }}
+        pointerEvents="box-none"
+      >
+        {canLiquidGlass ? (
+          <View style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+            <GlassView
+              glassEffectStyle="regular"
+              isInteractive={false}
+              colorScheme={mapIsLight ? 'light' : 'dark'}
+              style={{
+                width: LOCATE_BTN_SIZE,
+                height: LOCATE_BTN_SIZE,
+                borderRadius: LOCATE_BTN_SIZE / 2,
+                overflow: 'hidden',
               }}
-              style={{ fontFamily: 'Manrope_400Regular' }}
-            />
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Karte auf Standort zentrieren"
+                className="h-full w-full items-center justify-center"
+                onPress={handleLocatePress}
+              >
+                <MapPinIcon size={24} color="white" />
+              </Pressable>
+            </GlassView>
+
+            <Animated.View
+              style={[
+                morphContainerStyle,
+                { overflow: 'hidden', marginTop: GAP_LOCATE_SEARCH },
+              ]}
+            >
+              <GlassView
+                glassEffectStyle="regular"
+                isInteractive={false}
+                colorScheme={mapIsLight ? 'light' : 'dark'}
+                style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden' }}
+              >
+                {mapSearchMorphInner}
+              </GlassView>
+            </Animated.View>
           </View>
-        </View>
-      </SafeAreaView>
+        ) : (
+          <View
+            style={{
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              width: '100%',
+            }}
+          >
+            <BlurView
+              intensity={Platform.OS === 'ios' ? 42 : 58}
+              tint={mapIsLight ? 'light' : 'dark'}
+              style={{
+                width: LOCATE_BTN_SIZE,
+                height: LOCATE_BTN_SIZE,
+                borderRadius: LOCATE_BTN_SIZE / 2,
+                overflow: 'hidden',
+              }}
+            >
+              <View
+                pointerEvents="none"
+                style={[
+                  StyleSheet.absoluteFillObject,
+                  {
+                    backgroundColor: mapIsLight
+                      ? 'rgba(255,255,255,0.28)'
+                      : 'rgba(28,28,34,0.4)',
+                  },
+                ]}
+              />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Karte auf Standort zentrieren"
+                className="h-full w-full items-center justify-center"
+                onPress={handleLocatePress}
+              >
+                <MapPinIcon size={24} color="white" />
+              </Pressable>
+            </BlurView>
+
+            <View style={{ height: GAP_LOCATE_SEARCH }} />
+
+            <Animated.View
+              style={[morphContainerStyle, { overflow: 'hidden' }]}
+            >
+              <BlurView
+                intensity={Platform.OS === 'ios' ? 42 : 58}
+                tint={mapIsLight ? 'light' : 'dark'}
+                style={{ width: '100%', height: '100%', overflow: 'hidden' }}
+              >
+                <View
+                  pointerEvents="none"
+                  style={[
+                    StyleSheet.absoluteFillObject,
+                    {
+                      backgroundColor: mapIsLight
+                        ? 'rgba(255,255,255,0.28)'
+                        : 'rgba(28,28,34,0.4)',
+                    },
+                  ]}
+                />
+                {mapSearchMorphInner}
+              </BlurView>
+            </Animated.View>
+          </View>
+        )}
+      </View>
 
       <FilterBottomSheet
         visible={filterVisible}
