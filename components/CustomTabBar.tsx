@@ -4,7 +4,6 @@ import useChatStore from '../stores/useChatStore';
 import Animated, {
   useAnimatedStyle,
   withTiming,
-  withSpring,
   Easing,
 } from 'react-native-reanimated';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -31,6 +30,76 @@ const iconMap: Record<string, { solid: any; outline: any }> = {
   discover: { solid: GlobeAltIconSolid, outline: GlobeAltIconOutline },
   profile: { solid: UserIconSolid, outline: UserIconOutline },
 };
+
+type TabBarItemProps = {
+  isFocused: boolean;
+  tabBarAccessibilityLabel?: string;
+  onPress: () => void;
+  onLongPress: () => void;
+  badge?: string | number;
+  IconComponent: any;
+};
+
+/**
+ * Einzelner Tab-Button: Reanimated-Hooks duerfen NICHT in einer .map()-Schleife
+ * in der Parent-Komponente stehen (Rules of Hooks). Sonst variiert die Hook-Anzahl
+ * pro Render und Native/Reanimated kann mit EXC_BREAKPOINT/SIGTRAP abbrechen.
+ */
+function TabBarItem({
+  isFocused,
+  tabBarAccessibilityLabel,
+  onPress,
+  onLongPress,
+  badge,
+  IconComponent,
+}: TabBarItemProps) {
+  const animatedStyle = useAnimatedStyle(() => {
+    const scale = withTiming(isFocused ? 1.08 : 1, {
+      duration: 200,
+      easing: Easing.out(Easing.ease),
+    });
+    const translateY = withTiming(isFocused ? -2 : 0, {
+      duration: 200,
+      easing: Easing.out(Easing.ease),
+    });
+
+    return {
+      transform: [{ scale }, { translateY }],
+    };
+  });
+
+  const iconColorStyle = useAnimatedStyle(() => {
+    const opacity = withTiming(isFocused ? 1 : 0.5, {
+      duration: 200,
+      easing: Easing.out(Easing.ease),
+    });
+    return { opacity };
+  });
+
+  const color = theme.colors.primary.main2;
+
+  return (
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityState={isFocused ? { selected: true } : {}}
+      accessibilityLabel={tabBarAccessibilityLabel}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      style={styles.tabItem}
+    >
+      <Animated.View style={[styles.tabContent, animatedStyle]}>
+        <Animated.View style={[styles.iconContainer, iconColorStyle]}>
+          {IconComponent && <IconComponent size={24} color={color} />}
+          {badge !== undefined && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{badge}</Text>
+            </View>
+          )}
+        </Animated.View>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
 
 export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const totalUnread = useChatStore((s) =>
@@ -62,36 +131,9 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
           });
         };
 
-        // Einfache, schnelle Animationen für Tab-Bar
-        const animatedStyle = useAnimatedStyle(() => {
-          const scale = withTiming(isFocused ? 1.08 : 1, {
-            duration: 200,
-            easing: Easing.out(Easing.ease),
-          });
-          const translateY = withTiming(isFocused ? -2 : 0, {
-            duration: 200,
-            easing: Easing.out(Easing.ease),
-          });
-          
-          return {
-            transform: [{ scale }, { translateY }],
-          };
-        });
-
-        const iconColorStyle = useAnimatedStyle(() => {
-          const opacity = withTiming(isFocused ? 1 : 0.5, {
-            duration: 200,
-            easing: Easing.out(Easing.ease),
-          });
-          return { opacity };
-        });
-
-        const IconComponent = isFocused 
-          ? iconMap[route.name]?.solid 
+        const IconComponent = isFocused
+          ? iconMap[route.name]?.solid
           : iconMap[route.name]?.outline;
-
-        // Tab-Icons einheitlich schwarz; Untätige Tabs wirken durch iconColorStyle-Opacity (0,5) heller
-        const color = theme.colors.primary.main2;
 
         const badge =
           route.name === 'social' && totalUnread > 0
@@ -101,26 +143,15 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
             : undefined;
 
         return (
-          <TouchableOpacity
+          <TabBarItem
             key={route.key}
-            accessibilityRole="button"
-            accessibilityState={isFocused ? { selected: true } : {}}
-            accessibilityLabel={options.tabBarAccessibilityLabel}
+            isFocused={isFocused}
+            tabBarAccessibilityLabel={options.tabBarAccessibilityLabel}
             onPress={onPress}
             onLongPress={onLongPress}
-            style={styles.tabItem}
-          >
-            <Animated.View style={[styles.tabContent, animatedStyle]}>
-              <Animated.View style={[styles.iconContainer, iconColorStyle]}>
-                {IconComponent && <IconComponent size={24} color={color} />}
-                {badge !== undefined && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{badge}</Text>
-                  </View>
-                )}
-              </Animated.View>
-            </Animated.View>
-          </TouchableOpacity>
+            badge={badge}
+            IconComponent={IconComponent}
+          />
         );
       })}
     </View>
@@ -130,7 +161,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
 const styles = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: "white",
+    backgroundColor: 'white',
     height: 65,
     paddingBottom: 20,
     paddingTop: 10,

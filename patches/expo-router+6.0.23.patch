@@ -1,0 +1,25 @@
+diff --git a/node_modules/expo-router/ios/ExpoHead.podspec b/node_modules/expo-router/ios/ExpoHead.podspec
+index 4205de5..7f34f88 100644
+--- a/node_modules/expo-router/ios/ExpoHead.podspec
++++ b/node_modules/expo-router/ios/ExpoHead.podspec
+@@ -27,15 +27,17 @@ Pod::Spec.new do |s|
+ 
+   s.dependency 'ExpoModulesCore'
+ 
+-  add_dependency(s, "RNScreens")
+-
+-  # Swift/Objective-C compatibility
++  # Swift/Objective-C compatibility — MUST be set before add_dependency: React Native's
++  # add_dependency (react_native_pods.rb) merges HEADER_SEARCH_PATHS into pod_target_xcconfig
++  # and crashes with "undefined method `[]' for nil" if this hash is missing.
+   s.pod_target_xcconfig = {
+     'DEFINES_MODULE' => 'YES',
+     'SWIFT_COMPILATION_MODE' => 'wholemodule',
+     'OTHER_SWIFT_FLAGS' => "$(inherited) #{compiler_flags}",
+   }
+ 
++  add_dependency(s, "RNScreens")
++
+   if !$ExpoUseSources&.include?(package['name']) && ENV['EXPO_USE_SOURCE'].to_i == 0 && File.exist?("#{s.name}.xcframework") && Gem::Version.new(Pod::VERSION) >= Gem::Version.new('1.10.0')
+     s.source_files = "**/*.h"
+     s.vendored_frameworks = "#{s.name}.xcframework"

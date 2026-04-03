@@ -12,9 +12,10 @@ import { supabase } from '../../lib/supabase';
 
 // Mapbox Access Token aus Umgebungsvariable lesen (definiert in .env)
 const MAPBOX_ACCESS_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
-
-// Mapbox SDK mit dem Token initialisieren
-MapboxGL.setAccessToken(MAPBOX_ACCESS_TOKEN);
+// Nur bei gesetztem Token registrieren (leerer String am Modul-Anfang kann Native-Seite instabil machen)
+if (MAPBOX_ACCESS_TOKEN) {
+  MapboxGL.setAccessToken(MAPBOX_ACCESS_TOKEN);
+}
 
 const MAP_STYLE_DARK = "mapbox://styles/jonny2005/cmiag4rgh00eb01s90y2r7qw0";
 const MAP_STYLE_LIGHT = "mapbox://styles/mapbox/light-v11";
@@ -38,7 +39,8 @@ export default function HomeScreen() {
 
   const cameraRef = useRef<MapboxGL.Camera>(null);
   const mapRef = useRef<MapboxGL.MapView>(null);
-  const flightPlayer = useAudioPlayer(require('../../assets/flight.mp3'), 16);
+  // Options-Objekt (kein Raw-Zahl-Argument): zweites Arg ist AudioPlayerOptions, siehe expo-audio
+  const flightPlayer = useAudioPlayer(require('../../assets/flight.mp3'), { updateInterval: 16 });
 
   
 

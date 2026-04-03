@@ -75,7 +75,11 @@ export default function StoryViewerScreen() {
       try {
         const groups = await getActiveStories(currentUserId);
         if (cancelled) return;
-        const bundle = groups.find((g) => g.user?.id === authorUserId);
+        // UUID aus der Route kann anders formatiert sein als Supabase — case-insensitive vergleichen
+        const authorNorm = (authorUserId || '').trim().toLowerCase();
+        const bundle = groups.find(
+          (g) => (g.user?.id || '').trim().toLowerCase() === authorNorm
+        );
         setHeaderName(bundle?.user?.username || 'Story');
         setStories(bundle?.stories || []);
       } catch (e) {
@@ -141,15 +145,22 @@ export default function StoryViewerScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ alignItems: 'center' }}
       >
-        {stories.map((story) => (
+        {stories.map((story) => {
+          const isVideo = String(story.media_type || '').toLowerCase() === 'video';
+          const mediaUri = story.media_url;
+          return (
           <View
             key={story.id}
-            style={{ width: SCREEN_W, height: slideHeight }}
-            className="justify-center"
+            style={{ width: SCREEN_W, height: slideHeight, backgroundColor: '#000' }}
+            className="items-center justify-center"
           >
-            {story.media_type === 'video' ? (
+            {!mediaUri ? (
+              <Text className="text-white/60 px-6 text-center" style={{ fontFamily: 'Manrope_400Regular' }}>
+                Kein Medium fuer diese Story.
+              </Text>
+            ) : isVideo ? (
               <StoryVideoBody
-                uri={story.media_url}
+                uri={mediaUri}
                 storyId={story.id}
                 isOwn={isOwn}
                 onMarkViewed={onMarkViewed}
@@ -158,9 +169,9 @@ export default function StoryViewerScreen() {
               />
             ) : (
               <Image
-                source={{ uri: story.media_url }}
-                style={{ width: SCREEN_W, flex: 1 }}
-                contentFit="contain"
+                source={{ uri: mediaUri }}
+                style={{ width: SCREEN_W, height: slideHeight }}
+                contentFit="cover"
                 onLoad={() => onMarkViewed(story.id, isOwn)}
               />
             )}
@@ -172,7 +183,8 @@ export default function StoryViewerScreen() {
               </View>
             ) : null}
           </View>
-        ))}
+          );
+        })}
       </ScrollView>
     </View>
   );

@@ -181,14 +181,15 @@ export async function uploadStoryMedia(userId, uri, mimeType = 'image/jpeg') {
   const fileName = `story_${Date.now()}.${fileExtension}`;
   const filePath = `${userId}/${fileName}`;
 
-  // Datei als Blob lesen
-  const response = await fetch(uri);
-  const blob = await response.blob();
+  // Wie bei Chat-Bildern: Base64 + ArrayBuffer — fetch().blob() liefert in RN oft leere/fehlerhafte Uploads.
+  const base64 = await FileSystem.readAsStringAsync(uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  const arrayBuffer = decode(base64);
 
-  // Upload zu Supabase Storage
   const { data, error } = await supabase.storage
     .from(STORIES_BUCKET)
-    .upload(filePath, blob, {
+    .upload(filePath, arrayBuffer, {
       contentType: mimeType,
       upsert: false,
     });
@@ -198,7 +199,6 @@ export async function uploadStoryMedia(userId, uri, mimeType = 'image/jpeg') {
     throw error;
   }
 
-  // Oeffentliche URL zurueckgeben
   const { data: urlData } = supabase.storage
     .from(STORIES_BUCKET)
     .getPublicUrl(filePath);
