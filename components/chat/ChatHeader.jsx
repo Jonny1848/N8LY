@@ -1,12 +1,12 @@
 /**
  * ChatHeader – Wiederverwendbarer Header fuer den Chat-Detail-Screen
  *
- * Zeigt: Zurueck-Pfeil, Avatar, Name, Online-Status / Teilnehmerzahl,
+ * Zeigt: Zurück-Pfeil, Avatar, Name, Online-Status / Teilnehmerzahl,
  * und einen Options-Button (drei Punkte).
  *
  * Props:
  *  - conversation: Objekt mit displayName, displayAvatar, type, conversation_participants
- *  - onBack: Callback fuer den Zurueck-Button
+ *  - onBack: Callback fuer den Zurück-Button
  *  - onOptions: Callback fuer den Options-Button (optional)
  */
 import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
@@ -27,7 +27,7 @@ export default function ChatHeader({ conversation, onBack, onOptions }) {
 
   return (
     <View style={styles.header}>
-      {/* Zurueck-Pfeil */}
+      {/* Zurück-Pfeil */}
       <Pressable style={styles.headerBtn} onPress={onBack}>
         <ChevronLeftIcon size={30} color={"black"} strokeWidth={2.5} />
       </Pressable>

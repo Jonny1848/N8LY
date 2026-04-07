@@ -16,7 +16,7 @@ import { supabase } from '../lib/supabase';
 /**
  * Laedt alle aktiven Stories (noch nicht abgelaufen).
  *
- * Gibt Stories gruppiert nach User zurueck, damit der Story-Ring
+ * Gibt Stories gruppiert nach User Zurück, damit der Story-Ring
  * korrekt angezeigt werden kann (ein Ring pro User, mehrere Stories dahinter).
  *
  * @param {string} currentUserId – Die UUID des eingeloggten Users
@@ -90,7 +90,7 @@ export async function getActiveStories(currentUserId) {
     }
   });
 
-  // Schritt 4: Als Array zurueckgeben, eigene Story zuerst, dann ungesehene zuerst
+  // Schritt 4: Als Array Zurückgeben, eigene Story zuerst, dann ungesehene zuerst
   return Object.values(userStoriesMap).sort((a, b) => {
     // Eigene Stories immer ganz vorne
     if (a.isOwn) return -1;

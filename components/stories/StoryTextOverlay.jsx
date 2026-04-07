@@ -53,9 +53,14 @@ function DraggableTextBlock({ item, selected, onChange, onSelectBlock, canvasW, 
   const textAlign = item.textAlign ?? 'left';
   const pillColor = item.pillColor ?? null;
 
+  /**
+   * Feste Zeilenbreite von x bis zum rechten Rand (8px Rand): erst so wirkt textAlign
+   * (ohne volle Breite bleibt Text immer „optisch“ linksbuendig wie ein schmales RN-Text-Element).
+   */
+  const maxBlockW = Math.max(28, canvasW - item.x - 8);
+
   // Grobe Blockhoehe fuer Clamp (eine Zeile Minimum; mehrzeilig bleibt innerhalb maxWidth).
   const blockH = Math.max(28, fontSize * 1.35);
-  const blockW = Math.min(canvasW - 16, canvasW - item.x);
 
   const pan = useRef(
     PanResponder.create({
@@ -84,19 +89,26 @@ function DraggableTextBlock({ item, selected, onChange, onSelectBlock, canvasW, 
       fontSize,
       fontFamily,
       textAlign,
+      width: '100%',
     },
   ];
 
+  // Pill im definierten Streifen je nach Modus einruecken (Canvas-Band bleibt gleich breit).
+  const pillBandAlign =
+    textAlign === 'center' ? 'center' : textAlign === 'right' ? 'flex-end' : 'flex-start';
+
   const inner = pillColor ? (
-    <View
-      style={[
-        styles.pill,
-        {
-          backgroundColor: pillColor,
-        },
-      ]}
-    >
-      <Text style={textStyle}>{item.text}</Text>
+    <View style={[styles.pillBand, { alignItems: pillBandAlign }]}>
+      <View
+        style={[
+          styles.pill,
+          {
+            backgroundColor: pillColor,
+          },
+        ]}
+      >
+        <Text style={textStyle}>{item.text}</Text>
+      </View>
     </View>
   ) : (
     <Text style={textStyle}>{item.text}</Text>
@@ -109,6 +121,7 @@ function DraggableTextBlock({ item, selected, onChange, onSelectBlock, canvasW, 
         {
           left: item.x,
           top: item.y,
+          width: maxBlockW,
           maxWidth: canvasW - 16,
           zIndex: 5,
         },
@@ -129,11 +142,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 2,
   },
+  /** Volle Bandbreite, damit die Pill selbst links/mitte/rechts sitzen kann */
+  pillBand: {
+    width: '100%',
+  },
   pill: {
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    alignSelf: 'flex-start',
     maxWidth: '100%',
   },
   txt: {

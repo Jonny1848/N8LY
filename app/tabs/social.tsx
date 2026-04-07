@@ -96,7 +96,7 @@ export default function SocialScreen() {
 
   const toggleSearch = useCallback(() => {
     if (searchVisible) {
-      // Schliessen: animieren, danach State zuruecksetzen
+      // Schliessen: animieren, danach State Zurücksetzen
       searchAnim.value = withTiming(
         0,
         { duration: 220, easing: Easing.out(Easing.ease) },

@@ -16,7 +16,7 @@ export default function ImagePreviewModal({ visible, imageUri, onClose }) {
   // Echtes Seitenverhaeltnis des Bildes – 4:3 als Fallback bis onLoad feuert
   const [ratio, setRatio] = useState(4 / 3);
 
-  // Ratio zuruecksetzen bei neuem Bild (verhindert Flicker vom vorherigen Wert)
+  // Ratio Zurücksetzen bei neuem Bild (verhindert Flicker vom vorherigen Wert)
   useEffect(() => { setRatio(4 / 3); }, [imageUri]);
 
   // Rahmen: so gross wie moeglich, mit minimalem Rand fuer den Dismiss-Tap drumherum

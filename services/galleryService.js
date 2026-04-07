@@ -19,7 +19,7 @@ import { supabase } from '../lib/supabase';
 /**
  * Laedt alle Medien einer Chat-Galerie.
  *
- * Gibt alle geteilten Bilder eines Chats zurueck, sortiert nach
+ * Gibt alle geteilten Bilder eines Chats Zurück, sortiert nach
  * Upload-Zeitpunkt (neueste zuerst). Inkludiert den Uploader.
  *
  * @param {string} conversationId – Die UUID der Konversation

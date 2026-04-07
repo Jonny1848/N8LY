@@ -6,7 +6,7 @@
  * Er selbst enthaelt KEINE Darstellungslogik – nur Datenfluss und Callbacks.
  *
  * Komponenten:
- *  - ChatHeader: Zurueck-Pfeil, Avatar, Name, Online-Status
+ *  - ChatHeader: Zurück-Pfeil, Avatar, Name, Online-Status
  *  - ChatBubble: Nachrichten-Bubbles mit Datumsseparator
  *  - MessageInput: 3-Modi Input Bar (Normal, Recording, Preview)
  *  - ShareSheet: "Inhalt teilen" Bottom Sheet (bei Offenheit Unschaerfe ueber Chat, wie Figma-Make)

@@ -121,7 +121,7 @@ const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   /**
-   * Auth-State komplett zuruecksetzen (bei Logout).
+   * Auth-State komplett Zurücksetzen (bei Logout).
    */
   clearAuth: () => {
     set({

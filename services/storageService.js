@@ -12,13 +12,23 @@
  *
  * WICHTIG (React Native): Blob-Uploads zu Supabase liefern oft 0 Bytes,
  * da Blob/FormData in RN nicht korrekt serialisiert werden.
- * Sprachnachrichten nutzen daher expo-file-system + base64 → ArrayBuffer.
+ * Wir lesen lokale URIs daher als ArrayBuffer ueber expo-file-system v19+ (`File`, nicht mehr
+ * `readAsStringAsync`/`EncodingType` auf dem Default-Export).
  * =============================================================
  */
 
-import * as FileSystem from 'expo-file-system';
-import { decode } from 'base64-arraybuffer';
+import { File } from 'expo-file-system';
 import { supabase } from '../lib/supabase';
+
+/**
+ * Lokale file://-URI zu ArrayBuffer (zuverlaessig fuer Supabase `.upload` in RN).
+ * @param {string} uri
+ * @returns {Promise<ArrayBuffer>}
+ */
+async function readLocalUriAsArrayBuffer(uri) {
+  const file = new File(uri);
+  return file.arrayBuffer();
+}
 
 // Bucket-Namen als Konstanten (falls sie sich aendern)
 const CHAT_MEDIA_BUCKET = 'chat-media';
@@ -41,11 +51,7 @@ export async function uploadChatImage(conversationId, uri, mimeType = 'image/jpe
   const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
   const filePath = `${conversationId}/${fileName}`;
 
-  // Datei mit expo-file-system als Base64 lesen (Blob-Upload liefert in RN oft 0 Bytes)
-  const base64 = await FileSystem.readAsStringAsync(uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  const arrayBuffer = decode(base64);
+  const arrayBuffer = await readLocalUriAsArrayBuffer(uri);
 
   // ArrayBuffer zu Supabase hochladen – funktioniert zuverlaessig in React Native
   const { data, error } = await supabase.storage
@@ -60,7 +66,7 @@ export async function uploadChatImage(conversationId, uri, mimeType = 'image/jpe
     throw error;
   }
 
-  // Oeffentliche URL der hochgeladenen Datei zurueckgeben
+  // Oeffentliche URL der hochgeladenen Datei Zurückgeben
   const { data: urlData } = supabase.storage
     .from(CHAT_MEDIA_BUCKET)
     .getPublicUrl(filePath);
@@ -81,11 +87,7 @@ export async function uploadVoiceMessage(conversationId, uri, mimeType = 'audio/
   const fileName = `voice_${Date.now()}.${fileExtension}`;
   const filePath = `${conversationId}/${fileName}`;
 
-  // Datei mit expo-file-system als Base64 lesen (Blob-Upload liefert in RN oft 0 Bytes)
-  const base64 = await FileSystem.readAsStringAsync(uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  const arrayBuffer = decode(base64);
+  const arrayBuffer = await readLocalUriAsArrayBuffer(uri);
 
   // ArrayBuffer zu Supabase hochladen – funktioniert zuverlaessig in React Native
   const { data, error } = await supabase.storage
@@ -100,7 +102,7 @@ export async function uploadVoiceMessage(conversationId, uri, mimeType = 'audio/
     throw error;
   }
 
-  // Oeffentliche URL zurueckgeben
+  // Oeffentliche URL Zurückgeben
   const { data: urlData } = supabase.storage
     .from(CHAT_MEDIA_BUCKET)
     .getPublicUrl(filePath);
@@ -139,10 +141,7 @@ export async function uploadChatFile(
   const fileName = `doc_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
   const filePath = `${conversationId}/${fileName}`;
 
-  const base64 = await FileSystem.readAsStringAsync(uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  const arrayBuffer = decode(base64);
+  const arrayBuffer = await readLocalUriAsArrayBuffer(uri);
 
   const contentType = mimeType || 'application/octet-stream';
 
@@ -181,11 +180,7 @@ export async function uploadStoryMedia(userId, uri, mimeType = 'image/jpeg') {
   const fileName = `story_${Date.now()}.${fileExtension}`;
   const filePath = `${userId}/${fileName}`;
 
-  // Wie bei Chat-Bildern: Base64 + ArrayBuffer — fetch().blob() liefert in RN oft leere/fehlerhafte Uploads.
-  const base64 = await FileSystem.readAsStringAsync(uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  const arrayBuffer = decode(base64);
+  const arrayBuffer = await readLocalUriAsArrayBuffer(uri);
 
   const { data, error } = await supabase.storage
     .from(STORIES_BUCKET)

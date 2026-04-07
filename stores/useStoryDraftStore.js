@@ -14,7 +14,7 @@ export const useStoryDraftStore = create((set, get) => ({
   /** @type {StoryDraftClip[]} */
   clips: [],
 
-  /** Neuen Clip anhaengen und dessen id zurueckgeben (Navigation zum Editor). */
+  /** Neuen Clip anhaengen und dessen id Zurückgeben (Navigation zum Editor). */
   addClip: (partial) => {
     const id = newClipId();
     const clip = {

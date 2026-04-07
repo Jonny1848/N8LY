@@ -96,20 +96,79 @@ function buildPalette() {
 /** @type {string[]} sortierte eindeutige Hex-Farben fuer die UI */
 export const STORY_TEXT_COLORS = buildPalette();
 
+/** Einheitliche Hex-Normalisierung fuer Vergleich und Sortierung */
+function normalizeHex(hex) {
+  const k = (hex || '').replace(/^#/, '').toLowerCase();
+  if (k.length !== 6) return null;
+  return `#${k}`;
+}
+
+function hexToRgb(hex) {
+  const n = normalizeHex(hex);
+  if (!n) return { r: 0, g: 0, b: 0 };
+  const k = n.slice(1);
+  return {
+    r: parseInt(k.slice(0, 2), 16),
+    g: parseInt(k.slice(2, 4), 16),
+    b: parseInt(k.slice(4, 6), 16),
+  };
+}
+
 /**
- * Reihenfolge fuer die horizontale Story-Farbleiste (wie Instagram: Weiss, Schwarz, dann kraeftige Toene).
- * Anschliessend alle weiteren Farben aus STORY_TEXT_COLORS ohne Duplikat.
+ * HSL fuer sortierbares Spektrum (hue 0–360, S/L je 0–100).
+ * Achromatisch: S nahe 0 — in der Sortierung ans Ende der bunten Farben.
  */
-const HORIZONTAL_ROW_LEADING = [
+function rgbToHsl(r, g, b) {
+  r /= 255;
+  g /= 255;
+  b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  let s = 0;
+  const l = ((max + min) / 2) * 100;
+  if (max !== min) {
+    const d = max - min;
+    s = (l > 50 ? d / (2 - max - min) : d / (max + min)) * 100;
+    switch (max) {
+      case r:
+        h = (g - b) / d + (g < b ? 6 : 0);
+        break;
+      case g:
+        h = (b - r) / d + 2;
+        break;
+      default:
+        h = (r - g) / d + 4;
+    }
+    h *= 60;
+  }
+  return { h, s, l };
+}
+
+/**
+ * Vordere Swatches: neutrale Stufen (hell→schwarz), dann durchgehendes Farbspektrum.
+ * So wirkt die Leiste planbar statt willkuerlich aus der Set-Reihenfolge.
+ */
+const COLOR_STRIP_LEADING = [
   '#ffffff',
+  '#f2f2f7',
+  '#e5e5ea',
+  '#aeaeb2',
+  '#636366',
+  '#3a3a3c',
+  '#1c1c1e',
   '#000000',
-  '#38a5ff',
+  '#ff3b30',
+  '#ff9500',
+  '#ffcc00',
+  '#34c759',
   '#30d158',
-  '#ffe733',
-  '#ff9f0a',
-  '#ff453a',
-  '#ff375f',
-  '#bf5af2',
+  '#00c7be',
+  '#32ade6',
+  '#007aff',
+  '#5856d6',
+  '#af52de',
+  '#ff2d55',
 ];
 
 /**
@@ -120,16 +179,38 @@ function buildHorizontalOrder() {
   /** @type {string[]} */
   const out = [];
   const add = (hex) => {
-    const k = (hex || '').replace(/^#/, '').toLowerCase();
-    const normalized = `#${k}`;
-    if (!k || seen.has(k)) return;
-    seen.add(k);
-    out.push(normalized);
+    const n = normalizeHex(hex);
+    if (!n) return;
+    const key = n.slice(1);
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(n);
   };
-  HORIZONTAL_ROW_LEADING.forEach(add);
-  STORY_TEXT_COLORS.forEach((c) => add(c));
+
+  COLOR_STRIP_LEADING.forEach(add);
+
+  const rest = STORY_TEXT_COLORS.map((c) => normalizeHex(c))
+    .filter(Boolean)
+    .filter((n) => !seen.has(n.slice(1)));
+
+  rest.sort((a, b) => {
+    const ra = hexToRgb(a);
+    const rb = hexToRgb(b);
+    const ha = rgbToHsl(ra.r, ra.g, ra.b);
+    const hb = rgbToHsl(rb.r, rb.g, rb.b);
+    const grayA = ha.s < 6;
+    const grayB = hb.s < 6;
+    if (grayA && grayB) return ha.l - hb.l;
+    if (grayA) return 1;
+    if (grayB) return -1;
+    if (Math.abs(ha.h - hb.h) > 0.01) return ha.h - hb.h;
+    if (Math.abs(ha.s - hb.s) > 0.01) return hb.s - ha.s;
+    return hb.l - ha.l;
+  });
+
+  rest.forEach((n) => add(n));
   return out;
 }
 
-/** Fuer horizontale ScrollView: feste Reihenfolge + volle Palette */
+/** Fuer horizontale ScrollView: Kopfzeile + spektralsortierter Rest */
 export const STORY_COLORS_HORIZONTAL_ORDER = buildHorizontalOrder();

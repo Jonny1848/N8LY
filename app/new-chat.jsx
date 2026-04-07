@@ -73,7 +73,7 @@ export default function NewChatScreen() {
           onPress={() => router.back()}
           className="w-10 h-10 items-center justify-center -ml-1"
           accessibilityRole="button"
-          accessibilityLabel="Zurueck"
+          accessibilityLabel="Zurück"
         >
           <ChevronLeftIcon size={26} color={theme.colors.neutral.gray[800]} />
         </Pressable>

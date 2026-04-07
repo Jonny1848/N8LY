@@ -11,7 +11,7 @@
  *
  * Vorteile gegenueber dem alten Pattern (useState pro Screen):
  * - Konversationsliste bleibt erhalten beim Wechsel zwischen Tabs
- * - Nachrichten werden pro Chat gecacht (schneller Zurueck-Button)
+ * - Nachrichten werden pro Chat gecacht (schneller Zurück-Button)
  * - Realtime-Subscriptions werden zentral verwaltet
  * - Kein doppeltes Laden beim Navigieren
  *
@@ -152,7 +152,7 @@ interface ChatState {
   /** Fuegt eine Nachricht zum lokalen Cache hinzu (fuer optimistic UI) */
   addMessage: (conversationId: string, message: Message) => void;
 
-  /** Setzt den aktiven Chat zurueck (beim Verlassen des Chat-Screens) */
+  /** Setzt den aktiven Chat Zurück (beim Verlassen des Chat-Screens) */
   clearActiveConversation: () => void;
 }
 
@@ -239,7 +239,7 @@ const useChatStore = create<ChatState>((set, get) => ({
 
   loadConversationDetails: async (conversationId, userId) => {
     try {
-      // chatService gibt untypisierte Objekte zurueck – als any casten
+      // chatService gibt untypisierte Objekte Zurück – als any casten
       const conv: any = await fetchConversationById(conversationId);
       if (!conv) return;
 

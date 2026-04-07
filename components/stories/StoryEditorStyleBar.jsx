@@ -8,13 +8,19 @@ import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
-import { EyeDropperIcon } from 'react-native-heroicons/outline';
 import { STORY_TEXT_FONT_PRESETS } from '../../constants/storyEditorFonts';
 import { STORY_IMAGE_EFFECT_IDS, STORY_EFFECT_LABELS } from '../../constants/storyImageEffects';
 import { STORY_COLORS_HORIZONTAL_ORDER } from '../../constants/storyTextColors';
 
-/** Vertikaler Regler: Hoehe in px (Breite fuer Touch) */
-const VERTICAL_SLIDER_HEIGHT = 196;
+/**
+ * Hoehe des vertikalen Groessen-Reglers (optisch wie IG-Rahmen im Screenshot).
+ * Hinweis: @react-native-community/slider v5 hat kein `vertical`-Prop mehr — wir drehen
+ * einen horizontalen Slider per transform, damit er auf iOS und Android senkrecht wirkt.
+ * +90°: oben großes „A“ = hoher fontSize (Maximum), unten kleines „a“ = Minimum.
+ */
+const VERTICAL_SLIDER_HEIGHT = 88;
+/** Sensibler Querschnitt des gedrehten Sliders (Touch / Daumen) */
+const VERTICAL_SLIDER_THICKNESS = 34;
 
 // liftAboveFooterPx: Abstand vom unteren Rand, damit die Leiste ueber dem Weiter-FAB sitzt.
 
@@ -30,6 +36,8 @@ const VERTICAL_SLIDER_HEIGHT = 196;
  *   onFontSizeCommit?: () => void,
  *   textColor?: string,
  *   onTextColorChange?: (c: string) => void,
+ *   textAlign?: 'left'|'center'|'right',
+ *   onTextAlignChange?: (a: 'left'|'center'|'right') => void,
  *   stickerScale?: number,
  *   onStickerScaleChange?: (n: number) => void,
  *   onStickerScaleCommit?: () => void,
@@ -49,6 +57,8 @@ export default function StoryEditorStyleBar({
   onFontSizeCommit,
   textColor,
   onTextColorChange,
+  textAlign = 'left',
+  onTextAlignChange,
   stickerScale = 1,
   onStickerScaleChange,
   onStickerScaleCommit,
@@ -96,19 +106,21 @@ export default function StoryEditorStyleBar({
             <View style={styles.fontLayout}>
               <View style={styles.verticalSliderColumn}>
                 <Text style={styles.sizeCap}>A</Text>
-                <Slider
-                  style={styles.verticalSlider}
-                  vertical
-                  minimumValue={14}
-                  maximumValue={52}
-                  step={1}
-                  value={fontSize}
-                  onValueChange={onFontSizeChange}
-                  onSlidingComplete={onFontSizeCommit}
-                  minimumTrackTintColor="rgba(255,80,80,0.95)"
-                  maximumTrackTintColor="rgba(120,120,120,0.45)"
-                  thumbTintColor="#ffffff"
-                />
+                {/* Horizontaler Slider, -90° gedreht = zuverlaessig vertikal (v5 API) */}
+                <View style={styles.verticalSliderHost}>
+                  <Slider
+                    style={styles.verticalSliderRotated}
+                    minimumValue={14}
+                    maximumValue={52}
+                    step={1}
+                    value={fontSize}
+                    onValueChange={onFontSizeChange}
+                    onSlidingComplete={onFontSizeCommit}
+                    minimumTrackTintColor="theme.colors.primary.main2"
+                    maximumTrackTintColor="rgba(120,120,120,0.45)"
+                    thumbTintColor="#ffffff"
+                  />
+                </View>
                 <Text style={styles.sizeCapSmall}>a</Text>
               </View>
               <ScrollView
@@ -184,7 +196,7 @@ export default function StoryEditorStyleBar({
             </View>
           ) : null}
 
-          {/* Untere Icon-Leiste: nur Schrift + Farbe (Fokus laut Produktwunsch) */}
+          {/* Untere Icon-Leiste: Schrift, Farbe, Ausrichtung (Zyklus wie Instagram) */}
           <View style={styles.textIconToolbar}>
             <Pressable
               onPress={() => setTextPanel('font')}
@@ -206,6 +218,26 @@ export default function StoryEditorStyleBar({
                 end={{ x: 1, y: 1 }}
                 style={styles.rainbowDisk}
               />
+            </Pressable>
+            {/* Ein Tipp schaltet links → mitte → rechts (kein extra Panel, nur Zustand am Text) */}
+            <Pressable
+              onPress={() => {
+                const order = /** @type {const} */ (['left', 'center', 'right']);
+                const cur = order.includes(textAlign) ? textAlign : 'left';
+                const next = order[(order.indexOf(cur) + 1) % order.length];
+                onTextAlignChange?.(next);
+              }}
+              style={styles.iconCircle}
+              accessibilityLabel={
+                textAlign === 'center'
+                  ? 'Textausrichtung Mitte — tippe fuer Rechts'
+                  : textAlign === 'right'
+                    ? 'Textausrichtung Rechts — tippe fuer Links'
+                    : 'Textausrichtung Links — tippe fuer Mitte'
+              }
+              accessibilityRole="button"
+            >
+              <TextAlignIgIcon align={textAlign} />
             </Pressable>
           </View>
         </>
@@ -255,49 +287,82 @@ export default function StoryEditorStyleBar({
   );
 }
 
+/**
+ * Drei Linien wie im Instagram-Story-Editor; gemeinsame Kanten spiegeln links / mitte / rechts.
+ */
+function TextAlignIgIcon({ align }) {
+  const rowAlign =
+    align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start';
+  // Leicht unterschiedliche Laengen pro Zeile (klassisches „Text“-Symbol)
+  const widths =
+    align === 'center' ? [0.72, 1, 0.78] : align === 'right' ? [0.62, 0.88, 0.74] : [1, 0.76, 0.58];
+  return (
+    <View style={styles.alignIconBox}>
+      {widths.map((w, i) => (
+        <View
+          key={i}
+          style={[
+            styles.alignIconLine,
+            { width: `${Math.round(w * 100)}%`, alignSelf: rowAlign },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
     left: 0,
     right: 0,
     paddingHorizontal: 10,
-    paddingTop: 12,
-    paddingBottom: 10,
+    paddingTop: 6,
+    paddingBottom: 5,
     backgroundColor: 'rgba(18,18,22,0.94)',
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.12)',
     zIndex: 18,
-    maxHeight: 360,
+    maxHeight: 198,
   },
   fontLayout: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: VERTICAL_SLIDER_HEIGHT + 8,
-    marginBottom: 8,
+    minHeight: VERTICAL_SLIDER_HEIGHT + 2,
+    marginBottom: 3,
   },
   verticalSliderColumn: {
-    width: 52,
+    width: 46,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 4,
   },
   sizeCap: {
     color: 'rgba(255,255,255,0.9)',
-    fontSize: 18,
+    fontSize: 13,
     fontFamily: 'Manrope_700Bold',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   sizeCapSmall: {
     color: 'rgba(255,255,255,0.85)',
-    fontSize: 13,
+    fontSize: 11,
     fontFamily: 'Manrope_600SemiBold',
-    marginTop: 2,
+    marginTop: 1,
   },
-  verticalSlider: {
-    width: 44,
+  /** Platz fuer gedrehten Slider: Breite/Hoehe nach Rotation ~ vertikal */
+  verticalSliderHost: {
+    width: VERTICAL_SLIDER_THICKNESS + 8,
     height: VERTICAL_SLIDER_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
+  },
+  verticalSliderRotated: {
+    width: VERTICAL_SLIDER_HEIGHT,
+    height: VERTICAL_SLIDER_THICKNESS,
+    transform: [{ rotate: '90deg' }],
   },
   fontScrollFlex: {
     flex: 1,
@@ -305,15 +370,15 @@ const styles = StyleSheet.create({
   fontRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    paddingRight: 8,
+    gap: 7,
+    paddingVertical: 4,
+    paddingRight: 4,
   },
   fontChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 22,
-    maxHeight: 48,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 16,
+    maxHeight: 32,
     justifyContent: 'center',
   },
   /** Inaktiv: dunkle Kapsel / aktiv: helle Kapsel wie Instagram */
@@ -324,7 +389,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f2f2f7',
   },
   fontChipLabel: {
-    fontSize: 15,
+    fontSize: 12,
   },
   fontChipLabelOffIg: {
     color: '#f5f5f7',
@@ -333,13 +398,13 @@ const styles = StyleSheet.create({
     color: '#1c1c1e',
   },
   colorRowSection: {
-    marginBottom: 6,
-    paddingTop: 4,
+    marginBottom: 3,
+    paddingTop: 2,
   },
   colorRowScrollContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 4,
     paddingHorizontal: 4,
   },
   /** Weisser Kreis mit Pipette wie im Story-Screenshot */
@@ -356,12 +421,12 @@ const styles = StyleSheet.create({
    * Abgerundetes Quadrat mit kraeftigem weissen Rand wie im Story-Screenshot.
    */
   swatchTile: {
-    width: 46,
-    height: 46,
-    borderRadius: 13,
-    borderWidth: 3.5,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 2.5,
     borderColor: '#ffffff',
-    marginRight: 10,
+    marginRight: 7,
   },
   swatchTileActive: {
     borderWidth: 4.5,
@@ -394,14 +459,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 28,
-    paddingTop: 4,
-    paddingBottom: 2,
+    gap: 12,
+    paddingTop: 1,
+    paddingBottom: 0,
   },
   iconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: 'rgba(60,60,67,0.72)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -411,13 +476,24 @@ const styles = StyleSheet.create({
   },
   iconAa: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 17,
     fontFamily: 'Manrope_700Bold',
   },
   rainbowDisk: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+  },
+  /** Feste Breite: Prozent-Linien im Ausrichtungs-Icon */
+  alignIconBox: {
+    width: 22,
+    height: 15,
+    justifyContent: 'space-between',
+  },
+  alignIconLine: {
+    height: 2.5,
+    borderRadius: 1.25,
+    backgroundColor: '#ffffff',
   },
   sectionLabel: {
     color: '#aaa',

@@ -23,7 +23,7 @@ import { supabase } from '../lib/supabase';
 /**
  * Laedt alle Konversationen eines Users mit der letzten Nachricht.
  *
- * Gibt fuer jeden Chat zurueck:
+ * Gibt fuer jeden Chat Zurück:
  * - Konversations-Details (Name, Typ, Avatar)
  * - Alle Teilnehmer mit Profil-Daten
  * - Die letzte Nachricht (fuer die Chat-Liste Vorschau)
@@ -44,7 +44,7 @@ export async function getConversations(userId) {
     return [];
   }
 
-  // Falls der User in keinem Chat ist, leeres Array zurueckgeben
+  // Falls der User in keinem Chat ist, leeres Array Zurückgeben
   if (!participations || participations.length === 0) return [];
 
   // Map fuer schnellen Zugriff auf last_read_at pro Konversation
@@ -186,7 +186,7 @@ export async function getConversationById(conversationId) {
  * Erstellt einen neuen Einzelchat zwischen zwei Usern.
  *
  * Prueft zuerst, ob bereits ein Einzelchat zwischen den beiden existiert.
- * Falls ja, wird der bestehende Chat zurueckgegeben (kein Duplikat).
+ * Falls ja, wird der bestehende Chat Zurückgegeben (kein Duplikat).
  *
  * @param {string} currentUserId – Die UUID des eingeloggten Users
  * @param {string} otherUserId – Die UUID des Chat-Partners
@@ -329,7 +329,7 @@ async function findExistingDirectChat(userId1, userId2) {
 /**
  * Laedt Nachrichten einer Konversation mit Pagination.
  *
- * Gibt Nachrichten sortiert nach Erstellungszeit zurueck (neueste zuerst),
+ * Gibt Nachrichten sortiert nach Erstellungszeit Zurück (neueste zuerst),
  * zusammen mit dem Profil des Absenders.
  *
  * @param {string} conversationId – Die UUID der Konversation
@@ -454,7 +454,7 @@ export async function sendMediaMessage(
  * Wird aufgerufen, wenn der User einen Chat oeffnet.
  * Bei jeder neuen Nachricht wird der Callback ausgefuehrt.
  *
- * WICHTIG: Das zurueckgegebene Channel-Objekt muss beim Verlassen
+ * WICHTIG: Das Zurückgegebene Channel-Objekt muss beim Verlassen
  * des Screens ueber unsubscribeFromMessages() abgemeldet werden,
  * um Memory-Leaks zu vermeiden!
  *
@@ -654,7 +654,7 @@ export async function searchUsers(query, currentUserId, limit = 20) {
 
 /**
  * Alle bekannten Kontakte laden: User, mit denen der aktuelle User
- * mindestens eine Konversation teilt. Gibt eindeutige Profile zurueck.
+ * mindestens eine Konversation teilt. Gibt eindeutige Profile Zurück.
  *
  * @param {string} currentUserId – UUID des eingeloggten Users
  * @returns {Array} – Liste der bekannten Profile { id, username, avatar_url }

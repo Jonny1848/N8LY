@@ -2,7 +2,7 @@
  * Neue Gruppe – Schritt 1: Teilnehmer auswaehlen.
  *
  * Referenz-Design:
- * - Header: umrandeter Zurueck-Button + „Gruppe erstellen" + „Weiter" (blau)
+ * - Header: umrandeter Zurück-Button + „Gruppe erstellen" + „Weiter" (blau)
  * - Suchleiste: weiss, graue Umrandung, dunkle Lupe
  * - Ausgewaehlte Mitglieder: runde Avatare horizontal mit ×-Badge + Name
  * - Trennstrich → „Teilnehmer hinzufuegen" → Kontaktliste mit Checkbox
@@ -320,12 +320,12 @@ export default function NewGroupSelectScreen() {
     <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
       {/* ── Header ── */}
       <View className="flex-row items-center px-4 py-3">
-        {/* Zurueck-Button mit Umrandung (Referenz-Screenshot) */}
+        {/* Zurück-Button mit Umrandung (Referenz-Screenshot) */}
         <Pressable
           onPress={() => router.back()}
           className="w-10 h-10 items-center justify-center rounded-xl border-[1.5px] border-gray-200"
           accessibilityRole="button"
-          accessibilityLabel="Zurueck"
+          accessibilityLabel="Zurück"
         >
           <ChevronLeftIcon size={20} color={theme.colors.neutral.gray[700]} />
         </Pressable>

@@ -111,7 +111,7 @@ function RootLayoutContent() {
           if (session) await handleAuthenticated(session, event);
         } else if (event === 'SIGNED_OUT') {
           console.log('[AUTH] SIGNED_OUT detected, navigating to login');
-          // Auth-Store zuruecksetzen
+          // Auth-Store zurücksetzen
           clearAuth();
           navigatingRef.current = null;
           setPendingRedirect('/login');

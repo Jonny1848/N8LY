@@ -2,7 +2,7 @@
  * Neue Gruppe – Schritt 2: Gruppenname, Gruppenbild und Erstellen.
  *
  * Referenz-Design:
- * - Header: umrandeter Zurueck-Button + „Neue Gruppe" + „Erstellen" (blau)
+ * - Header: umrandeter Zurück-Button + „Neue Gruppe" + „Erstellen" (blau)
  * - „GROUP NAME" Uppercase-Label + Eingabe mit UserGroup-Icon + blaue Unterlinie
  * - „GROUP IMAGE" Uppercase-Label + Upload-Card (110×110)
  * - „Participants: N" + horizontale Avatare mit ×-Badge
@@ -237,12 +237,12 @@ export default function NewGroupDetailsScreen() {
     <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
       {/* ── Header ── */}
       <View className="flex-row items-center px-4 py-3">
-        {/* Zurueck-Button mit Umrandung */}
+        {/* Zurück-Button mit Umrandung */}
         <Pressable
           onPress={() => router.back()}
           className="w-10 h-10 items-center justify-center rounded-xl border-[1.5px] border-gray-200"
           accessibilityRole="button"
-          accessibilityLabel="Zurueck"
+          accessibilityLabel="Zurück"
         >
           <ChevronLeftIcon size={20} color={theme.colors.neutral.gray[700]} />
         </Pressable>

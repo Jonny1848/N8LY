@@ -315,7 +315,7 @@ export default function StoryEditorScreen() {
       <View style={[styles.center, { paddingTop: insets.top }]}>
         <Text style={styles.muted}>Clip nicht gefunden.</Text>
         <Pressable onPress={() => router.back()} style={styles.btn}>
-          <Text style={styles.btnTxt}>Zurueck</Text>
+          <Text style={styles.btnTxt}>Zurück</Text>
         </Pressable>
       </View>
     );
@@ -501,6 +501,11 @@ export default function StoryEditorScreen() {
           pushHistory();
           patchSelectedText({ color: c });
         }}
+        textAlign={selectedText?.textAlign ?? 'left'}
+        onTextAlignChange={(a) => {
+          pushHistory();
+          patchSelectedText({ textAlign: a });
+        }}
         stickerScale={selectedSticker?.scale ?? 1}
         onStickerScaleChange={(n) => {
           if (!selectedStickerId) return;
@@ -581,6 +586,11 @@ export default function StoryEditorScreen() {
               multiline
               autoFocus
               textAlignVertical="top"
+              textAlign={
+                editingTextId
+                  ? texts.find((x) => x.id === editingTextId)?.textAlign ?? 'center'
+                  : 'center'
+              }
               keyboardAppearance="dark"
             />
           </View>
@@ -668,7 +678,7 @@ const styles = StyleSheet.create({
   /** Vollbild-Texteditor angelehnt an Instagram Story */
   textEditKb: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.94)',
+    backgroundColor: 'rgba(0,0,0,0.8)',
   },
   textEditOverlay: {
     flex: 1,
