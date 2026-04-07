@@ -64,6 +64,10 @@ const LOCATE_BTN_SIZE = 56;
 const GAP_LOCATE_SEARCH = 14;
 /** Suchzeile aufgeklappt: Höhe der Kapsel */
 const SEARCH_MORPH_EXPANDED_H = 52;
+/**
+ * Abstand Lupe → Textfeld (RN: `space-x-*` auf der Row greift oft nicht / kollidiert mit Reanimated-margins).
+ */
+const SEARCH_ICON_TO_INPUT_GAP = 20;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -139,6 +143,13 @@ export default function HomeScreen() {
     flexBasis: 0,
     minWidth: 0,
     opacity: interpolate(searchMorph.value, [0, 0.22, 1], [0, 0, 1], Extrapolation.CLAMP),
+    // Sichtbarer Zwischenraum erst wenn die Zeile aufgeht (zugeklappt = 0)
+    marginLeft: interpolate(
+      searchMorph.value,
+      [0, 1],
+      [0, SEARCH_ICON_TO_INPUT_GAP],
+      Extrapolation.CLAMP
+    ),
   }));
 
   const xSlotStyle = useAnimatedStyle(() => ({
@@ -334,13 +345,7 @@ export default function HomeScreen() {
         if (!searchExpanded) expandSearch();
       }}
     >
-      <View
-        style={{
-          flex: 1,
-          flexDirection: 'row',
-          alignItems: 'center',
-        }}
-      >
+      <View className="flex-1 flex-row items-center">
         <Animated.View style={iconLeadStyle}>
           <MagnifyingGlassIcon size={ICON_W} color="white" />
         </Animated.View>
@@ -424,7 +429,7 @@ export default function HomeScreen() {
       {/* Logo zentral oben */}
       <SafeAreaView edges={['top']} className="absolute left-0 right-0 items-center" style={{ zIndex: 10, top: -12 }}>
         <Image
-          source={require('../../assets/N8LY9.png')}
+          source={require('../../assets/N8LY10.png')}
           style={{ width: 140, height: 140 }}
           resizeMode="contain"
         />

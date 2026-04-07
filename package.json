@@ -11,6 +11,7 @@
   },
   "scripts": {
     "start": "expo start",
+    "start:safe": "EXPO_NO_WATCHMAN=1 expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
@@ -96,15 +97,10 @@
   },
   "private": true,
   "devDependencies": {
-    "@types/react": "~19.1.10",
     "baseline-browser-mapping": "^2.9.19",
     "browserslist": "^4.26.3",
     "caniuse-lite": "^1.0.30001747",
     "patch-package": "^8.0.1",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "react-native": "0.81.5",
-    "react-native-reanimated": "~4.1.1",
     "tailwindcss": "^3.4.17",
     "typescript": "~5.9.2"
   }

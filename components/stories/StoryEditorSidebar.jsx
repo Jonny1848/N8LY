@@ -41,6 +41,7 @@ const SPRING_CFG = {
  *   canUndo: boolean,
  *   onOpenEffects?: () => void,
  *   effectsActive?: boolean,
+ *   onDismissTextEditor?: () => void,
  * }} props
  */
 export default function StoryEditorSidebar({
@@ -53,6 +54,7 @@ export default function StoryEditorSidebar({
   canUndo,
   onOpenEffects,
   effectsActive,
+  onDismissTextEditor,
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const progress = useSharedValue(0);
@@ -84,11 +86,11 @@ export default function StoryEditorSidebar({
 
   return (
     <View style={styles.column}>
-      {/* Aa: erster Tap oeffnet Text-Modal; erneuter Tap schliesst Text-Modus */}
+      {/* Aa: oeffnet Vollbild-Texteingabe; erneuter Tap schliesst Editor inkl. Modal (wie IG abbrechen) */}
       <Pressable
         onPress={() => {
           if (mode === 'text') {
-            onModeChange('none');
+            onDismissTextEditor?.();
           } else {
             onOpenText();
           }

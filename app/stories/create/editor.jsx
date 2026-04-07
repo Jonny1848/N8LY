@@ -16,6 +16,9 @@ import {
   ActivityIndicator,
   StyleSheet,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -90,6 +93,8 @@ export default function StoryEditorScreen() {
   const [selectedStickerId, setSelectedStickerId] = useState(null);
   const [effectsTrayOpen, setEffectsTrayOpen] = useState(false);
   const [textModal, setTextModal] = useState(false);
+  /** null = neuer Text; sonst ID des bearbeiteten Blocks (Instagram: Tap oeffnet direkt Eingabe) */
+  const [editingTextId, setEditingTextId] = useState(null);
   const [draftText, setDraftText] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -145,22 +150,47 @@ export default function StoryEditorScreen() {
     setEffectsTrayOpen(false);
   };
 
-  const openTextModal = () => {
+  /** Text-Overlay schliessen (ohne Speichern der laufenden Eingabe — Canvas bleibt unveraendert) */
+  const dismissTextEditor = () => {
+    Keyboard.dismiss();
+    setTextModal(false);
+    setEditingTextId(null);
+    setMode('none');
+  };
+
+  /** Aa: neuer Text, leeres Feld, Tastatur sofort (Instagram-Flow) */
+  const handleOpenText = () => {
+    setMode('text');
+    setEffectsTrayOpen(false);
+    setSelectedStickerId(null);
+    setEditingTextId(null);
     setDraftText('');
     setTextModal(true);
   };
 
-  /** Aa in Sidebar: Modus Text + Eingabe */
-  const handleOpenText = () => {
-    setMode('text');
-    setEffectsTrayOpen(false);
-    openTextModal();
-  };
-
   const confirmText = () => {
     const t = draftText.trim();
+    Keyboard.dismiss();
+
+    if (editingTextId) {
+      pushHistory();
+      if (!t) {
+        setTexts((items) => items.filter((x) => x.id !== editingTextId));
+        setSelectedTextId(null);
+      } else {
+        changeTextItem(editingTextId, { text: t });
+        setSelectedTextId(editingTextId);
+      }
+      setTextModal(false);
+      setEditingTextId(null);
+      setMode('none');
+      return;
+    }
+
     if (!t) {
       setTextModal(false);
+      setEditingTextId(null);
+      setMode('none');
       return;
     }
     pushHistory();
@@ -180,6 +210,7 @@ export default function StoryEditorScreen() {
       },
     ]);
     setTextModal(false);
+    setEditingTextId(null);
     setMode('none');
     setSelectedTextId(id);
     setSelectedStickerId(null);
@@ -208,10 +239,17 @@ export default function StoryEditorScreen() {
     });
   };
 
+  /** Tap auf Text: gleich Eingabemaske + Tastatur wie bei Instagram (nicht nur Style-Leiste) */
   const onSelectText = (id) => {
+    const item = texts.find((x) => x.id === id);
+    if (!item) return;
     setSelectedTextId(id);
     setSelectedStickerId(null);
     setEffectsTrayOpen(false);
+    setEditingTextId(id);
+    setDraftText(item.text);
+    setMode('text');
+    setTextModal(true);
   };
 
   const onSelectSticker = (id) => {
@@ -238,7 +276,9 @@ export default function StoryEditorScreen() {
     changeTextItem(selectedTextId, patch);
   };
 
-  const styleBarVisible = effectsTrayOpen || selectedTextId != null || selectedStickerId != null;
+  /** Waehrend Texteingabe keine Style-Leiste — Fokus wie bei IG aufs Tippen */
+  const styleBarVisible =
+    !textModal && (effectsTrayOpen || selectedTextId != null || selectedStickerId != null);
   const styleBarVariant = effectsTrayOpen
     ? 'effects'
     : selectedStickerId
@@ -413,6 +453,7 @@ export default function StoryEditorScreen() {
           mode={mode}
           onModeChange={setMode}
           onOpenText={handleOpenText}
+          onDismissTextEditor={dismissTextEditor}
           strokeColor={strokeColor}
           onColorChange={setStrokeColor}
           onUndo={undo}
@@ -506,35 +547,44 @@ export default function StoryEditorScreen() {
         </Pressable>
       </View>
 
-      <Modal visible={textModal} transparent animationType="fade">
-        <View style={styles.modalBg}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Text</Text>
+      <Modal
+        visible={textModal}
+        transparent
+        animationType="fade"
+        onRequestClose={dismissTextEditor}
+        statusBarTranslucent
+      >
+        <KeyboardAvoidingView
+          style={styles.textEditKb}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={[styles.textEditOverlay, { paddingTop: insets.top + 6, paddingBottom: insets.bottom + 12 }]}>
+            <View style={styles.textEditHeader}>
+              <Pressable
+                onPress={dismissTextEditor}
+                accessibilityRole="button"
+                accessibilityLabel="Abbrechen"
+                hitSlop={12}
+              >
+                <Text style={styles.textEditCancel}>Abbrechen</Text>
+              </Pressable>
+              <Pressable onPress={confirmText} accessibilityRole="button" accessibilityLabel="Fertig" hitSlop={12}>
+                <Text style={styles.textEditDone}>Fertig</Text>
+              </Pressable>
+            </View>
             <TextInput
               value={draftText}
               onChangeText={setDraftText}
-              placeholder="Schreib etwas…"
-              placeholderTextColor="#888"
-              style={styles.modalInput}
+              placeholder="Dein Text"
+              placeholderTextColor="rgba(255,255,255,0.35)"
+              style={styles.textEditInput}
               multiline
               autoFocus
+              textAlignVertical="top"
+              keyboardAppearance="dark"
             />
-            <View style={styles.modalRow}>
-              <Pressable
-                onPress={() => {
-                  setTextModal(false);
-                  setMode('none');
-                }}
-                style={styles.modalBtn}
-              >
-                <Text style={styles.modalBtnTxt}>Abbrechen</Text>
-              </Pressable>
-              <Pressable onPress={confirmText} style={[styles.modalBtn, styles.modalBtnPrimary]}>
-                <Text style={[styles.modalBtnTxt, { color: '#fff' }]}>OK</Text>
-              </Pressable>
-            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -615,29 +665,37 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 8,
   },
-  modalBg: {
+  /** Vollbild-Texteditor angelehnt an Instagram Story */
+  textEditKb: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    justifyContent: 'center',
-    padding: 24,
+    backgroundColor: 'rgba(0,0,0,0.94)',
   },
-  modalBox: {
-    backgroundColor: '#222',
-    borderRadius: 14,
-    padding: 18,
+  textEditOverlay: {
+    flex: 1,
+    paddingHorizontal: 20,
   },
-  modalTitle: { color: '#fff', fontFamily: 'Manrope_700Bold', fontSize: 18, marginBottom: 12 },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: '#444',
-    borderRadius: 10,
-    padding: 12,
+  textEditHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  textEditCancel: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 17,
+    fontFamily: 'Manrope_500Medium',
+  },
+  textEditDone: {
     color: '#fff',
-    minHeight: 88,
-    fontFamily: 'Manrope_400Regular',
+    fontSize: 17,
+    fontFamily: 'Manrope_700Bold',
   },
-  modalRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 16 },
-  modalBtn: { paddingVertical: 10, paddingHorizontal: 16 },
-  modalBtnPrimary: { backgroundColor: '#5b8cff', borderRadius: 10 },
-  modalBtnTxt: { color: '#7eb6ff', fontFamily: 'Manrope_600SemiBold' },
+  textEditInput: {
+    flex: 1,
+    fontSize: 28,
+    lineHeight: 36,
+    color: '#fff',
+    fontFamily: 'Manrope_600SemiBold',
+    paddingVertical: 12,
+  },
 });

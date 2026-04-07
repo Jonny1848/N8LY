@@ -7,6 +7,16 @@ const config = getDefaultConfig(__dirname);
 
 const nativeWindConfig = withNativeWind(config, { input: "./global.css" });
 
+// Wenn `expo start` / Metro scheinbar nichts tut: oft blockiert oder kaputt angemeldetes Watchman.
+// Mit EXPO_NO_WATCHMAN=1 nutzt Metro den langsameren Node-Dateicrawler statt Watchman (stabil).
+// Danach optional Watchman reparieren: `watchman shutdown-server` (oder Homebrew-Reinstall).
+if (process.env.EXPO_NO_WATCHMAN === "1") {
+  nativeWindConfig.resolver = {
+    ...nativeWindConfig.resolver,
+    useWatchman: false,
+  };
+}
+
 const proxyPath = path.resolve(__dirname, "lib/react-native-proxy.js");
 const origResolveRequest = nativeWindConfig.resolver.resolveRequest;
 

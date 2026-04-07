@@ -1,6 +1,6 @@
 /**
  * Verschiebbare Text-Bloecke auf der Story (PanResponder).
- * Tap ohne Bewegung waehlt den Block (Schrift/Groesse/Farbe in der Style-Leiste).
+ * Tap ohne Bewegung: Parent oeffnet die Texteingabe (Instagram: direkt tippen).
  */
 import { useRef } from 'react';
 import { View, Text, PanResponder, StyleSheet } from 'react-native';
