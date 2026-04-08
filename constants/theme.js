@@ -194,3 +194,13 @@ export const getColor = (path) => {
 export const getGradient = (type = 'primary') => {
   return theme.gradients[type] || theme.gradients.primary;
 };
+
+/**
+ * Icons auf der Karte (Lupe, Standort): neutrales „System-Chrome“ statt `primary.main`.
+ * Wenn Logo, Tab-Aktivzustand und Map-Buttons alle dasselbe Blau nutzen, wirkt die Oberfläche
+ * schnell laut; hier bleibt das Blau für Identität (Logo) und Navigation (Tabs).
+ *
+ * @param {boolean} isLightMap – z. B. `mapStyleUrl === MAP_STYLE_LIGHT`
+ */
+export const getMapChromeIconColor = (isLightMap) =>
+  isLightMap ? theme.colors.neutral.gray[800] : '#FFFFFF';

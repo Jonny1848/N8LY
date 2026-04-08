@@ -23,7 +23,7 @@ import {
   XMarkIcon as XMarkIconOutline,
 } from 'react-native-heroicons/outline';
 import {MagnifyingGlassIcon} from 'react-native-heroicons/solid';
-import { theme } from '../../constants/theme';
+import { theme, getMapChromeIconColor } from '../../constants/theme';
 import MapboxGL from "@rnmapbox/maps";
 import * as Location from 'expo-location';
 import { useAudioPlayer } from 'expo-audio';
@@ -94,10 +94,25 @@ export default function HomeScreen() {
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterVisible, setFilterVisible] = useState(false);
+  const [logo, setLogo] = useState(() =>
+    getMapStyleForHour(new Date().getHours()) === MAP_STYLE_LIGHT ? 
+    require('../../assets/N8LY9.png') : require('../../assets/N8LY9.png'));
   const [mapStyleUrl, setMapStyleUrl] = useState(() =>
     getMapStyleForHour(new Date().getHours())
   );
   const mapIsLight = mapStyleUrl === MAP_STYLE_LIGHT;
+  // Map-Buttons: neutral (Theme-Helper), nicht Markenblau — sonst zu viel Blau mit Logo + Tabs
+  const glassChromeIconColor = getMapChromeIconColor(mapIsLight);
+  /**
+   * Suchfeld: bei heller Karte dunkle Schrift (Lesbarkeit auf hellem Glas),
+   * bei dunkler Karte weiterhin hell.
+   */
+  const glassChromeInputTextColor = mapIsLight
+    ? theme.colors.neutral.gray[900]
+    : '#FFFFFF';
+  const glassChromePlaceholderColor = mapIsLight
+    ? theme.colors.neutral.gray[500]
+    : theme.colors.neutral.gray[400];
 
   /** 0 = Kreis, 1 = Leiste — steuert Morph-Grenzen */
   const searchMorph = useSharedValue(0);
@@ -347,13 +362,14 @@ export default function HomeScreen() {
     >
       <View className="flex-1 flex-row items-center">
         <Animated.View style={iconLeadStyle}>
-          <MagnifyingGlassIcon size={ICON_W} color="white" />
+          <MagnifyingGlassIcon size={ICON_W} color={glassChromeIconColor} />
         </Animated.View>
         <Animated.View style={inputSlotStyle}>
           <TextInput
             ref={searchInputRef}
-            className="text-base text-white placeholder:text-gray-400"
+            className="text-base"
             placeholder="Wohin möchtest du?"
+            placeholderTextColor={glassChromePlaceholderColor}
             value={searchQuery}
             onChangeText={setSearchQuery}
             returnKeyType="search"
@@ -368,6 +384,7 @@ export default function HomeScreen() {
               paddingVertical: 6,
               marginRight: 4,
               minWidth: 0,
+              color: glassChromeInputTextColor,
             }}
           />
         </Animated.View>
@@ -429,7 +446,7 @@ export default function HomeScreen() {
       {/* Logo zentral oben */}
       <SafeAreaView edges={['top']} className="absolute left-0 right-0 items-center" style={{ zIndex: 10, top: -12 }}>
         <Image
-          source={require('../../assets/N8LY10.png')}
+          source={logo}
           style={{ width: 140, height: 140 }}
           resizeMode="contain"
         />
@@ -487,7 +504,7 @@ export default function HomeScreen() {
                 className="h-full w-full items-center justify-center"
                 onPress={handleLocatePress}
               >
-                <MapPinIcon size={24} color="white" />
+                <MapPinIcon size={24} color={glassChromeIconColor} />
               </Pressable>
             </GlassView>
 
@@ -542,7 +559,7 @@ export default function HomeScreen() {
                 className="h-full w-full items-center justify-center"
                 onPress={handleLocatePress}
               >
-                <MapPinIcon size={24} color="white" />
+                <MapPinIcon size={24} color={glassChromeIconColor} />
               </Pressable>
             </BlurView>
 

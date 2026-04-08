@@ -1,50 +1,33 @@
 /**
- * Story-Viewer – zeigt alle aktiven Stories eines Nutzers, markiert Aufrufe in story_views.
- * Videos: expo-video (VideoView); Bilder: expo-image.
+ * Story-Viewer Route: laedt Bundle, orchestriert Slides und Overlays.
+ * UI-Bausteine unter `components/stories/viewer/`.
  */
-import {
-  View,
-  Text,
-  Pressable,
-  ScrollView,
-  Dimensions,
-  ActivityIndicator,
-} from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Platform, Share, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState, useCallback } from 'react';
-import { XMarkIcon } from 'react-native-heroicons/outline';
-import { Image } from 'expo-image';
-import { useVideoPlayer, VideoView } from 'expo-video';
+import { isGlassEffectAPIAvailable } from 'expo-glass-effect';
+import {
+  REACTION_BOTTOM_PAD,
+  REACTION_ROW_PILL_HEIGHT,
+  REACTION_TO_SIDE_RAIL_GAP,
+  SIDE_RAIL_EXTRA_LIFT,
+  STORY_TAP_LEFT_ZONE_RATIO,
+  STORY_VIEWER_SCREEN_W,
+  storyViewerFontArial,
+} from '../../components/stories/viewer/constants';
+import { StoryPressableScale } from '../../components/stories/viewer/StoryPressableScale';
+import { StoryViewerSlide } from '../../components/stories/viewer/StoryViewerSlide';
+import { StoryHeaderOverlay } from '../../components/stories/viewer/StoryHeaderOverlay';
+import { StorySideRail } from '../../components/stories/viewer/StorySideRail';
+import { StoryReactionScrim } from '../../components/stories/viewer/StoryReactionScrim';
+import { StoryCommentModal } from '../../components/stories/viewer/StoryCommentModal';
+import { StoryReactionPickerModal } from '../../components/stories/viewer/StoryReactionPickerModal';
+import { useStoryViewerEngagement } from '../../components/stories/viewer/useStoryViewerEngagement';
+import { formatReactionCount, formatStoryCount } from '../../components/stories/viewer/utils';
 import useAuthStore from '../../stores/useAuthStore';
 import { getActiveStories, markStoryAsViewed } from '../../services/storyService';
-
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
-
-/** Ein Video pro Slide: eigener Hook-Aufruf (Regeln von React). */
-function StoryVideoBody({ uri, storyId, isOwn, onMarkViewed, width, height }) {
-  const player = useVideoPlayer(uri, (p) => {
-    p.loop = true;
-    p.play();
-  });
-
-  useEffect(() => {
-    // Sobald die Slide sichtbar ist, als gesehen zaehlen (ohne komplexes Status-Event)
-    const t = setTimeout(() => {
-      onMarkViewed(storyId, isOwn);
-    }, 500);
-    return () => clearTimeout(t);
-  }, [storyId, isOwn, onMarkViewed]);
-
-  return (
-    <VideoView
-      player={player}
-      style={{ width, height }}
-      contentFit="contain"
-      nativeControls
-    />
-  );
-}
 
 export default function StoryViewerScreen() {
   const raw = useLocalSearchParams().userId;
@@ -55,11 +38,38 @@ export default function StoryViewerScreen() {
 
   const [loading, setLoading] = useState(true);
   const [stories, setStories] = useState([]);
-  const [headerName, setHeaderName] = useState('');
+  const [bundleUser, setBundleUser] = useState(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isMuted, setIsMuted] = useState(true);
+  const [followingAuthor, setFollowingAuthor] = useState(false);
+
+  const authorNorm = (authorUserId || '').trim().toLowerCase();
+  const isOwn = authorNorm === (currentUserId || '').trim().toLowerCase();
+
+  const {
+    bundleEng,
+    bundleReactions,
+    visibleReactionPresets,
+    handleDoubleTapLike,
+    toggleHeartReaction,
+    bumpReaction,
+    openCommentModal,
+    submitComment,
+    commentModalVisible,
+    setCommentModalVisible,
+    commentDraft,
+    setCommentDraft,
+    recordShare,
+    toggleBookmark,
+    reactionPickVisible,
+    setReactionPickVisible,
+    openReactionPicker,
+    pickReactionEmoji,
+  } = useStoryViewerEngagement({ authorNorm, isOwn, stories });
 
   const onMarkViewed = useCallback(
-    async (storyId, isOwn) => {
-      if (!currentUserId || isOwn) return;
+    async (storyId, own) => {
+      if (!currentUserId || own) return;
       await markStoryAsViewed(storyId, currentUserId);
     },
     [currentUserId]
@@ -75,12 +85,8 @@ export default function StoryViewerScreen() {
       try {
         const groups = await getActiveStories(currentUserId);
         if (cancelled) return;
-        // UUID aus der Route kann anders formatiert sein als Supabase — case-insensitive vergleichen
-        const authorNorm = (authorUserId || '').trim().toLowerCase();
-        const bundle = groups.find(
-          (g) => (g.user?.id || '').trim().toLowerCase() === authorNorm
-        );
-        setHeaderName(bundle?.user?.username || 'Story');
+        const bundle = groups.find((g) => (g.user?.id || '').trim().toLowerCase() === authorNorm);
+        setBundleUser(bundle?.user || null);
         setStories(bundle?.stories || []);
       } catch (e) {
         console.error('[STORY VIEWER]', e);
@@ -92,7 +98,62 @@ export default function StoryViewerScreen() {
     return () => {
       cancelled = true;
     };
-  }, [authorUserId, currentUserId]);
+  }, [authorNorm, authorUserId, currentUserId]);
+
+  const username = bundleUser?.username || 'user';
+  const avatarUrl = bundleUser?.avatar_url || null;
+  const displayName = `@${username}`;
+
+  const shareStory = useCallback(
+    async (story) => {
+      const url = story?.media_url || '';
+      try {
+        await Share.share({
+          message: url ? `${displayName} — ${url}` : `${displayName}`,
+          url: Platform.OS === 'ios' ? url : undefined,
+        });
+        recordShare();
+      } catch {
+        /* Abbruch: kein Zaehler */
+      }
+    },
+    [displayName, recordShare]
+  );
+
+  const dismissStoryViewer = useCallback(() => {
+    router.back();
+  }, [router]);
+
+  const handleStoryTapZone = useCallback(
+    (x) => {
+      if (x < STORY_VIEWER_SCREEN_W * STORY_TAP_LEFT_ZONE_RATIO) {
+        setActiveIndex((i) => Math.max(0, i - 1));
+        return;
+      }
+      setActiveIndex((i) => {
+        if (i >= stories.length - 1) {
+          router.back();
+          return i;
+        }
+        return i + 1;
+      });
+    },
+    [router, stories.length]
+  );
+
+  useEffect(() => {
+    if (stories.length === 0) return;
+    setActiveIndex((i) => Math.min(Math.max(i, 0), stories.length - 1));
+  }, [stories.length]);
+
+  const canStoryReactionGlass = Platform.OS === 'ios' && isGlassEffectAPIAvailable();
+  const sideRailBottomOffset =
+    insets.bottom +
+    REACTION_BOTTOM_PAD +
+    (isOwn ? 8 : REACTION_ROW_PILL_HEIGHT + REACTION_TO_SIDE_RAIL_GAP) +
+    SIDE_RAIL_EXTRA_LIFT;
+
+  const activeStory = stories[activeIndex];
 
   if (loading) {
     return (
@@ -105,87 +166,88 @@ export default function StoryViewerScreen() {
   if (stories.length === 0) {
     return (
       <View className="flex-1 bg-black items-center justify-center px-6">
-        <Text className="text-white text-center mb-6">Keine aktiven Stories mehr.</Text>
-        <Pressable onPress={() => router.back()} className="px-6 py-3 rounded-full bg-white/20">
-          <Text className="text-white">Schliessen</Text>
-        </Pressable>
+        <Text className="text-white text-center mb-6" style={storyViewerFontArial}>
+          Keine aktiven Stories mehr.
+        </Text>
+        <StoryPressableScale
+          onPress={() => router.back()}
+          className="px-6 py-3 rounded-full bg-white/20"
+          innerClassName="items-center justify-center"
+          accessibilityLabel="Schliessen"
+        >
+          <Text className="text-white" style={storyViewerFontArial}>
+            Schliessen
+          </Text>
+        </StoryPressableScale>
       </View>
     );
   }
 
-  const isOwn = authorUserId === currentUserId;
-  const slideHeight = SCREEN_H - insets.top - insets.bottom - 56;
-
   return (
-    <View className="flex-1 bg-black">
-      <View
-        className="absolute left-0 right-0 z-10 flex-row items-center justify-between px-4"
-        style={{ top: insets.top + 8 }}
-      >
-        <Text className="text-white text-base flex-1" style={{ fontFamily: 'Manrope_600SemiBold' }}>
-          {headerName}
-        </Text>
-        <Pressable
-          onPress={() => router.back()}
-          className="w-10 h-10 items-center justify-center rounded-full bg-black/40"
-          accessibilityRole="button"
-          accessibilityLabel="Schliessen"
-        >
-          <XMarkIcon size={24} color="#fff" />
-        </Pressable>
-      </View>
+    <GestureHandlerRootView className="flex-1 bg-black">
+      <View className="flex-1 bg-black">
+        <StoryViewerSlide
+          story={activeStory}
+          isOwn={isOwn}
+          isMuted={isMuted}
+          onMarkViewed={onMarkViewed}
+          doubleTapLikeEnabled={!isOwn}
+          onTriggerLike={handleDoubleTapLike}
+          onTapZone={handleStoryTapZone}
+          onDismiss={dismissStoryViewer}
+        />
 
-      <ScrollView
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        decelerationRate="fast"
-        snapToInterval={SCREEN_W}
-        snapToAlignment="center"
-        style={{ flex: 1 }}
-        contentContainerStyle={{ alignItems: 'center' }}
-      >
-        {stories.map((story) => {
-          const isVideo = String(story.media_type || '').toLowerCase() === 'video';
-          const mediaUri = story.media_url;
-          return (
-          <View
-            key={story.id}
-            style={{ width: SCREEN_W, height: slideHeight, backgroundColor: '#000' }}
-            className="items-center justify-center"
-          >
-            {!mediaUri ? (
-              <Text className="text-white/60 px-6 text-center" style={{ fontFamily: 'Manrope_400Regular' }}>
-                Kein Medium fuer diese Story.
-              </Text>
-            ) : isVideo ? (
-              <StoryVideoBody
-                uri={mediaUri}
-                storyId={story.id}
-                isOwn={isOwn}
-                onMarkViewed={onMarkViewed}
-                width={SCREEN_W}
-                height={slideHeight}
-              />
-            ) : (
-              <Image
-                source={{ uri: mediaUri }}
-                style={{ width: SCREEN_W, height: slideHeight }}
-                contentFit="cover"
-                onLoad={() => onMarkViewed(story.id, isOwn)}
-              />
-            )}
-            {story.caption ? (
-              <View className="absolute bottom-12 left-4 right-4">
-                <Text className="text-white text-center" style={{ fontFamily: 'Manrope_400Regular' }}>
-                  {story.caption}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-          );
-        })}
-      </ScrollView>
-    </View>
+        <StoryHeaderOverlay
+          insets={insets}
+          avatarUrl={avatarUrl}
+          displayName={displayName}
+          isOwn={isOwn}
+          followingAuthor={followingAuthor}
+          onToggleFollow={() => setFollowingAuthor((f) => !f)}
+          useSpeakerGlass={canStoryReactionGlass}
+          isMuted={isMuted}
+          onToggleMute={() => setIsMuted((m) => !m)}
+        />
+
+        <StorySideRail
+          bottomOffset={sideRailBottomOffset}
+          isOwn={isOwn}
+          bundleEng={bundleEng}
+          activeStory={activeStory}
+          formatStoryCount={formatStoryCount}
+          onComment={openCommentModal}
+          onBookmark={toggleBookmark}
+          onShare={shareStory}
+        />
+
+        <StoryReactionScrim
+          insets={insets}
+          activeStory={activeStory}
+          bundleEng={bundleEng}
+          isOwn={isOwn}
+          useGlass={canStoryReactionGlass}
+          visibleReactionPresets={visibleReactionPresets}
+          bundleReactions={bundleReactions}
+          formatReactionCount={formatReactionCount}
+          onToggleHeart={toggleHeartReaction}
+          onBumpReaction={bumpReaction}
+          onOpenPicker={openReactionPicker}
+        />
+
+        <StoryCommentModal
+          visible={commentModalVisible}
+          draft={commentDraft}
+          onChangeDraft={setCommentDraft}
+          onRequestClose={() => setCommentModalVisible(false)}
+          onSubmit={submitComment}
+        />
+
+        <StoryReactionPickerModal
+          visible={reactionPickVisible}
+          onRequestClose={() => setReactionPickVisible(false)}
+          onPick={pickReactionEmoji}
+        />
+      </View>
+    </GestureHandlerRootView>
   );
 }

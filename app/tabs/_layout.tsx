@@ -45,7 +45,7 @@ export default function TabLayout() {
       }}
       labelStyle={{
         default: { color: theme.colors.neutral.gray[600] },
-        selected: { color: theme.colors.primary.main },
+        selected: { color: theme.colors.primary.main},
       }}
     >
       <NativeTabs.Trigger name="home">

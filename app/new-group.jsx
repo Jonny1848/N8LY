@@ -400,8 +400,8 @@ export default function NewGroupSelectScreen() {
                       style={
                         selected
                           ? {
-                              backgroundColor: theme.colors.primary.main3,
-                              borderColor: theme.colors.primary.main3,
+                              backgroundColor: theme.colors.primary.main,
+                              borderColor: theme.colors.primary.main,
                             }
                           : undefined
                       }

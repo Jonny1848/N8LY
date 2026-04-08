@@ -14,6 +14,7 @@ import Animated, {
   withTiming,
   interpolateColor,
 } from 'react-native-reanimated';
+
 import { theme } from '../../constants/theme';
 import { TrashIcon, PlusIcon } from 'react-native-heroicons/outline';
 import {
@@ -462,9 +463,9 @@ const MessageInput = forwardRef(function MessageInput(
           <View className="flex-1 flex-row items-center bg-gray-100 rounded-3xl px-3 py-2.5 mx-2">
             <Pressable onPress={togglePreviewPlayback} className="w-8 h-8 rounded-full bg-white items-center justify-center mr-2.5">
               {previewStatus.playing ? (
-                <PauseIcon size={16} color="#0066FF" />
+                <PauseIcon size={16} color={theme.colors.primary.main} />
               ) : (
-                <PlayIcon size={16} color="#0066FF" />
+                <PlayIcon size={16} color={theme.colors.primary.main} />
               )}
             </Pressable>
             <View className="flex-1 h-1 rounded bg-gray-200 overflow-hidden">
