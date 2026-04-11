@@ -27,14 +27,14 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { XMarkIcon, ArrowRightIcon } from 'react-native-heroicons/outline';
 import { EmojiPickerModal, emojiData } from '@hiraku-ai/react-native-emoji-picker';
-import { theme } from '../../../constants/theme';
-import StoryEditorCanvas from '../../../components/stories/StoryEditorCanvas';
-import StoryTextOverlay from '../../../components/stories/StoryTextOverlay';
-import StoryStickerLayer from '../../../components/stories/StoryStickerLayer';
-import StoryDrawLayer from '../../../components/stories/StoryDrawLayer';
-import StoryEditorSidebar from '../../../components/stories/StoryEditorSidebar';
-import StoryEditorStyleBar from '../../../components/stories/StoryEditorStyleBar';
-import { useStoryDraftStore } from '../../../stores/useStoryDraftStore';
+import { theme } from '../../../../constants/theme';
+import StoryEditorCanvas from '../../../../components/stories/StoryEditorCanvas';
+import StoryTextOverlay from '../../../../components/stories/StoryTextOverlay';
+import StoryStickerLayer from '../../../../components/stories/StoryStickerLayer';
+import StoryDrawLayer from '../../../../components/stories/StoryDrawLayer';
+import StoryEditorSidebar from '../../../../components/stories/StoryEditorSidebar';
+import StoryEditorStyleBar from '../../../../components/stories/StoryEditorStyleBar';
+import { useStoryDraftStore } from '../../../../stores/useStoryDraftStore';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -297,7 +297,7 @@ export default function StoryEditorScreen() {
         result: 'tmpfile',
       });
       updateClip(clip.id, { exportUri: uri, mimeType: 'image/jpeg' });
-      router.push('/stories/create/review');
+      router.push('/chat/stories/create/review');
     } catch (e) {
       console.error('[STORY EDITOR] capture', e);
       Alert.alert('Editor', 'Bild konnte nicht exportiert werden.', [{ text: 'OK' }]);
@@ -307,7 +307,7 @@ export default function StoryEditorScreen() {
   };
 
   const proceedVideo = () => {
-    router.push('/stories/create/review');
+    router.push('/chat/stories/create/review');
   };
 
   if (!clip) {

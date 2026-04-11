@@ -20,21 +20,28 @@ export function useStoryViewerEngagement({ authorNorm, isOwn, stories }) {
       if (!next[authorNorm]) {
         next[authorNorm] = {
           liked: false,
+          myEmojiReactionKey: null,
           reactions: buildDefaultReactions(seed),
           comments: 100 + (seed % 120),
           shares: 25 + (seed % 80),
           bookmarks: 80 + (seed % 100),
           bookmarked: false,
         };
-      } else if (!next[authorNorm].reactions) {
-        const old = next[authorNorm];
-        const migratedHeart =
-          typeof old.likes === 'number' ? old.likes : buildDefaultReactions(seed).heart;
-        const { likes: _drop, ...rest } = old;
-        next[authorNorm] = {
-          ...rest,
-          reactions: { ...buildDefaultReactions(seed), heart: migratedHeart },
-        };
+      } else {
+        if (next[authorNorm].myEmojiReactionKey === undefined) {
+          next[authorNorm] = { ...next[authorNorm], myEmojiReactionKey: null };
+        }
+        if (!next[authorNorm].reactions) {
+          const old = next[authorNorm];
+          const migratedHeart =
+            typeof old.likes === 'number' ? old.likes : buildDefaultReactions(seed).heart;
+          const { likes: _drop, ...rest } = old;
+          next[authorNorm] = {
+            ...rest,
+            reactions: { ...buildDefaultReactions(seed), heart: migratedHeart },
+            myEmojiReactionKey: next[authorNorm].myEmojiReactionKey ?? null,
+          };
+        }
       }
       return next;
     });
@@ -78,15 +85,30 @@ export function useStoryViewerEngagement({ authorNorm, isOwn, stories }) {
     });
   }, [authorNorm, isOwn]);
 
+  /**
+   * Eine Emoji-Reaktion pro Nutzer (Herz/Like laeuft separat ueber liked + heart-Zaehler).
+   * Gleiche Emoji-Tap: Auswahl aufheben. Anderes Emoji: vorherige Zaehlung -1, neue +1.
+   */
   const bumpReaction = useCallback(
     (reactionKey) => {
-      if (isOwn || !authorNorm) return;
+      if (isOwn || !authorNorm || reactionKey === 'heart') return;
       setBundleEngagementByAuthor((prev) => {
         const e = prev[authorNorm];
         if (!e) return prev;
         const r = { ...(e.reactions || buildDefaultReactions(0)) };
+        const prevPick = e.myEmojiReactionKey ?? null;
+        if (prevPick === reactionKey) {
+          r[reactionKey] = Math.max(0, (r[reactionKey] ?? 0) - 1);
+          return { ...prev, [authorNorm]: { ...e, reactions: r, myEmojiReactionKey: null } };
+        }
+        if (prevPick) {
+          r[prevPick] = Math.max(0, (r[prevPick] ?? 0) - 1);
+        }
         r[reactionKey] = (r[reactionKey] ?? 0) + 1;
-        return { ...prev, [authorNorm]: { ...e, reactions: r } };
+        return {
+          ...prev,
+          [authorNorm]: { ...e, reactions: r, myEmojiReactionKey: reactionKey },
+        };
       });
     },
     [authorNorm, isOwn]
@@ -156,11 +178,15 @@ export function useStoryViewerEngagement({ authorNorm, isOwn, stories }) {
   const bundleEng =
     authorNorm && stories.length > 0 ? bundleEngagementByAuthor[authorNorm] ?? null : null;
   const bundleReactions = bundleEng?.reactions || buildDefaultReactions(0);
-  const visibleReactionPresets = bundleEng ? getVisibleReactionPresets(bundleReactions) : [];
+  const myEmojiReactionKey = bundleEng?.myEmojiReactionKey ?? null;
+  const visibleReactionPresets = bundleEng
+    ? getVisibleReactionPresets(bundleReactions, myEmojiReactionKey)
+    : [];
 
   return {
     bundleEng,
     bundleReactions,
+    myEmojiReactionKey,
     visibleReactionPresets,
     handleDoubleTapLike,
     toggleHeartReaction,

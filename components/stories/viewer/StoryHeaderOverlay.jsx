@@ -1,10 +1,21 @@
+import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
+import { UserIcon } from 'react-native-heroicons/outline';
 import { CheckBadgeIcon } from 'react-native-heroicons/solid';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { theme } from '../../../constants/theme';
 import { StoryFollowButton } from './StoryFollowButton';
 import { StorySpeakerGlassButton } from './StorySpeakerGlassButton';
 import { storyViewerFontArial } from './constants';
+
+/** Verlauf am Avatar-Ring: Primary/Akzent aus `theme.js` (IG-Style-Ring, aber N8TLY-Farben). */
+const AVATAR_RING_GRADIENT_COLORS = [
+  theme.colors.primary.main3,
+  theme.colors.primary.main,
+  theme.colors.accent.light,
+  theme.colors.accent.dark,
+];
 
 /**
  * Oberes Overlay: Avatar-Ring, @-Name, optional Follow, Stumm-Toggle.
@@ -20,6 +31,14 @@ export function StoryHeaderOverlay({
   isMuted,
   onToggleMute,
 }) {
+  /* Nach URL-Wechsel oder Ladefehler: Platzhalter statt schwarzer Fläche (expo-image onError). */
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [avatarUrl]);
+
+  const showAvatar = !!(avatarUrl && !avatarLoadFailed);
+
   return (
     <View
       pointerEvents="box-none"
@@ -32,20 +51,26 @@ export function StoryHeaderOverlay({
         style={{ paddingLeft: insets.left + 10 }}
       >
         <LinearGradient
-          colors={['#F58529', '#DD2A7B', '#8134AF', '#515BD4']}
+          colors={AVATAR_RING_GRADIENT_COLORS}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{ width: 46, height: 46, borderRadius: 23, padding: 2 }}
         >
-          <View className="w-full h-full rounded-full bg-black p-[2px]">
-            {avatarUrl ? (
+          {/* Kein bg-black: sonst wirkt ein nicht geladenes Bild wie „löchriger“ schwarzer Kreis */}
+          <View
+            className="w-full h-full rounded-full overflow-hidden items-center justify-center"
+            style={{ backgroundColor: theme.colors.neutral.gray[700] }}
+          >
+            {showAvatar ? (
               <Image
                 source={{ uri: avatarUrl }}
-                className="w-full h-full rounded-full"
+                style={{ width: '100%', height: '100%' }}
                 contentFit="cover"
+                accessibilityIgnoresInvertColors
+                onError={() => setAvatarLoadFailed(true)}
               />
             ) : (
-              <View className="w-full h-full rounded-full bg-neutral-700 items-center justify-center" />
+              <UserIcon size={22} color={theme.colors.neutral.gray[400]} />
             )}
           </View>
         </LinearGradient>
@@ -56,7 +81,7 @@ export function StoryHeaderOverlay({
               {displayName}
             </Text>
             <View className="ml-1">
-              <CheckBadgeIcon size={18} color="#3897F0" />
+              <CheckBadgeIcon size={18} color={theme.colors.primary.main} />
             </View>
           </View>
           {!isOwn ? (

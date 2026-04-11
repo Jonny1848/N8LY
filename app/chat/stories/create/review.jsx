@@ -22,10 +22,10 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { theme } from '../../../constants/theme';
-import useAuthStore from '../../../stores/useAuthStore';
-import { useStoryDraftStore } from '../../../stores/useStoryDraftStore';
-import { publishStoryDrafts } from '../../../services/publishStoryDrafts';
+import { theme } from '../../../../constants/theme';
+import useAuthStore from '../../../../stores/useAuthStore';
+import { useStoryDraftStore } from '../../../../stores/useStoryDraftStore';
+import { publishStoryDrafts } from '../../../../services/publishStoryDrafts';
 
 const THUMB = 56;
 /**
@@ -99,13 +99,13 @@ export default function StoryReviewScreen() {
 
   const openEditor = useCallback(
     (clipId) => {
-      router.push({ pathname: '/stories/create/editor', params: { clipId } });
+      router.push({ pathname: '/chat/stories/create/editor', params: { clipId } });
     },
     [router]
   );
 
   const addMore = () => {
-    router.push('/stories/create');
+    router.push('/chat/stories/create');
   };
 
   /** Clip entfernen und aktiven Index konsistent halten */

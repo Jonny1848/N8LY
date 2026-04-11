@@ -65,16 +65,39 @@ export async function getActiveStories(currentUserId) {
   // Schritt 3: Stories nach User gruppieren
   const userStoriesMap = {};
 
+  /** PostgREST kann `profiles` als Objekt oder (selten) als Array liefern — vereinheitlichen. */
+  const normalizeProfile = (profiles) => {
+    if (!profiles) return null;
+    if (Array.isArray(profiles)) return profiles[0] ?? null;
+    return profiles;
+  };
+
+  /** Profil aus mehreren Slides mergen: erster Eintrag hatte evtl. null-Join, spaetere Zeilen volles Profil. */
+  const mergeProfile = (existing, incoming) => {
+    const a = normalizeProfile(existing);
+    const b = normalizeProfile(incoming);
+    if (!b) return a;
+    if (!a) return b;
+    return {
+      ...a,
+      ...b,
+      username: b.username || a.username,
+      avatar_url: b.avatar_url || a.avatar_url,
+    };
+  };
+
   stories.forEach((story) => {
     const userId = story.user_id;
 
     if (!userStoriesMap[userId]) {
       userStoriesMap[userId] = {
-        user: story.profiles,
+        user: normalizeProfile(story.profiles),
         stories: [],
         hasUnviewed: false, // Gibt es ungesehene Stories von diesem User?
         isOwn: userId === currentUserId, // Ist es die eigene Story?
       };
+    } else {
+      userStoriesMap[userId].user = mergeProfile(userStoriesMap[userId].user, story.profiles);
     }
 
     // Story mit "viewed"-Flag hinzufuegen

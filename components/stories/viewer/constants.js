@@ -22,11 +22,23 @@ export const SIDE_RAIL_EXTRA_LIFT = 100;
 
 export const REACTION_TO_SIDE_RAIL_GAP = 14;
 
+/** Untere Emoji-Leiste: nur die staerksten N Reaktionen (nach Zaehler, absteigend) */
+export const STORY_REACTION_RAIL_MAX_VISIBLE = 5;
+
 /** Einheitliches Press-Feedback (Reanimated) fuer Story-UI */
 export const STORY_PRESS_SPRING_CONFIG = { damping: 18, stiffness: 410, mass: 0.42 };
 export const STORY_PRESS_IN_SCALE = 0.93;
 export const STORY_PRESS_IN_MS = 95;
 export const STORY_PRESS_IN_OPACITY = 0.88;
+
+/** Reaktions-Pill: staerkeres Eindruecken + Pop beim Loslassen */
+export const STORY_REACTION_PRESS_IN_SCALE = 0.86;
+export const STORY_REACTION_PRESS_IN_MS = 80;
+export const STORY_REACTION_PRESS_POP_SPRING = { damping: 10, stiffness: 440, mass: 0.38 };
+export const STORY_REACTION_PRESS_SETTLE_SPRING = { damping: 17, stiffness: 260, mass: 0.45 };
+/** Leichte Vergroesserung wenn Nutzer diese Reaktion gewaehlt hat */
+export const STORY_REACTION_SELECTED_SCALE = 1.07;
+export const STORY_REACTION_SELECTED_SPRING = { damping: 14, stiffness: 240, mass: 0.5 };
 
 /** Folgen-Pill: Blauton wie Verified-Badge */
 export const STORY_FOLLOW_BLUE = '#3897F0';
@@ -35,15 +47,6 @@ export const STORY_FOLLOW_BLUE = '#3897F0';
 export const storyViewerFontArial = {
   fontFamily: Platform.select({ ios: 'Arial', android: 'sans-serif', default: 'Arial' }),
 };
-
-/** Festes Emoji-Set fuer Reaktionsleiste und Picker */
-export const STORY_REACTION_PRESETS = [
-  { key: 'heart', emoji: '❤️', label: 'Herz' },
-  { key: 'heartEyes', emoji: '😍', label: 'Herzaugen' },
-  { key: 'joy', emoji: '😂', label: 'Freude' },
-  { key: 'wow', emoji: '😮', label: 'Ueberrascht' },
-  { key: 'hushed', emoji: '😯', label: 'Verwundert' },
-];
 
 export const STORY_SPEAKER_GLASS_SIZE = 40;
 

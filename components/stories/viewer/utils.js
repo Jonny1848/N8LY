@@ -1,4 +1,16 @@
-import { STORY_REACTION_PRESETS } from './constants';
+import { STORY_REACTION_RAIL_MAX_VISIBLE } from './constants';
+
+/**
+ * Keys aus buildDefaultReactions sind kurze Strings; in der Leiste brauchen wir das Darstellungs-Emoji.
+ * Reaktionen aus dem Picker nutzen das Emoji selbst als Key — dann faellt emoji = key zurueck.
+ */
+export const LEGACY_REACTION_KEY_TO_EMOJI = {
+  heart: '❤️',
+  heartEyes: '😍',
+  joy: '😂',
+  wow: '😮',
+  hushed: '😯',
+};
 
 /**
  * Default-Zaehler pro Autor-Bundle (lokal bis Supabase).
@@ -41,19 +53,37 @@ export function formatStoryCount(n) {
   return String(num);
 }
 
-/** Reaktionszahlen: unter 10 mit fuehrender Null, sonst wie formatStoryCount */
+/** Reaktionszahlen: normale Darstellung 1, 2, …; ab 1k kompaktes k/M wie formatStoryCount */
 export function formatReactionCount(n) {
   const num = Math.max(0, Number(n) || 0);
   if (num >= 1000) return formatStoryCount(num);
-  if (num < 10) return String(num).padStart(2, '0');
-  if (num < 100) return String(num);
-  return formatStoryCount(num);
+  return String(num);
 }
 
-/** Sichtbare Presets nach absteigender Zaehlung */
-export function getVisibleReactionPresets(reactions) {
+/**
+ * Reaktionen mit Zaehler > 0, nach Haeufigkeit absteigend — hoechstens STORY_REACTION_RAIL_MAX_VISIBLE.
+ * userPickedKey (optional, nie "heart"): eigene Emoji-Wahl bleibt sichtbar, auch wenn sie nicht zu Top-N zaehlt.
+ * Keys: Legacy (heart, …) oder Emoji-Strings; Rueckgabe { key, emoji, label } fuer StoryReactionScrim.
+ */
+export function getVisibleReactionPresets(reactions, userPickedKey = null) {
   if (!reactions) return [];
-  return STORY_REACTION_PRESETS.filter((p) => (reactions[p.key] ?? 0) > 0).sort(
-    (a, b) => (reactions[b.key] ?? 0) - (reactions[a.key] ?? 0)
-  );
+  const sorted = Object.entries(reactions)
+    .filter(([, n]) => (Number(n) || 0) > 0)
+    .map(([key]) => {
+      const emoji = LEGACY_REACTION_KEY_TO_EMOJI[key] ?? key;
+      return { key, emoji, label: emoji };
+    })
+    .sort((a, b) => (reactions[b.key] ?? 0) - (reactions[a.key] ?? 0));
+
+  const max = STORY_REACTION_RAIL_MAX_VISIBLE;
+  let visible = sorted.slice(0, max);
+  if (userPickedKey && userPickedKey !== 'heart' && !visible.some((e) => e.key === userPickedKey)) {
+    const emoji = LEGACY_REACTION_KEY_TO_EMOJI[userPickedKey] ?? userPickedKey;
+    const userEntry = { key: userPickedKey, emoji, label: emoji };
+    const rest = sorted.filter((e) => e.key !== userPickedKey).slice(0, max - 1);
+    visible = [...rest, userEntry].sort(
+      (a, b) => (reactions[b.key] ?? 0) - (reactions[a.key] ?? 0)
+    );
+  }
+  return visible;
 }

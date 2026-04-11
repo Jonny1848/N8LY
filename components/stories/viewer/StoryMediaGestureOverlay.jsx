@@ -104,7 +104,7 @@ export function StoryMediaGestureOverlay({ onTriggerLike, onTapZone, onDismiss, 
     <GestureDetector gesture={rootGesture}>
       <Animated.View pointerEvents="box-only" style={[StyleSheet.absoluteFillObject]}>
         <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, top: 0 }, animatedStyle]}>
-          <HeartIconSolid size={72} color="#FFFFFF" />
+          <HeartIconSolid size={72} color="red" />
         </Animated.View>
       </Animated.View>
     </GestureDetector>

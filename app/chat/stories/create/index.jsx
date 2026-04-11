@@ -5,15 +5,15 @@
 import { View, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import StoryCamera from '../../../components/stories/StoryCamera';
-import { useStoryDraftStore } from '../../../stores/useStoryDraftStore';
+import StoryCamera from '../../../../components/stories/StoryCamera';
+import { useStoryDraftStore } from '../../../../stores/useStoryDraftStore';
 
 export default function StoryCaptureScreen() {
   const router = useRouter();
   const addClip = useStoryDraftStore((s) => s.addClip);
 
   const goEditor = (clipId) => {
-    router.push({ pathname: '/stories/create/editor', params: { clipId } });
+    router.push({ pathname: '/chat/stories/create/editor', params: { clipId } });
   };
 
   const onCaptured = ({ uri, kind, mimeType }) => {
@@ -52,11 +52,21 @@ export default function StoryCaptureScreen() {
       if (assets.length === 1) {
         goEditor(firstId);
       } else {
-        router.push('/stories/create/review');
+        router.push('/chat/stories/create/review');
       }
     } catch (e) {
       console.error('[STORY CAPTURE] Galerie', e);
-      Alert.alert('Galerie', 'Auswahl nicht moeglich.', [{ text: 'OK' }]);
+      // 3164 = PHPhotos networkAccessRequired (iCloud asset); 3169 = network error while downloading
+      const errText = typeof e?.message === 'string' ? e.message : '';
+      const isIcloudOrNetwork =
+        errText.includes('3164') || errText.includes('3169') || errText.includes('networkAccessRequired');
+      Alert.alert(
+        'Galerie',
+        isIcloudOrNetwork
+          ? 'Fuer Videos aus der iCloud braucht iOS Internet. Bitte Verbindung pruefen und erneut versuchen.'
+          : 'Auswahl nicht moeglich.',
+        [{ text: 'OK' }],
+      );
     }
   };
 

@@ -2,7 +2,7 @@
  * Story-Viewer Route: laedt Bundle, orchestriert Slides und Overlays.
  * UI-Bausteine unter `components/stories/viewer/`.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, Share, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,18 +16,18 @@ import {
   STORY_TAP_LEFT_ZONE_RATIO,
   STORY_VIEWER_SCREEN_W,
   storyViewerFontArial,
-} from '../../components/stories/viewer/constants';
-import { StoryPressableScale } from '../../components/stories/viewer/StoryPressableScale';
-import { StoryViewerSlide } from '../../components/stories/viewer/StoryViewerSlide';
-import { StoryHeaderOverlay } from '../../components/stories/viewer/StoryHeaderOverlay';
-import { StorySideRail } from '../../components/stories/viewer/StorySideRail';
-import { StoryReactionScrim } from '../../components/stories/viewer/StoryReactionScrim';
-import { StoryCommentModal } from '../../components/stories/viewer/StoryCommentModal';
-import { StoryReactionPickerModal } from '../../components/stories/viewer/StoryReactionPickerModal';
-import { useStoryViewerEngagement } from '../../components/stories/viewer/useStoryViewerEngagement';
-import { formatReactionCount, formatStoryCount } from '../../components/stories/viewer/utils';
-import useAuthStore from '../../stores/useAuthStore';
-import { getActiveStories, markStoryAsViewed } from '../../services/storyService';
+} from '../../../components/stories/viewer/constants';
+import { StoryPressableScale } from '../../../components/stories/viewer/StoryPressableScale';
+import { StoryViewerSlide } from '../../../components/stories/viewer/StoryViewerSlide';
+import { StoryHeaderOverlay } from '../../../components/stories/viewer/StoryHeaderOverlay';
+import { StorySideRail } from '../../../components/stories/viewer/StorySideRail';
+import { StoryReactionScrim } from '../../../components/stories/viewer/StoryReactionScrim';
+import { StoryCommentModal } from '../../../components/stories/viewer/StoryCommentModal';
+import { StoryReactionPickerModal } from '../../../components/stories/viewer/StoryReactionPickerModal';
+import { useStoryViewerEngagement } from '../../../components/stories/viewer/useStoryViewerEngagement';
+import { formatReactionCount, formatStoryCount } from '../../../components/stories/viewer/utils';
+import useAuthStore from '../../../stores/useAuthStore';
+import { getActiveStories, markStoryAsViewed } from '../../../services/storyService';
 
 export default function StoryViewerScreen() {
   const raw = useLocalSearchParams().userId;
@@ -101,7 +101,19 @@ export default function StoryViewerScreen() {
   }, [authorNorm, authorUserId, currentUserId]);
 
   const username = bundleUser?.username || 'user';
-  const avatarUrl = bundleUser?.avatar_url || null;
+  /* URL auch aus beliebigem Slide ziehen (Bundle-User kann bei erstem Join unvollständig gewesen sein). */
+  const avatarUrl = useMemo(() => {
+    const u = bundleUser?.avatar_url?.trim();
+    if (u) return u;
+    for (const s of stories) {
+      const p = s?.profiles;
+      if (!p) continue;
+      const row = Array.isArray(p) ? p[0] : p;
+      const url = row?.avatar_url?.trim();
+      if (url) return url;
+    }
+    return null;
+  }, [bundleUser, stories]);
   const displayName = `@${username}`;
 
   const shareStory = useCallback(

@@ -30,6 +30,7 @@ import {
   RecordingPresets,
   useAudioPlayer,
   useAudioPlayerStatus,
+  setAudioModeAsync,
 } from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -64,6 +65,7 @@ const MessageInput = forwardRef(function MessageInput(
   const [uploadingContact, setUploadingContact] = useState(false);
 
   // expo-audio: Recorder mit Metering fuer Waveform (Lautstaerke pro Zeitscheibe)
+  // Hinweis: iOS erlaubt record() erst, wenn setAudioModeAsync({ allowsRecording: true }) gesetzt wurde (siehe handleStartRecording).
   const recordingOptions = {
     ...RecordingPresets.HIGH_QUALITY,
     isMeteringEnabled: true,
@@ -145,6 +147,11 @@ const MessageInput = forwardRef(function MessageInput(
         console.warn('[VOICE] Mikrofon-Berechtigung verweigert');
         return;
       }
+      // iOS: Ohne allowsRecording wirft record() RecordingDisabledException (Expo-Audio / AVAudioSession).
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+      });
       await audioRecorder.prepareToRecordAsync(recordingOptions);
       audioRecorder.record();
       setRecording(true);
@@ -152,6 +159,15 @@ const MessageInput = forwardRef(function MessageInput(
       setWaveformSamples([]); // Reset fuer neue Aufnahme
     } catch (err) {
       console.error('[VOICE] Fehler beim Starten der Aufnahme:', err);
+      // Wenn prepare/record scheitert, allowsRecording nicht offen lassen (iOS-Session)
+      try {
+        await setAudioModeAsync({
+          allowsRecording: false,
+          playsInSilentMode: true,
+        });
+      } catch (_) {
+        // ignore
+      }
     }
   };
 
@@ -163,22 +179,51 @@ const MessageInput = forwardRef(function MessageInput(
       await audioRecorder.stop();
       setRecording(false);
       setRecordedUri(audioRecorder.uri);
+      // Session zurueck: Recording-Flag nur waehrend Aufnahme noetig; Vorschau-Wiedergabe braucht es nicht.
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+      });
     } catch (err) {
       console.error('[VOICE] Fehler beim Stoppen der Aufnahme:', err);
       setRecording(false);
+      try {
+        await setAudioModeAsync({
+          allowsRecording: false,
+          playsInSilentMode: true,
+        });
+      } catch (_) {
+        // ignore
+      }
     }
   };
 
   // ============================
   // Sprachnachricht: Aufnahme verwerfen
   // ============================
-  const handleDiscardRecording = () => {
-    setRecording(false);
-    setRecordedUri(null);
-    setWaveformSamples([]);
+  const handleDiscardRecording = async () => {
     if (previewStatus.playing) {
       previewPlayer.pause();
     }
+    // Wenn waehrend Aufnahme verworfen wird: Recorder stoppen und iOS-Session zuruecksetzen (sonst bleibt Mic-Session aktiv).
+    if (recording) {
+      try {
+        await audioRecorder.stop();
+      } catch (_) {
+        // ignore — evtl. war prepare/record fehlgeschlagen
+      }
+      try {
+        await setAudioModeAsync({
+          allowsRecording: false,
+          playsInSilentMode: true,
+        });
+      } catch (_) {
+        // ignore
+      }
+    }
+    setRecording(false);
+    setRecordedUri(null);
+    setWaveformSamples([]);
   };
 
   // ============================

@@ -1,38 +1,23 @@
-import { Modal, Pressable, Text, View } from 'react-native';
-import { STORY_REACTION_PRESETS, storyViewerFontArial } from './constants';
-import { StoryPressableScale } from './StoryPressableScale';
+import { EmojiPickerModal, emojiData } from '@hiraku-ai/react-native-emoji-picker';
 
 /**
- * Raster aller Preset-Emojis — Auswahl ruft onPick(reactionKey) (Bundle-Zaehler).
+ * Voller Emoji-Katalog; das ausgewaehlte Zeichen (getrimmt) ist der reactionKey im Bundle.
+ * Legacy-Demo-Keys (heart, joy, …) kommen nur noch aus buildDefaultReactions, nicht aus einer Preset-Liste.
  */
 export function StoryReactionPickerModal({ visible, onRequestClose, onPick }) {
   return (
-    <Modal visible={visible} animationType="fade" transparent onRequestClose={onRequestClose}>
-      <View className="flex-1 justify-end">
-        <Pressable
-          className="absolute inset-0 bg-black/70"
-          onPress={onRequestClose}
-          accessibilityLabel="Schliessen"
-        />
-        <View className="bg-neutral-900 rounded-t-2xl px-4 pt-4 pb-8 border-t border-white/10">
-          <Text className="text-white text-base mb-4" style={storyViewerFontArial}>
-            Reaktion waehlen
-          </Text>
-          <View className="flex-row flex-wrap">
-            {STORY_REACTION_PRESETS.map((p) => (
-              <StoryPressableScale
-                key={p.key}
-                onPress={() => onPick(p.key)}
-                className="w-14 h-14 rounded-2xl bg-white/10 mr-3 mb-3"
-                innerClassName="h-full w-full items-center justify-center"
-                accessibilityLabel={p.label}
-              >
-                <Text style={{ fontSize: 30 }}>{p.emoji}</Text>
-              </StoryPressableScale>
-            ))}
-          </View>
-        </View>
-      </View>
-    </Modal>
+    <EmojiPickerModal
+      visible={visible}
+      onClose={onRequestClose}
+      onEmojiSelect={(emoji) => {
+        const trimmed = typeof emoji === 'string' ? emoji.trim() : '';
+        if (trimmed) onPick(trimmed);
+      }}
+      emojis={emojiData}
+      darkMode
+      modalTitle="Reaktion waehlen"
+      searchPlaceholder="Emoji suchen…"
+      modalHeightPercentage={72}
+    />
   );
 }

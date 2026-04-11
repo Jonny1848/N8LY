@@ -85,7 +85,16 @@ export function StoryReactionScrim({
                 <StoryReactionGlassChip
                   useGlass={useGlass}
                   isRound={false}
-                  accessibilityLabel={`Reaktion ${preset.label}`}
+                  isSelected={
+                    preset.key === 'heart'
+                      ? !!bundleEng?.liked
+                      : bundleEng?.myEmojiReactionKey === preset.key
+                  }
+                  accessibilityLabel={`Reaktion ${preset.label}${
+                    (preset.key === 'heart' ? bundleEng?.liked : bundleEng?.myEmojiReactionKey === preset.key)
+                      ? ', ausgewaehlt'
+                      : ''
+                  }`}
                   onPress={() =>
                     preset.key === 'heart' ? onToggleHeart() : onBumpReaction(preset.key)
                   }
@@ -102,11 +111,16 @@ export function StoryReactionScrim({
                 </StoryReactionGlassChip>
               </View>
             ))}
+            {/* Smiley oeffnet nur den Katalog — kein Auswahl-Ring (besonderer Aktions-Button) */}
             <StoryReactionGlassChip
               useGlass={useGlass}
               isRound
-              accessibilityLabel="Reaktion hinzufuegen"
               onPress={onOpenPicker}
+              accessibilityLabel={
+                bundleEng?.myEmojiReactionKey
+                  ? 'Emoji-Reaktion aendern'
+                  : 'Reaktion hinzufuegen'
+              }
             >
               <FaceSmileIcon size={24} color="#FFFFFF" />
             </StoryReactionGlassChip>

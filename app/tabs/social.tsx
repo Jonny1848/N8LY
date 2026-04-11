@@ -22,17 +22,38 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../../constants/theme';
 import {
   MagnifyingGlassIcon,
   XMarkIcon,
+  UserPlusIcon,
 } from 'react-native-heroicons/outline';
 import { UserIcon, PlusIcon } from 'react-native-heroicons/solid';
 import useAuthStore from '../../stores/useAuthStore';
 import useChatStore from '../../stores/useChatStore';
 import { getActiveStories } from '../../services/storyService';
+import ChatsEmptyStateIllustration from '../../components/chat/ChatsEmptyStateIllustration';
 
 const SEARCH_BAR_HEIGHT = 56;
+
+
+
+
+/** Plus im leeren Story-Ring: Goldtoenung wie im Referenz-UI */
+const STORY_ADD_PLUS_GOLD = '#F4D03F';
+
+/** Story-Labels auf blauem Grund */
+const STORY_LABEL_ON_BLUE = 'rgba(255,255,255,0.88)';
+
+/** Ringe auf blauem Header: inaktiv leicht transparent, neu weiss */
+const STORY_RING_IDLE_ON_BLUE = 'rgba(255,255,255,0.42)';
+
+/**
+ * Untere Rundung der blauen Kopf-Karte zum weissen Chat-Bereich darunter.
+ */
+const HEADER_CARD_BOTTOM_RADIUS = 44;
 
 export default function SocialScreen() {
   const userId = useAuthStore((s) => s.userId);
@@ -173,37 +194,49 @@ export default function SocialScreen() {
   }, [router]);
 
   // ============================
-  // HEADER: Suchbutton links, "Chats" Mitte, Optionen rechts
+  // HEADER: weisser Such-Kreis, weisser Titel, dunklerer Blau-Kreis + weisses UserPlusIcon
   // ============================
   const renderHeader = () => (
-    <View className="flex-row items-center px-5 pt-2 pb-1">
-      {/* Suchbutton links */}
+    <View className="flex-row items-center px-5 pb-2 pt-3">
+      {/* Suche: weisser Kreis auf Blau — duenne Kontur hilft auf hellem Blau */}
       <Pressable
-        className="w-10 h-10 items-center justify-center"
+        className="h-11 w-11 items-center justify-center rounded-full bg-white"
+        style={{
+          borderWidth: 1,
+          borderColor: 'rgba(0,0,0,0.07)',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.15,
+          shadowRadius: 6,
+          elevation: 4,
+        }}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         onPress={toggleSearch}
       >
-        <MagnifyingGlassIcon size={24} color={theme.colors.neutral.gray[800]} />
+        <MagnifyingGlassIcon size={22} color={theme.colors.neutral.gray[900]} />
       </Pressable>
 
-      {/* Titel zentriert */}
       <View className="flex-1 items-center justify-center">
         <Text
           className="text-[28px]"
-          style={{ fontFamily: 'Manrope_700Bold', color: theme.colors.neutral.gray[900] }}
+          style={{ fontFamily: 'Manrope_700Bold', color: theme.colors.neutral.white }}
         >
           Chats
         </Text>
       </View>
 
-      {/* Plus-Button: blauer Kreis mit weissem Plus */}
+      {/* Etwas dunkleres Blau als die Fläche — subtiler Kontrast zum Header */}
       <Pressable
         onPress={onNewChatPress}
-        className="w-10 h-10 items-center justify-center rounded-full"
-        style={{ backgroundColor: theme.colors.primary.main }}
+        className="h-11 w-11 items-center justify-center rounded-full"
+        style={{
+          backgroundColor: theme.colors.primary.main2,
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.2)',
+        }}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <PlusIcon size={22} color="#fff" />
+        <UserPlusIcon size={22} color="#fff" />
       </Pressable>
     </View>
   );
@@ -218,11 +251,17 @@ export default function SocialScreen() {
 
   const renderSearchBar = () => (
     <Animated.View style={[{ paddingHorizontal: 20, paddingBottom: 8, paddingTop: 4 }, searchBarAnimatedStyle]}>
+      {/* Weisses Pill-Feld auf blauem Kopf */}
       <View
-        className="flex-row items-center rounded-xl px-4"
+        className="flex-row items-center rounded-full px-4"
         style={{
-          backgroundColor: "white",
+          backgroundColor: theme.colors.neutral.white,
           height: 44,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.12,
+          shadowRadius: 6,
+          elevation: 3,
         }}
       >
         <MagnifyingGlassIcon size={18} color={theme.colors.neutral.gray[400]} />
@@ -267,10 +306,10 @@ export default function SocialScreen() {
     ];
 
     return (
-      <View className="pb-4 pt-2">
+      <View className="pb-5 pt-1">
         {storiesLoading && storyGroups.length === 0 ? (
           <View className="py-4 items-center">
-            <ActivityIndicator size="small" color={theme.colors.primary.main} />
+            <ActivityIndicator size="small" color={theme.colors.neutral.white} />
           </View>
         ) : null}
         <FlatList
@@ -287,24 +326,24 @@ export default function SocialScreen() {
               if (!hasOwnStories) {
                 return (
                   <Pressable
-                    className="items-center mr-5"
-                    onPress={() => router.push('/stories/create')}
+                    className="items-center mr-6"
+                    onPress={() => router.push('/chat/stories/create')}
                   >
                     <View
                       className="w-16 h-16 rounded-full items-center justify-center"
                       style={{
                         borderWidth: 2,
                         borderStyle: 'dashed',
-                        borderColor: theme.colors.neutral.gray[300],
+                        borderColor: theme.colors.neutral.white,
                       }}
                     >
-                      <PlusIcon size={24} color={theme.colors.neutral.gray[400]} />
+                      <PlusIcon size={24} color={STORY_ADD_PLUS_GOLD} />
                     </View>
                     <Text
                       className="text-xs mt-1.5"
                       style={{
                         fontFamily: 'Manrope_500Medium',
-                        color: theme.colors.neutral.gray[600],
+                        color: STORY_LABEL_ON_BLUE,
                       }}
                     >
                       Deine Story
@@ -315,16 +354,16 @@ export default function SocialScreen() {
               const u = item.bundle.user;
               return (
                 <Pressable
-                  className="items-center mr-5"
-                  onPress={() => userId && router.push(`/stories/${userId}`)}
+                  className="items-center mr-6"
+                  onPress={() => userId && router.push(`/chat/stories/${userId}`)}
                 >
                   <View
                     className="w-16 h-16 rounded-full items-center justify-center"
                     style={{
                       borderWidth: 2.5,
                       borderColor: ringActive
-                        ? theme.colors.primary.main
-                        : theme.colors.neutral.gray[300],
+                        ? theme.colors.neutral.white
+                        : STORY_RING_IDLE_ON_BLUE,
                     }}
                   >
                     {u?.avatar_url ? (
@@ -346,7 +385,7 @@ export default function SocialScreen() {
                     className="text-xs mt-1.5"
                     style={{
                       fontFamily: 'Manrope_500Medium',
-                      color: theme.colors.neutral.gray[700],
+                      color: STORY_LABEL_ON_BLUE,
                     }}
                     numberOfLines={1}
                   >
@@ -360,16 +399,16 @@ export default function SocialScreen() {
             const u = g?.user;
             return (
               <Pressable
-                className="items-center mr-5"
-                onPress={() => u?.id && router.push(`/stories/${u.id}`)}
+                className="items-center mr-6"
+                onPress={() => u?.id && router.push(`/chat/stories/${u.id}`)}
               >
                 <View
                   className="w-16 h-16 rounded-full items-center justify-center"
                   style={{
                     borderWidth: 2.5,
                     borderColor: g?.hasUnviewed
-                      ? theme.colors.primary.main
-                      : theme.colors.neutral.gray[300],
+                      ? theme.colors.neutral.white
+                      : STORY_RING_IDLE_ON_BLUE,
                   }}
                 >
                   {u?.avatar_url ? (
@@ -391,7 +430,7 @@ export default function SocialScreen() {
                   className="text-xs mt-1.5 max-w-[64px]"
                   style={{
                     fontFamily: 'Manrope_500Medium',
-                    color: theme.colors.neutral.gray[700],
+                    color: STORY_LABEL_ON_BLUE,
                   }}
                   numberOfLines={1}
                 >
@@ -490,27 +529,27 @@ export default function SocialScreen() {
   );
 
   // ============================
-  // LEERER ZUSTAND (keine Chats)
+  // LEERER ZUSTAND (keine Chats) — Layout wie gaengige „No messages“-Screens:
+  // Illustration mit Kreis + Liste, darunter Headline + Subline (zentriert, ohne Rahmenkarte).
   // ============================
   const renderEmptyState = () => (
-    <View className="flex-1 items-center justify-center py-20">
-      <View
-        className="w-16 h-16 rounded-full items-center justify-center mb-4"
-        style={{ backgroundColor: `${theme.colors.primary.main}12` }}
-      >
-        <MagnifyingGlassIcon size={28} color={theme.colors.primary.main} />
-      </View>
+    <View className="flex-1 items-center justify-center px-6">
+      <ChatsEmptyStateIllustration />
       <Text
-        className="text-lg mb-1.5"
+        className="mt-7 text-center text-[22px] leading-7"
         style={{ fontFamily: 'Manrope_700Bold', color: theme.colors.neutral.gray[900] }}
       >
-        Noch keine Chats
+        Huch! Noch keine Chats
       </Text>
       <Text
-        className="text-sm text-center px-12"
-        style={{ fontFamily: 'Manrope_400Regular', color: theme.colors.neutral.gray[500] }}
+        className="mt-2 text-center text-[15px] leading-[22px]"
+        style={{
+          fontFamily: 'Manrope_400Regular',
+          color: theme.colors.neutral.gray[500],
+          maxWidth: 300,
+        }}
       >
-        Starte eine Unterhaltung mit jemandem aus deiner Community
+        Lade jemanden aus deiner Community zum Chat ein
       </Text>
     </View>
   );
@@ -519,35 +558,38 @@ export default function SocialScreen() {
 
   return (
     <View className="flex-1 bg-white">
-      {/* Oberer Bereich hervorgehoben: SafeArea + Header + Suchleiste + Stories (grau bis ganz oben) */}
-      <View
+      {/* Helle Icons in der Statusleiste auf blauem Kopf */}
+      <StatusBar style="light" />
+      {/*
+        Kopf: LinearGradient vertikal — main oben, main2 unten (y: 0 → y: 1).
+      */}
+      <LinearGradient
+        colors={[theme.colors.primary.main3, theme.colors.primary.main2]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
         style={{
-          backgroundColor: theme.colors.neutral.gray[100],
           paddingTop: insets.top,
-          borderBottomLeftRadius: 24,
-          borderBottomRightRadius: 24,
-          // Dezenter Schatten zur Hervorhebung
+          borderBottomLeftRadius: HEADER_CARD_BOTTOM_RADIUS,
+          borderBottomRightRadius: HEADER_CARD_BOTTOM_RADIUS,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: 3 },
-          shadowOpacity: 0.06,
-          shadowRadius: 6,
-          elevation: 4,
+          shadowOffset: { width: 0, height: 12 },
+          shadowOpacity: 0.14,
+          shadowRadius: 24,
+          elevation: 10,
         }}
       >
         {renderHeader()}
         {renderSearchBar()}
         {renderStorySection()}
-      </View>
+      </LinearGradient>
 
-      
-
-      {/* Chat-Liste mit Trennlinien zwischen den Eintraegen (nicht bis zum Rand) */}
       {loading ? (
-        <View className="flex-1 items-center justify-center">
+        <View className="flex-1 items-center justify-center bg-white">
           <ActivityIndicator size="large" color={theme.colors.primary.main} />
         </View>
       ) : (
         <FlatList
+          style={{ flex: 1, backgroundColor: theme.colors.neutral.white }}
           data={filteredConversations}
           keyExtractor={(item) => item.id}
           renderItem={renderConversationItem}
