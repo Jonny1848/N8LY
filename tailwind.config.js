@@ -1,6 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  // NativeWind-v4-Preset (Interop, className-Unterstuetzung)
+  presets: [require("nativewind/preset")],
   content: [
+    './global.css',
     './app/**/*.{js,jsx,ts,tsx}',
     './components/**/*.{js,jsx,ts,tsx}',
     './node_modules/@gluestack-ui/themed/**/*.{js,jsx,ts,tsx}',
@@ -8,8 +11,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // N8TLY Brand (Electric Blue)
-        brand: '#0066FF',
+        // N8LY Brand Blue (Chat-Bubbles, Buttons)
+        'N8LY-blue': '#0066FF',
         // Minimalistische Farbpalette
         primary: {
           DEFAULT: '#1F2937',

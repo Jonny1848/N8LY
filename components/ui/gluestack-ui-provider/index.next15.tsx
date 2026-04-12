@@ -29,10 +29,13 @@ export function GluestackUIProvider({
   Object.keys(config).forEach((configKey) => {
     cssVariablesWithMode +=
       configKey === 'dark' ? `\n .dark {\n ` : `\n:root {\n`;
-    const cssVariables = Object.keys(
-      config[configKey as keyof typeof config]
-    ).reduce((acc: string, curr: string) => {
-      acc += `${curr}:${config[configKey as keyof typeof config][curr]}; `;
+    // Theme-Slice als flaches Record typisieren (sonst TS: kein Index fuer string-Schluessel)
+    const themeVars = config[configKey as keyof typeof config] as Record<
+      string,
+      string
+    >;
+    const cssVariables = Object.keys(themeVars).reduce((acc: string, curr: string) => {
+      acc += `${curr}:${themeVars[curr]}; `;
       return acc;
     }, '');
     cssVariablesWithMode += `${cssVariables} \n}`;

@@ -1,0 +1,54 @@
+diff --git a/node_modules/expo-image-picker/ios/MediaHandler.swift b/node_modules/expo-image-picker/ios/MediaHandler.swift
+index 6e4fbe1..f68afad 100644
+--- a/node_modules/expo-image-picker/ios/MediaHandler.swift
++++ b/node_modules/expo-image-picker/ios/MediaHandler.swift
+@@ -10,6 +10,14 @@ internal struct MediaHandler {
+   internal weak var fileSystem: EXFileSystemInterface?
+   internal let options: ImagePickerOptions
+ 
++  /// Lets Photos download assets that live in iCloud only. Without this, `writeData` / `requestData` can fail with
++  /// `PHPhotosErrorDomain` code 3164 (`networkAccessRequired`).
++  private var phAssetResourceRequestOptionsAllowingNetwork: PHAssetResourceRequestOptions {
++    let o = PHAssetResourceRequestOptions()
++    o.isNetworkAccessAllowed = true
++    return o
++  }
++
+   internal func handleMedia(_ mediaInfo: MediaInfo) async throws -> AssetInfo {
+     let mediaType: String? = mediaInfo[UIImagePickerController.InfoKey.mediaType] as? String
+ 
+@@ -237,12 +245,12 @@ internal struct MediaHandler {
+       photoFileExtension: photoFileExtension, videoFileExtension: pairedVideoFileExtension)
+ 
+     let imageData = try await PHAssetResourceManager.default().requestData(
+-      for: photoResource, options: nil)
++      for: photoResource, options: phAssetResourceRequestOptionsAllowingNetwork)
+ 
+     try await PHAssetResourceManager.default().writeData(
+-      for: photoResource, toFile: photoUrl, options: nil)
++      for: photoResource, toFile: photoUrl, options: phAssetResourceRequestOptionsAllowingNetwork)
+     try await PHAssetResourceManager.default().writeData(
+-      for: videoResource, toFile: pairedVideoUrl, options: nil)
++      for: videoResource, toFile: pairedVideoUrl, options: phAssetResourceRequestOptionsAllowingNetwork)
+ 
+     let fileSize = getFileSize(from: photoUrl)
+     let mimeType = getMimeType(from: photoUrl.pathExtension)
+@@ -313,7 +321,7 @@ internal struct MediaHandler {
+         try await PHAssetResourceManager.default().writeData(
+           for: resource,
+           toFile: destinationUrl,
+-          options: nil
++          options: phAssetResourceRequestOptionsAllowingNetwork
+         )
+ 
+         let mimeType = getMimeType(from: destinationUrl.pathExtension)
+@@ -389,7 +397,8 @@ internal struct MediaHandler {
+ 
+           // Stream the resource into our cache directory. This API is asynchronous but doesn't require
+           // a temporary file like `loadFileRepresentation`.
+-          try await PHAssetResourceManager.default().writeData(for: resource, toFile: destinationUrl, options: nil)
++          try await PHAssetResourceManager.default().writeData(
++            for: resource, toFile: destinationUrl, options: phAssetResourceRequestOptionsAllowingNetwork)
+ 
+           // Build and return the result using the helper.
+           let mimeType = getMimeType(from: destinationUrl.pathExtension)

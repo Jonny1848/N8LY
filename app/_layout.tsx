@@ -1,3 +1,5 @@
+import "../global.css";
+
 /**
  * Root Layout – Auth-Routing & Control Flow
  *
@@ -12,7 +14,7 @@
  *
  * 3) Google OAuth – zwei Einstiegspunkte:
  *    A) login.jsx: WebBrowser öffnet, User kehrt zurück → setSession() → fetchProfileWithToken() → setOauthRedirectTo → <Redirect>
- *    B) auth/callback: Deep-Link n8tly://auth/callback → setSession() → fetchProfileWithToken() → router.replace()
+ *    B) auth/callback: Deep-Link N8LY://auth/callback → setSession() → fetchProfileWithToken() → router.replace()
  *    Zusätzlich: onAuthStateChange(SIGNED_IN) → handleAuthenticated(session, 'SIGNED_IN') → fetchProfileWithToken() → safeReplace()
  *
  * WICHTIG (OAuth): Der Supabase-Client sendet den JWT manchmal nicht mit der ersten Anfrage nach setSession.
@@ -23,25 +25,23 @@ import 'react-native-url-polyfill/auto';
 import 'react-native-get-random-values';
 import { Slot, useRouter, usePathname, Stack } from 'expo-router';
 import { GluestackUIProvider } from '../components/ui/gluestack-ui-provider';
-import { supabase, fetchProfileWithToken } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useEffect, useRef, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native'
-import { useFonts, Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold } from '@expo-google-fonts/manrope';
-import { useGeneralStore } from './store/generalStore';
+import { IntroProvider, useIntro } from '../components/IntroContext';
+import { OnboardingProvider } from '../components/OnboardingContext';
+import { useFonts } from 'expo-font';
+import { storyEditorFontAssets } from '../lib/storyEditorFontAssets';
+// Zustand: Globaler Auth-Store (ersetzt lokale getSession()-Aufrufe)
+import useAuthStore from '../stores/useAuthStore';
 
 function RootLayoutContent() {
-  // Load Manrope fonts
-  const [fontsLoaded, fontError] = useFonts({
-    Manrope_400Regular,
-    Manrope_500Medium,
-    Manrope_600SemiBold,
-    Manrope_700Bold,
-  });
-  // Zustand Store
-  const { introCompleted } = useGeneralStore();
+  // Manrope + Story-Editor-Google-Fonts (siehe lib/storyEditorFontAssets)
+  const [fontsLoaded, fontError] = useFonts(storyEditorFontAssets);
 
   const router = useRouter();
   const pathname = usePathname();
+  const { introCompleted } = useIntro();
   const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
 
   // Debug: Check if fonts are loaded
@@ -52,12 +52,15 @@ function RootLayoutContent() {
     }
   }, [fontsLoaded, fontError]);
 
-  // verhindert Doppelnavigation & parallele handleAuthenticated-Läufe
+  // Zustand-Store: Auth-Actions und State
+  const { setSession, fetchProfile, clearAuth } = useAuthStore();
+
+  // Verhindert Doppelnavigation & parallele handleAuthenticated-Laeufe
   const navigatingRef = useRef<string | null>(null);
   const handlingAuthRef = useRef(false);
   const bootstrappedRef = useRef(false);
 
-  // State-based redirect: runs in React lifecycle, works after OAuth WebBrowser returns
+  // State-basierter Redirect: laeuft im React-Lifecycle (wichtig fuer OAuth)
   useEffect(() => {
     if (!pendingRedirect || pathname === pendingRedirect) return;
     console.log('[NAV] Executing pending redirect to:', pendingRedirect);
@@ -66,15 +69,16 @@ function RootLayoutContent() {
     setTimeout(() => (navigatingRef.current = null), 100);
   }, [pendingRedirect, pathname]);
 
+  // ============================
+  // Auth-Bootstrap & Listener – befuellt den globalen Auth-Store
+  // ============================
   useEffect(() => {
     // Warte bis Intro abgeschlossen ist und Fonts geladen (oder Font-Fehler aufgetreten)
-    // Wenn Font-Loading fehlschlägt, sollte Auth-Bootstrap trotzdem laufen
     if (!introCompleted || (!fontsLoaded && !fontError)) {
       console.log('[AUTH] Waiting for intro or fonts...', { introCompleted, fontsLoaded, fontError });
       return;
     }
 
-    // Warnung ausgeben, wenn Fonts fehlgeschlagen sind, aber trotzdem fortfahren
     if (fontError) {
       console.warn('[AUTH] Font loading failed, but proceeding with auth bootstrap');
     }
@@ -82,25 +86,33 @@ function RootLayoutContent() {
     let unsub = () => {};
 
     (async () => {
-      // 1) BOOTSTRAP: aktuelle Session prüfen und DIREKT routen
+      // 1) BOOTSTRAP: Aktuelle Session pruefen und im Store speichern
       const { data: { session } } = await supabase.auth.getSession();
+      // Session im Zustand-Store setzen (macht userId global verfuegbar)
+      setSession(session);
+
       if (session) {
-        console.log("Aktuelle Session:" + session?.user?.email);
+        console.log('Aktuelle Session:' + session?.user?.email);
         await handleAuthenticated(session);
       } else {
         safeReplace('/login');
       }
       bootstrappedRef.current = true;
 
-      // 2) EVENTS: zukünftige Änderungen behandeln (ohne Doppelaufrufe)
+      // 2) EVENTS: Auth-Aenderungen behandeln und Store aktualisieren
       const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
         console.log('[AUTH] Event:', event, 'Pathname:', pathname);
         if (!bootstrappedRef.current) return;
+
+        // Store bei jedem Auth-Event aktualisieren
+        setSession(session);
 
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           if (session) await handleAuthenticated(session, event);
         } else if (event === 'SIGNED_OUT') {
           console.log('[AUTH] SIGNED_OUT detected, navigating to login');
+          // Auth-Store zurücksetzen
+          clearAuth();
           navigatingRef.current = null;
           setPendingRedirect('/login');
         }
@@ -111,6 +123,7 @@ function RootLayoutContent() {
     return () => unsub();
   }, [introCompleted, fontsLoaded, fontError]);
 
+  /** Sichere Navigation ohne Doppelaufrufe */
   function safeReplace(target: string) {
     console.log('[NAV] safeReplace called:', { target, current: navigatingRef.current, pathname });
     if (navigatingRef.current === target || pathname === target) {
@@ -118,10 +131,13 @@ function RootLayoutContent() {
       return;
     }
     navigatingRef.current = target;
-    // Use state to trigger redirect - ensures it runs in React lifecycle (fixes OAuth redirect)
     setPendingRedirect(target);
   }
 
+  /**
+   * Nach erfolgreicher Authentifizierung: Profil laden und navigieren.
+   * Speichert das Profil im Zustand-Store, sodass alle Screens darauf zugreifen koennen.
+   */
   async function handleAuthenticated(session: any, event?: string) {
     if (handlingAuthRef.current) return;
     handlingAuthRef.current = true;
@@ -133,23 +149,15 @@ function RootLayoutContent() {
       }
       console.log('[AUTH] PreSupabase Auth Check');
 
-      // OAuth (SIGNED_IN): fetchProfileWithToken – Supabase Client sendet JWT oft nicht mit erster Anfrage
-      let profile: { onboarding_completed?: boolean } | null;
-      if (event === 'SIGNED_IN' && session?.access_token) {
-        profile = await fetchProfileWithToken(session.access_token, uid);
-        console.log('[AUTH] Profil-Abfrage (OAuth mit Token):', profile);
-      } else {
-        const { data, error: profileError } = await supabase
-          .from('profiles')
-          .select('onboarding_completed')
-          .eq('id', uid)
-          .maybeSingle();
-        profile = data ?? null;
-        console.log('[AUTH] Profil-Abfrage (Supabase Client):', { profile, profileError });
-      }
+      // Profil laden und im Store speichern.
+      // Bei OAuth (SIGNED_IN) wird die Session uebergeben fuer Token-basierte Abfrage
+      const profile = await fetchProfile(
+        event === 'SIGNED_IN' ? session : undefined
+      );
+      console.log('[AUTH] Profil geladen:', { profile });
       console.log('[AUTH] : Post Supabase Auth Check');
-      const onboardingComplete = profile?.onboarding_completed === true;
 
+      const onboardingComplete = profile?.onboarding_completed === true;
       if (onboardingComplete) {
         safeReplace('/tabs');
       } else {
@@ -179,7 +187,13 @@ function RootLayoutContent() {
         <Stack.Screen name="tabs" options={{ animation: 'fade' }} />
         <Stack.Screen name="login" options={{ animation: 'fade' }} />
         <Stack.Screen name="signup" options={{ animation: 'fade' }} />
-        <Stack.Screen name="home" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="chat/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="chat/group-info/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="user/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="new-chat" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="new-chat-details" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="chat/stories/create" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="chat/stories/[userId]" options={{ animation: 'fade' }} />
       </Stack>
     </GluestackUIProvider>
   );
@@ -187,9 +201,10 @@ function RootLayoutContent() {
 
 export default function RootLayout() {
   return (
-    <RootLayoutContent />
+    <IntroProvider>
+      <OnboardingProvider>
+        <RootLayoutContent />
+      </OnboardingProvider>
+    </IntroProvider>
   );
 }
-
-
-

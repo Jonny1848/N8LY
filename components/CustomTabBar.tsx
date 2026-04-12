@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import useChatStore from '../stores/useChatStore';
 import Animated, {
   useAnimatedStyle,
   withTiming,
@@ -12,14 +13,14 @@ import { theme } from '../constants/theme';
 // Solid Icons
 import { HomeIcon as HomeIconSolid } from 'react-native-heroicons/solid';
 import { CalendarIcon as CalendarIconSolid } from 'react-native-heroicons/solid';
-import { ChatBubbleLeftIcon as ChatBubbleLeftIconSolid } from 'react-native-heroicons/solid';
+import { ChatBubbleBottomCenterTextIcon as ChatBubbleLeftIconSolid } from 'react-native-heroicons/solid';
 import { GlobeAltIcon as GlobeAltIconSolid } from 'react-native-heroicons/solid';
 import { UserIcon as UserIconSolid } from 'react-native-heroicons/solid';
 
 // Outline Icons
 import { HomeIcon as HomeIconOutline } from 'react-native-heroicons/outline';
 import { CalendarIcon as CalendarIconOutline } from 'react-native-heroicons/outline';
-import { ChatBubbleLeftIcon as ChatBubbleLeftIconOutline } from 'react-native-heroicons/outline';
+import { ChatBubbleBottomCenterTextIcon as ChatBubbleLeftIconOutline } from 'react-native-heroicons/outline';
 import { GlobeAltIcon as GlobeAltIconOutline } from 'react-native-heroicons/outline';
 import { UserIcon as UserIconOutline } from 'react-native-heroicons/outline';
 
@@ -32,6 +33,10 @@ const iconMap: Record<string, { solid: any; outline: any }> = {
 };
 
 export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const totalUnread = useChatStore((s) =>
+    s.conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0)
+  );
+
   return (
     <View style={styles.tabBar}>
       {state.routes.map((route, index) => {
@@ -85,11 +90,15 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
           ? iconMap[route.name]?.solid 
           : iconMap[route.name]?.outline;
 
-        const color = isFocused 
-          ? theme.colors.primary.main 
-          : theme.colors.neutral.gray[400];
+        // Tab-Icons einheitlich schwarz; Untätige Tabs wirken durch iconColorStyle-Opacity (0,5) heller
+        const color = theme.colors.primary.main2;
 
-        const badge = route.name === 'social' ? 3 : undefined;
+        const badge =
+          route.name === 'social' && totalUnread > 0
+            ? totalUnread > 99
+              ? '99+'
+              : totalUnread
+            : undefined;
 
         return (
           <TouchableOpacity
