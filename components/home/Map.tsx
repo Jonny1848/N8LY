@@ -27,6 +27,8 @@ export default function Map() {
     getMapStyleForHour(new Date().getHours())
   );
 
+  MapboxGL.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN as string);
+
   const cameraRef = useRef<MapboxGL.Camera>(null);
   const mapRef = useRef<MapboxGL.MapView>(null);
 
@@ -108,11 +110,33 @@ export default function Map() {
       ne_lng: neLng,
     });
 
-    if (error) {
-      console.error("RPC Fehler get_events_in_bounds:", error);
-    } else {
-      setEvents(data ?? []);
+    // Ergebnis aus RPC; bei leerem oder fehlgeschlagenem Aufruf Fallback (siehe unten).
+    let resultRows: any[] = !error && Array.isArray(data) ? data : [];
+
+    // Fallback: Direkt `events` lesen und Rechteck clientseitig filtern (z. B. RLS auf RPC vs. Tabelle, oder RPC liefert fälschlich 0).
+    if (resultRows.length === 0) {
+      const { data: allRows, error: tableError } = await supabase.from('events').select('*');
+
+      let filtered: any[] = [];
+      if (!tableError && Array.isArray(allRows)) {
+        filtered = allRows.filter((e: any) => {
+          const lat = e.location_lat;
+          const lng = e.location_lng;
+          if (lat == null || lng == null) return false;
+          return lat >= swLat && lat <= neLat && lng >= swLng && lng <= neLng;
+        });
+      }
+
+      if (!tableError) {
+        resultRows = filtered;
+      }
     }
+
+    if (error && resultRows.length === 0) {
+      console.error("RPC Fehler get_events_in_bounds:", error);
+    }
+
+    setEvents(resultRows);
 
     setLoadingEvents(false);
   };
