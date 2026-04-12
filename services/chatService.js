@@ -110,9 +110,12 @@ export async function getConversations(userId) {
       }
 
       // Bei Einzelchats: Den Namen und Avatar des Chat-Partners ermitteln
-      // (Bei Gruppenchats wird der Gruppenname verwendet)
+      // (Bei Gruppenchats: Gruppenname + avatar_url aus conversations)
       let displayName = conv.name;
-      let displayAvatar = conv.avatar_url;
+      let displayAvatar =
+        conv.avatar_url != null && String(conv.avatar_url).trim() !== ''
+          ? String(conv.avatar_url).trim()
+          : null;
 
       if (conv.type === 'direct') {
         // Den anderen Teilnehmer finden (nicht den eingeloggten User)
@@ -121,7 +124,9 @@ export async function getConversations(userId) {
         );
         if (otherParticipant?.profiles) {
           displayName = otherParticipant.profiles.username;
-          displayAvatar = otherParticipant.profiles.avatar_url;
+          const pUrl = otherParticipant.profiles.avatar_url;
+          displayAvatar =
+            pUrl != null && String(pUrl).trim() !== '' ? String(pUrl).trim() : null;
         }
       }
 
@@ -159,15 +164,18 @@ export async function getConversationById(conversationId) {
       type,
       name,
       avatar_url,
+      description,
       created_by,
       created_at,
+      updated_at,
       conversation_participants (
         user_id,
         role,
         profiles:user_id (
           id,
           username,
-          avatar_url
+          avatar_url,
+          bio
         )
       )
     `)
@@ -180,6 +188,73 @@ export async function getConversationById(conversationId) {
   }
 
   return data;
+}
+
+/**
+ * Aktualisiert Metadaten einer Gruppenkonversation (Name, Gruppenbild).
+ * Nur fuer type = 'group'. RLS: typischerweise nur Ersteller/Admins — Fehler werden durchgereicht.
+ *
+ * @param {string} conversationId
+ * @param {{ name?: string|null, avatar_url?: string|null, description?: string|null }} updates
+ * @returns {Object|null} – Aktualisierte Zeile oder null
+ */
+export async function updateGroupConversation(conversationId, updates = {}) {
+  const payload = {};
+  if (updates.name !== undefined) {
+    payload.name = updates.name === null ? null : String(updates.name).trim();
+  }
+  if (updates.avatar_url !== undefined) {
+    payload.avatar_url =
+      updates.avatar_url === null || String(updates.avatar_url).trim() === ''
+        ? null
+        : String(updates.avatar_url).trim();
+  }
+  if (updates.description !== undefined) {
+    payload.description =
+      updates.description === null || String(updates.description).trim() === ''
+        ? null
+        : String(updates.description).trim();
+  }
+  if (Object.keys(payload).length === 0) return null;
+
+  const { data, error } = await supabase
+    .from('conversations')
+    .update({
+      ...payload,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', conversationId)
+    .eq('type', 'group')
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[chatService] updateGroupConversation:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+/**
+ * Zaehlt Medien-/Datei-Nachrichten in der Gruppe (WhatsApp: „Medien, Links, Doks“ — hier Medien + Dateien).
+ *
+ * @param {string} conversationId
+ * @returns {Promise<number>}
+ */
+export async function countGroupSharedMediaMessages(conversationId) {
+  const { count, error } = await supabase
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('conversation_id', conversationId)
+    .in('message_type', ['image', 'voice', 'file']);
+
+  if (error) {
+    console.error('[chatService] countGroupSharedMediaMessages:', error);
+    return 0;
+  }
+
+  return count ?? 0;
 }
 
 /**
@@ -619,7 +694,7 @@ export async function removeParticipant(conversationId, userId) {
 }
 
 // ========================
-// USER-SUCHE
+// USER-SUCHE & KONTAKTE (Konversationen + follows)
 // ========================
 
 /**
@@ -653,16 +728,13 @@ export async function searchUsers(query, currentUserId, limit = 20) {
 }
 
 /**
- * Alle bekannten Kontakte laden: User, mit denen der aktuelle User
- * mindestens eine Konversation teilt. Gibt eindeutige Profile Zurück.
+ * Profile aus Konversationen: alle anderen Teilnehmer geteilter Chats.
+ * Kann leer sein, wenn noch keine conversation_participants existieren.
  *
- * @param {string} currentUserId – UUID des eingeloggten Users
- * @returns {Array} – Liste der bekannten Profile { id, username, avatar_url }
+ * @param {string} currentUserId
+ * @returns {Promise<Array<{ id: string, username: string, avatar_url: string|null }>>}
  */
-export async function getKnownContacts(currentUserId) {
-  if (!currentUserId) return [];
-
-  // Schritt 1: Alle Konversations-IDs des aktuellen Users
+async function getContactsFromConversations(currentUserId) {
   const { data: myChats, error: chatErr } = await supabase
     .from('conversation_participants')
     .select('conversation_id')
@@ -672,7 +744,6 @@ export async function getKnownContacts(currentUserId) {
 
   const chatIds = myChats.map((c) => c.conversation_id);
 
-  // Schritt 2: Alle anderen Teilnehmer dieser Konversationen laden
   const { data: others, error: othersErr } = await supabase
     .from('conversation_participants')
     .select('user_id, profiles:user_id ( id, username, avatar_url )')
@@ -681,7 +752,6 @@ export async function getKnownContacts(currentUserId) {
 
   if (othersErr || !others?.length) return [];
 
-  // Duplikate entfernen (ein User kann in mehreren Chats sein)
   const seen = new Set();
   const unique = [];
   for (const row of others) {
@@ -691,7 +761,75 @@ export async function getKnownContacts(currentUserId) {
       unique.push({ id: profile.id, username: profile.username, avatar_url: profile.avatar_url });
     }
   }
-  // Alphabetisch nach Username sortieren
-  unique.sort((a, b) => (a.username || '').localeCompare(b.username || ''));
   return unique;
+}
+
+/**
+ * Profile ueber Follow-Graph: User, denen man folgt, oder die einem folgen
+ * (Tabelle `follows`: follower_id -> following_id).
+ *
+ * @param {string} currentUserId
+ * @returns {Promise<Array<{ id: string, username: string, avatar_url: string|null }>>}
+ */
+export async function getFollowRelatedProfiles(currentUserId) {
+  if (!currentUserId) return [];
+
+  const [{ data: outgoing, error: outErr }, { data: incoming, error: inErr }] = await Promise.all([
+    supabase.from('follows').select('following_id').eq('follower_id', currentUserId),
+    supabase.from('follows').select('follower_id').eq('following_id', currentUserId),
+  ]);
+
+  if (outErr) console.error('[chatService] follows outgoing:', outErr);
+  if (inErr) console.error('[chatService] follows incoming:', inErr);
+
+  const idSet = new Set();
+  for (const row of outgoing || []) {
+    if (row.following_id) idSet.add(row.following_id);
+  }
+  for (const row of incoming || []) {
+    if (row.follower_id) idSet.add(row.follower_id);
+  }
+  idSet.delete(currentUserId);
+
+  if (idSet.size === 0) return [];
+
+  const ids = [...idSet];
+  const { data: profiles, error: profErr } = await supabase
+    .from('profiles')
+    .select('id, username, avatar_url')
+    .in('id', ids);
+
+  if (profErr) {
+    console.error('[chatService] getFollowRelatedProfiles profiles:', profErr);
+    return [];
+  }
+
+  return profiles || [];
+}
+
+/**
+ * Vereinigt Kontakte aus Konversationen und Follow-Beziehungen (ohne Duplikate).
+ * Sortiert alphabetisch nach Username.
+ *
+ * @param {string} currentUserId – UUID des eingeloggten Users
+ * @returns {Array} – Liste { id, username, avatar_url }
+ */
+export async function getKnownContacts(currentUserId) {
+  if (!currentUserId) return [];
+
+  const [fromChats, fromFollows] = await Promise.all([
+    getContactsFromConversations(currentUserId),
+    getFollowRelatedProfiles(currentUserId),
+  ]);
+
+  const byId = new Map();
+  for (const p of [...fromChats, ...fromFollows]) {
+    if (p?.id && !byId.has(p.id)) {
+      byId.set(p.id, { id: p.id, username: p.username, avatar_url: p.avatar_url });
+    }
+  }
+
+  const merged = [...byId.values()];
+  merged.sort((a, b) => (a.username || '').localeCompare(b.username || ''));
+  return merged;
 }

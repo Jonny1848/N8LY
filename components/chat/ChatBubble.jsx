@@ -103,9 +103,9 @@ export default function ChatBubble({ item, index, messages, userId, conversation
     (isImage
       ? 'bg-transparent p-0 overflow-hidden'
       : isVoice
-        ? 'py-2 pl-2.5 pr-4 ' + (isOwn ? 'bg-n8tly-blue rounded-br-[4px]' : 'bg-gray-100 rounded-bl-[4px]')
+        ? 'py-2 pl-2.5 pr-4 ' + (isOwn ? 'bg-N8LY-blue rounded-br-[4px]' : 'bg-gray-100 rounded-bl-[4px]')
         : 'px-3.5 py-2.5 ' +
-          (isOwn ? 'bg-n8tly-blue rounded-br-[4px]' : 'bg-gray-100 rounded-bl-[4px]'));
+          (isOwn ? 'bg-N8LY-blue rounded-br-[4px]' : 'bg-gray-100 rounded-bl-[4px]'));
 
   return (
     <View>
@@ -156,7 +156,7 @@ export default function ChatBubble({ item, index, messages, userId, conversation
             {/* Absendername bei Bildnachrichten AUSSERHALB der Bubble, damit overflow-hidden ihn nicht abschneidet */}
             {!isOwn && conversation?.type === 'group' && item.profiles?.username && isImage && (
               <Text
-                className="text-xs mb-1 text-n8tly-blue"
+                className="text-xs mb-1 text-N8LY-blue"
                 style={{ fontFamily: 'Manrope_600SemiBold' }}
               >
                 {item.profiles.username}
@@ -167,7 +167,7 @@ export default function ChatBubble({ item, index, messages, userId, conversation
               {/* Absendername bei Nicht-Bild-Nachrichten innerhalb der Bubble */}
               {!isOwn && conversation?.type === 'group' && item.profiles?.username && !isImage && (
                 <Text
-                  className="text-xs mb-0.5 text-n8tly-blue"
+                  className="text-xs mb-0.5 text-N8LY-blue"
                   style={{ fontFamily: 'Manrope_600SemiBold' }}
                 >
                   {item.profiles.username}

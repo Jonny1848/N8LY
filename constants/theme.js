@@ -1,4 +1,4 @@
-// N8TLY App Theme
+// N8LY App Theme
 // Minimalistisches, erwachsenes Design mit dezenten Akzenten
 
 export const theme = {

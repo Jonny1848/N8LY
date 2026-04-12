@@ -18,10 +18,10 @@ type IMotionViewProps = React.ComponentProps<typeof View> &
 const MotionView = Motion.View as React.ComponentType<IMotionViewProps>;
 cssInterop(MotionView, { className: 'style' });
 
-// Keine Gluestack-Semantik-Tokens im N8TLY-Tailwind (background-0, outline-100, …) -> sonst keine sichtbare Fuellfarbe
+// Keine Gluestack-Semantik-Tokens im N8LY-Tailwind (background-0, outline-100, …) -> sonst keine sichtbare Fuellfarbe
 const MENU_SURFACE_BG = '#FFFFFF';
 
-// PostScript-Namen von @expo-google-fonts/manrope (wie im restlichen N8TLY-UI)
+// PostScript-Namen von @expo-google-fonts/manrope (wie im restlichen N8LY-UI)
 const MENU_ITEM_FONT_MEDIUM = 'Manrope_500Medium';
 const MENU_ITEM_FONT_BOLD = 'Manrope_700Bold';
 

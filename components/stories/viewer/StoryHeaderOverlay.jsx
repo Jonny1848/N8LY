@@ -9,7 +9,7 @@ import { StoryFollowButton } from './StoryFollowButton';
 import { StorySpeakerGlassButton } from './StorySpeakerGlassButton';
 import { storyViewerFontArial } from './constants';
 
-/** Verlauf am Avatar-Ring: Primary/Akzent aus `theme.js` (IG-Style-Ring, aber N8TLY-Farben). */
+/** Verlauf am Avatar-Ring: Primary/Akzent aus `theme.js` (IG-Style-Ring, aber N8LY-Farben). */
 const AVATAR_RING_GRADIENT_COLORS = [
   theme.colors.primary.main3,
   theme.colors.primary.main,
@@ -77,7 +77,7 @@ export function StoryHeaderOverlay({
 
         <View className="flex-1 ml-2.5 justify-center min-h-[46px]">
           <View className="flex-row items-center flex-wrap">
-            <Text className="text-white text-[15px]" style={storyViewerFontArial} numberOfLines={1}>
+            <Text className="text-white text-[15px] font-bold" style={storyViewerFontArial} numberOfLines={1}>
               {displayName}
             </Text>
             <View className="ml-1">

@@ -4,7 +4,7 @@
 const { withPodfile } = require("@expo/config-plugins");
 
 /** Eindeutiger Marker, damit wir bei wiederholtem Prebuild nicht doppelt einfügen. */
-const MARKER = "# FMT_USE_CONSTEVAL fix (N8TLY plugin withFmtPodConstevalFix)";
+const MARKER = "# FMT_USE_CONSTEVAL fix (N8LY plugin withFmtPodConstevalFix)";
 
 /**
  * Ruby-Snippet: C++-Standard fuer das fmt-Pod-Ziel auf C++17 herabsetzen.

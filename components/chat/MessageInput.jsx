@@ -1,19 +1,26 @@
 /**
- * MessageInput – Bottom Input Bar (Layout wie Referenz-Screenshot)
+ * MessageInput – Bottom Input Bar
  *
- * Normal-Modus: + | Input | Send (drei Elemente)
- * Plus oeffnet ShareSheet mit Kamera, Sprachnachricht, Medien etc.
- *
- * Recording/Preview-Modus: Sprachnachricht-Aufnahme (unveraendert)
+ * Normal: + | Input | Mic | Send
+ * Mic-Tap: Mic morpht smooth zur Aufnahme-Pill (Pause + Waveform + X).
+ * Stop/X: Pill collapse → Preview mit Waveform + Play/Pause + Send.
+ * Send: Preview fadet raus, Normal kommt zurueck.
  */
-import { View, Text, TextInput, Pressable, ActivityIndicator, Alert, Platform } from 'react-native';
-import { useState, useEffect, Fragment, forwardRef, useImperativeHandle } from 'react';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Alert, Platform, StyleSheet, Dimensions } from 'react-native';
+import { useState, useEffect, useRef, Fragment, forwardRef, useImperativeHandle, useCallback } from 'react';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  interpolate,
   interpolateColor,
+  Easing,
+  runOnJS,
+  FadeIn,
+  FadeOut,
 } from 'react-native-reanimated';
+import { MicrophoneIcon } from 'react-native-heroicons/solid';
+import { XMarkIcon as XMarkOutline } from 'react-native-heroicons/outline';
 
 import { theme } from '../../constants/theme';
 import { TrashIcon, PlusIcon } from 'react-native-heroicons/outline';
@@ -32,40 +39,42 @@ import {
   useAudioPlayerStatus,
   setAudioModeAsync,
 } from 'expo-audio';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 
+const SCREEN_W = Dimensions.get('window').width;
+const REC_PILL_W = SCREEN_W - 32;
+const MIC_BTN_SIZE = 40;
+const REC_PILL_H = 52;
 
-// expo-document-picker / expo-contacts: NICHT top-level importieren – fehlendes Native-Modul
-// wuerde den Screen brechen. require() in handlePickDocument / handlePickContacts mit Fallback-Alert.
+const REC_EXPAND_MS = 420;
+const REC_COLLAPSE_MS = 340;
+const REC_EASING = Easing.bezier(0.25, 0.1, 0.25, 1);
 
-/**
- * MessageInput – Layout wie Referenz-Screenshot: + | Input | Send
- */
+/** Dauer fuer Crossfade zwischen Modi (Recording ↔ Preview ↔ Normal) */
+const MODE_FADE_MS = 280;
+
 const MessageInput = forwardRef(function MessageInput(
   { onSendText, onSendVoice, onOpenShareSheet, onSendImage, onSendFile, onSendContact },
   ref
 ) {
-  // ============================
-  // Lokaler UI-State
-  // ============================
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
 
-  // Sprachnachrichten: Aufnahme-States (waveformSamples wird in Schritt 4 befuellt)
   const [recording, setRecording] = useState(false);
+  /** true solange die Recording-Pill sichtbar ist (inkl. Collapse-Animation) */
+  const [recBarVisible, setRecBarVisible] = useState(false);
   const [recordedUri, setRecordedUri] = useState(null);
   const [waveformSamples, setWaveformSamples] = useState([]);
   const [uploadingVoice, setUploadingVoice] = useState(false);
 
-  // Kamera / Galerie: Ladezustand waehrend Upload
+  /** Preview-Sichtbarkeit — steuert den Fade-Uebergang */
+  const [showPreview, setShowPreview] = useState(false);
+
   const [uploadingImage, setUploadingImage] = useState(false);
-  // Dokumente: Ladezustand nach Dateiauswahl bis Upload fertig
   const [uploadingFile, setUploadingFile] = useState(false);
-  // Kontakt: nach Auswahl bis Text-Nachricht gesendet
   const [uploadingContact, setUploadingContact] = useState(false);
 
-  // expo-audio: Recorder mit Metering fuer Waveform (Lautstaerke pro Zeitscheibe)
-  // Hinweis: iOS erlaubt record() erst, wenn setAudioModeAsync({ allowsRecording: true }) gesetzt wurde (siehe handleStartRecording).
   const recordingOptions = {
     ...RecordingPresets.HIGH_QUALITY,
     isMeteringEnabled: true,
@@ -73,43 +82,54 @@ const MessageInput = forwardRef(function MessageInput(
   const audioRecorder = useAudioRecorder(recordingOptions);
   const recorderState = useAudioRecorderState(audioRecorder, 16);
 
-  // Audio-Player fuer die Vorschau der eigenen Aufnahme (vor dem Senden)
   const previewPlayer = useAudioPlayer(recordedUri, 16);
   const previewStatus = useAudioPlayerStatus(previewPlayer);
 
-  // Sende-Button nur anzeigen wenn Text vorhanden ist
   const hasContent = inputText.trim().length > 0;
-  /** Visuell „aktiv“ auch waehrend sending — sonst graut der Button sofort aus (Text wird geleert) */
   const sendLooksActive = hasContent || sending;
 
-  /** Sanfter Uebergang inaktiv ↔ aktiv (Hintergrundfarbe + leichte Skalierung) */
+  // ── Send button animation (normal mode) ──
   const sendActive = useSharedValue(0);
   useEffect(() => {
     sendActive.value = withTiming(sendLooksActive ? 1 : 0, { duration: 260 });
   }, [sendLooksActive]);
 
   const sendBtnAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: sendActive.value * 0.06 + 0.94 }],
     backgroundColor: interpolateColor(
       sendActive.value,
       [0, 1],
-      [theme.colors.neutral.gray[300], theme.colors.neutral.gray[800]],
+      [theme.colors.neutral.gray[300], "#74C365"],
     ),
-    transform: [{ scale: sendActive.value * 0.06 + 0.94 }],
   }));
 
-  // Metering waehrend der Aufnahme sammeln (fuer Waveform-Anzeige)
-  // recorderState.metering: dB-Wert (-160 bis 0), wird alle 200ms aktualisiert
+  // ── Recording-Bar expand/collapse ──
+  const recExpand = useSharedValue(0);
+
+  const recPillStyle = useAnimatedStyle(() => {
+    const w = interpolate(recExpand.value, [0, 1], [MIC_BTN_SIZE, REC_PILL_W]);
+    const h = interpolate(recExpand.value, [0, 1], [MIC_BTN_SIZE, REC_PILL_H]);
+    const r = interpolate(recExpand.value, [0, 1], [MIC_BTN_SIZE / 2, REC_PILL_H / 2]);
+    return { width: w, height: h, borderRadius: r };
+  });
+
+  const micIconStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(recExpand.value, [0, 0.25], [1, 0], 'clamp'),
+    transform: [{ scale: interpolate(recExpand.value, [0, 0.3], [1, 0.5], 'clamp') }],
+  }));
+
+  const recControlsStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(recExpand.value, [0.5, 0.85], [0, 1], 'clamp'),
+  }));
+
+  // Metering waehrend Aufnahme sammeln
   useEffect(() => {
     if (!recording || !recorderState.isRecording) return;
     const raw = recorderState.metering;
-    // dB zu 0-1 normalisieren (-60 dB = leise, 0 dB = laut)
-    const normalized =
-      raw == null ? 0.3 : Math.max(0.15, Math.min(1, (raw + 60) / 60));
+    const normalized = raw == null ? 0.3 : Math.max(0.15, Math.min(1, (raw + 60) / 60));
     setWaveformSamples((prev) => [...prev, normalized]);
   }, [recording, recorderState.isRecording, recorderState.metering, recorderState.durationMillis]);
 
- 
-  // Hilfsfunktion: Dauer in mm:ss formatieren
   const formatRecordingTime = (millis) => {
     const totalSec = Math.floor((millis || 0) / 1000);
     const min = Math.floor(totalSec / 60);
@@ -117,340 +137,164 @@ const MessageInput = forwardRef(function MessageInput(
     return `${min}:${sec.toString().padStart(2, '0')}`;
   };
 
-  // ============================
-  // Text-Nachricht senden
-  // ============================
+  // ── Handlers ──
+
   const handleSend = async () => {
     const text = inputText.trim();
     if (!text || sending) return;
-
     setSending(true);
     setInputText('');
-
-    try {
-      await onSendText(text);
-    } catch (err) {
-      console.error('Fehler beim Senden:', err);
-      setInputText(text);
-    } finally {
-      setSending(false);
-    }
+    try { await onSendText(text); }
+    catch (err) { console.error('Fehler beim Senden:', err); setInputText(text); }
+    finally { setSending(false); }
   };
 
-  // ============================
-  // Sprachnachricht: Aufnahme starten
-  // ============================
-  const handleStartRecording = async () => {
+  /** Collapse-Animation: erst nach Abschluss Layout freigeben */
+  const collapseRecPill = useCallback((opts = {}) => {
+    const { goToPreview = false } = opts;
+    recExpand.value = withTiming(0, { duration: REC_COLLAPSE_MS, easing: REC_EASING }, (finished) => {
+      if (finished) {
+        runOnJS(setRecBarVisible)(false);
+        if (goToPreview) runOnJS(setShowPreview)(true);
+      }
+    });
+  }, [recExpand]);
+
+  const handleMicPress = useCallback(async () => {
     try {
       const permStatus = await AudioModule.requestRecordingPermissionsAsync();
-      if (!permStatus.granted) {
-        console.warn('[VOICE] Mikrofon-Berechtigung verweigert');
-        return;
-      }
-      // iOS: Ohne allowsRecording wirft record() RecordingDisabledException (Expo-Audio / AVAudioSession).
-      await setAudioModeAsync({
-        allowsRecording: true,
-        playsInSilentMode: true,
-      });
+      if (!permStatus.granted) { console.warn('[VOICE] Mikrofon-Berechtigung verweigert'); return; }
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       await audioRecorder.prepareToRecordAsync(recordingOptions);
       audioRecorder.record();
       setRecording(true);
+      setRecBarVisible(true);
+      setShowPreview(false);
       setRecordedUri(null);
-      setWaveformSamples([]); // Reset fuer neue Aufnahme
+      setWaveformSamples([]);
+      recExpand.value = withTiming(1, { duration: REC_EXPAND_MS, easing: REC_EASING });
     } catch (err) {
       console.error('[VOICE] Fehler beim Starten der Aufnahme:', err);
-      // Wenn prepare/record scheitert, allowsRecording nicht offen lassen (iOS-Session)
-      try {
-        await setAudioModeAsync({
-          allowsRecording: false,
-          playsInSilentMode: true,
-        });
-      } catch (_) {
-        // ignore
-      }
+      try { await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }); } catch {}
     }
-  };
+  }, [audioRecorder, recExpand]);
 
-  // ============================
-  // Sprachnachricht: Aufnahme stoppen → wechselt in Preview
-  // ============================
-  const handleStopRecording = async () => {
+  const handleStartRecording = handleMicPress;
+
+  /** Stop: Aufnahme beenden → Pill collapse → Preview einblenden */
+  const handleStopRecording = useCallback(async () => {
     try {
       await audioRecorder.stop();
       setRecording(false);
       setRecordedUri(audioRecorder.uri);
-      // Session zurueck: Recording-Flag nur waehrend Aufnahme noetig; Vorschau-Wiedergabe braucht es nicht.
-      await setAudioModeAsync({
-        allowsRecording: false,
-        playsInSilentMode: true,
-      });
+      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
     } catch (err) {
-      console.error('[VOICE] Fehler beim Stoppen der Aufnahme:', err);
+      console.error('[VOICE] Fehler beim Stoppen:', err);
       setRecording(false);
-      try {
-        await setAudioModeAsync({
-          allowsRecording: false,
-          playsInSilentMode: true,
-        });
-      } catch (_) {
-        // ignore
-      }
+      try { await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }); } catch {}
     }
-  };
+    collapseRecPill({ goToPreview: true });
+  }, [audioRecorder, collapseRecPill]);
 
-  // ============================
-  // Sprachnachricht: Aufnahme verwerfen
-  // ============================
-  const handleDiscardRecording = async () => {
-    if (previewStatus.playing) {
-      previewPlayer.pause();
-    }
-    // Wenn waehrend Aufnahme verworfen wird: Recorder stoppen und iOS-Session zuruecksetzen (sonst bleibt Mic-Session aktiv).
+  /** X in Recording-Pill: verwerfen + collapse zurueck zum Normalzustand */
+  const handleRecDismiss = useCallback(async () => {
     if (recording) {
-      try {
-        await audioRecorder.stop();
-      } catch (_) {
-        // ignore — evtl. war prepare/record fehlgeschlagen
-      }
-      try {
-        await setAudioModeAsync({
-          allowsRecording: false,
-          playsInSilentMode: true,
-        });
-      } catch (_) {
-        // ignore
-      }
+      try { await audioRecorder.stop(); } catch {}
+      try { await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }); } catch {}
     }
     setRecording(false);
     setRecordedUri(null);
     setWaveformSamples([]);
-  };
+    collapseRecPill();
+  }, [recording, audioRecorder, collapseRecPill]);
 
-  // ============================
-  // Sprachnachricht: Hochladen und Senden (ueber Parent-Callback)
-  // ============================
+  /** Preview verwerfen: sanfter Fade-Out */
+  const handleDiscardRecording = useCallback(async () => {
+    if (previewStatus.playing) previewPlayer.pause();
+    setShowPreview(false);
+    setRecordedUri(null);
+    setWaveformSamples([]);
+    setRecording(false);
+  }, [previewStatus, previewPlayer]);
+
+  /** Sprachnachricht senden: sanfter Fade-Out der Preview */
   const handleSendVoice = async () => {
     const uri = recordedUri || audioRecorder.uri;
     if (!uri || uploadingVoice) return;
-
     setUploadingVoice(true);
     try {
       await onSendVoice(uri, waveformSamples);
+      setShowPreview(false);
       setRecordedUri(null);
       setWaveformSamples([]);
       setRecording(false);
-    } catch (err) {
-      console.error('[VOICE] Fehler beim Senden der Sprachnachricht:', err);
-    } finally {
-      setUploadingVoice(false);
-    }
+    } catch (err) { console.error('[VOICE] Fehler beim Senden:', err); }
+    finally { setUploadingVoice(false); }
   };
 
-  // ============================
-  // Kamera: Foto aufnehmen und ueber Parent-Callback senden
-  // ============================
   const handleTakePhoto = async () => {
     if (!onSendImage || uploadingImage) return;
-
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Kamera-Zugriff',
-          'Wir benoetigen Zugriff auf deine Kamera, um Fotos aufzunehmen.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        setUploadingImage(true);
-        await onSendImage(result.assets[0].uri);
-      }
-    } catch (err) {
-      console.error('[CAMERA] Fehler beim Aufnehmen/Senden:', err);
-    } finally {
-      setUploadingImage(false);
-    }
+      if (status !== 'granted') { Alert.alert('Kamera-Zugriff', 'Wir benoetigen Zugriff auf deine Kamera.', [{ text: 'OK' }]); return; }
+      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.8 });
+      if (!result.canceled && result.assets[0]) { setUploadingImage(true); await onSendImage(result.assets[0].uri); }
+    } catch (err) { console.error('[CAMERA] Fehler:', err); }
+    finally { setUploadingImage(false); }
   };
 
-  // ============================
-  // Medien: Bild aus Galerie waehlen und ueber Parent-Callback senden
-  // ============================
   const handlePickFromGallery = async () => {
     if (!onSendImage || uploadingImage) return;
-
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Fotozugriff',
-          'Wir benoetigen Zugriff auf deine Fotos, um Bilder zu teilen.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        setUploadingImage(true);
-        await onSendImage(result.assets[0].uri);
-      }
-    } catch (err) {
-      console.error('[MEDIEN] Fehler beim Auswaehlen/Senden:', err);
-    } finally {
-      setUploadingImage(false);
-    }
+      if (status !== 'granted') { Alert.alert('Fotozugriff', 'Wir benoetigen Zugriff auf deine Fotos.', [{ text: 'OK' }]); return; }
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.8 });
+      if (!result.canceled && result.assets[0]) { setUploadingImage(true); await onSendImage(result.assets[0].uri); }
+    } catch (err) { console.error('[MEDIEN] Fehler:', err); }
+    finally { setUploadingImage(false); }
   };
 
-  // ============================
-  // Dokumente: System-Dateiauswahl und Upload ueber Parent (Share Sheet / imperativ)
-  // ============================
   const handlePickDocument = async () => {
     if (!onSendFile || uploadingFile) return;
-
-    /*
-     * Schritt 1: Native-Modul laden.
-     * require() in einem eigenen try/catch: wenn ExpoDocumentPicker nicht im
-     * Dev-Client-Build enthalten ist, faengt das den "Cannot find native module"-
-     * Fehler ab und zeigt dem User eine hilfreiche Meldung statt eines Red-Screen.
-     */
     let getDocumentAsync;
-    try {
-      const mod = require('expo-document-picker');
-      getDocumentAsync = mod.getDocumentAsync ?? mod.default?.getDocumentAsync;
-    } catch {
-      // Native-Modul fehlt im Build
-    }
-
+    try { const mod = require('expo-document-picker'); getDocumentAsync = mod.getDocumentAsync ?? mod.default?.getDocumentAsync; } catch {}
     if (typeof getDocumentAsync !== 'function') {
-      Alert.alert(
-        'Nicht verfuegbar',
-        'Der Dokumenten-Picker ist in diesem Build nicht enthalten. '
-        + 'Bitte erstelle einen neuen Dev-Client mit „npx expo run:ios" bzw. „npx expo run:android".',
-        [{ text: 'OK' }],
-      );
+      Alert.alert('Nicht verfuegbar', 'Dokumenten-Picker fehlt im Build.', [{ text: 'OK' }]);
       return;
     }
-
-    // Schritt 2: Datei auswaehlen und hochladen
     try {
-      const result = await getDocumentAsync({
-        type: '*/*',
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
-
+      const result = await getDocumentAsync({ type: '*/*', copyToCacheDirectory: true, multiple: false });
       if (result.canceled || !result.assets?.length) return;
-
       const asset = result.assets[0];
       setUploadingFile(true);
-      await onSendFile(asset.uri, {
-        name: asset.name,
-        mimeType: asset.mimeType,
-      });
+      await onSendFile(asset.uri, { name: asset.name, mimeType: asset.mimeType });
     } catch (err) {
-      console.error('[DOKUMENTE] Fehler beim Auswaehlen oder Senden:', err);
-      Alert.alert(
-        'Datei',
-        'Die Datei konnte nicht gesendet werden. Bitte versuche es erneut.',
-        [{ text: 'OK' }],
-      );
-    } finally {
-      setUploadingFile(false);
-    }
+      console.error('[DOKUMENTE] Fehler:', err);
+      Alert.alert('Datei', 'Die Datei konnte nicht gesendet werden.', [{ text: 'OK' }]);
+    } finally { setUploadingFile(false); }
   };
 
-  // ============================
-  // Kontakte: nativer Picker (presentContactPickerAsync), Senden ueber Parent
-  // ============================
   const handlePickContacts = async () => {
     if (!onSendContact || uploadingContact) return;
-
-    /** Telefonnummer aus expo-contacts-Objekt (Primaernummer bevorzugt). */
-    const pickPhoneFromContact = (contact) => {
-      const nums = contact?.phoneNumbers;
-      if (!nums?.length) return null;
-      const primary = nums.find((p) => p.isPrimary) ?? nums[0];
-      const raw = primary?.number?.trim() || primary?.digits;
-      return raw || null;
-    };
-
-    /** Anzeigename aus Kontakt (name oder Vor-/Nachname). */
-    const displayNameFromContact = (contact) => {
-      if (contact.name?.trim()) return contact.name.trim();
-      const parts = [contact.firstName, contact.lastName].filter(Boolean);
-      const joined = parts.join(' ').trim();
-      return joined || 'Kontakt';
-    };
-
+    const pickPhoneFromContact = (c) => { const nums = c?.phoneNumbers; if (!nums?.length) return null; const p = nums.find((n) => n.isPrimary) ?? nums[0]; return p?.number?.trim() || p?.digits || null; };
+    const displayNameFromContact = (c) => { if (c.name?.trim()) return c.name.trim(); return [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || 'Kontakt'; };
     let Contacts;
+    try { Contacts = require('expo-contacts'); } catch { Contacts = null; }
+    if (!Contacts?.presentContactPickerAsync) { Alert.alert('Nicht verfuegbar', 'Kontakte fehlen im Build.', [{ text: 'OK' }]); return; }
     try {
-      Contacts = require('expo-contacts');
-    } catch {
-      Contacts = null;
-    }
-    if (!Contacts?.presentContactPickerAsync) {
-      Alert.alert(
-        'Nicht verfuegbar',
-        'Kontakte sind in diesem Build nicht eingebunden. Bitte App neu bauen (expo run:ios / android).',
-        [{ text: 'OK' }],
-      );
-      return;
-    }
-
-    try {
-      // Android: READ_CONTACTS fuer den Picker noetig; iOS oeffnet den Picker ohne vollstaendigen Adressbuch-Zugriff
-      if (Platform.OS === 'android') {
-        const { status } = await Contacts.requestPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert(
-            'Kontakt-Zugriff',
-            'Wir benoetigen Zugriff auf deine Kontakte, um einen Kontakt auszuwaehlen.',
-            [{ text: 'OK' }],
-          );
-          return;
-        }
-      }
-
+      if (Platform.OS === 'android') { const { status } = await Contacts.requestPermissionsAsync(); if (status !== 'granted') { Alert.alert('Kontakt-Zugriff', 'Zugriff auf Kontakte noetig.', [{ text: 'OK' }]); return; } }
       const contact = await Contacts.presentContactPickerAsync();
       if (!contact) return;
-
       const phone = pickPhoneFromContact(contact);
-      if (!phone) {
-        Alert.alert('Keine Telefonnummer', 'Dieser Kontakt hat keine gespeicherte Nummer.', [{ text: 'OK' }]);
-        return;
-      }
-
-      const name = displayNameFromContact(contact);
+      if (!phone) { Alert.alert('Keine Telefonnummer', 'Dieser Kontakt hat keine Nummer.', [{ text: 'OK' }]); return; }
       setUploadingContact(true);
-      await onSendContact({ displayName: name, phone });
+      await onSendContact({ displayName: displayNameFromContact(contact), phone });
     } catch (err) {
-      console.error('[KONTAKTE] Fehler beim Auswaehlen oder Senden:', err);
-      Alert.alert(
-        'Kontakt',
-        'Der Kontakt konnte nicht gesendet werden. Bitte versuche es erneut.',
-        [{ text: 'OK' }],
-      );
-    } finally {
-      setUploadingContact(false);
-    }
+      console.error('[KONTAKTE] Fehler:', err);
+      Alert.alert('Kontakt', 'Kontakt konnte nicht gesendet werden.', [{ text: 'OK' }]);
+    } finally { setUploadingContact(false); }
   };
 
-  // Imperative Handle: Kamera, Medien, Voice, Dokumente vom ShareSheet ausloesen
   useImperativeHandle(ref, () => ({
     openCamera: handleTakePhoto,
     openMediaLibrary: handlePickFromGallery,
@@ -459,67 +303,147 @@ const MessageInput = forwardRef(function MessageInput(
     openContactsPicker: handlePickContacts,
   }));
 
-  /** Preview-Wiedergabe umschalten (Play/Pause) */
   const togglePreviewPlayback = () => {
-    if (previewStatus.playing) {
-      previewPlayer.pause();
-    } else {
-      if (previewStatus.currentTime >= previewStatus.duration && previewStatus.duration > 0) {
-        previewPlayer.seekTo(0);
-      }
+    if (previewStatus.playing) { previewPlayer.pause(); }
+    else {
+      if (previewStatus.currentTime >= previewStatus.duration && previewStatus.duration > 0) previewPlayer.seekTo(0);
       previewPlayer.play();
     }
   };
 
+  // ── Shared Send-Button (normal mode) ──
+  const renderSendButton = ({ onPress, disabled, isLoading }) => (
+    <Pressable onPress={onPress} disabled={disabled} className="shrink-0">
+      <Animated.View
+        className="w-10 h-10 rounded-full items-center justify-center"
+        style={sendBtnAnimStyle}
+      >
+        {isLoading ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <PaperAirplaneIcon size={20} strokeWidth={2.5} color="#FFFFFF" />
+        )}
+      </Animated.View>
+    </Pressable>
+  );
+
+  // ── Waveform: Recording-Pill (live) ──
+  const renderRecordingWaveform = () => {
+    const maxBars = 28;
+    const samples = waveformSamples.slice(-maxBars);
+    return (
+      <View className="flex-1 flex-row items-center justify-center gap-[3px] mx-2">
+        {samples.map((v, i) => (
+          <View
+            key={i}
+            style={{
+              width: 2.5,
+              height: Math.max(4, v * 20),
+              borderRadius: 1.5,
+              backgroundColor: 'rgba(255,255,255,0.85)',
+            }}
+          />
+        ))}
+      </View>
+    );
+  };
+
+  // ── Waveform: Preview (statisch, mit Fortschrittsanzeige) ──
+  const renderPreviewWaveform = () => {
+    const maxBars = 36;
+    const samples = waveformSamples.length > 0 ? waveformSamples : [];
+    if (samples.length === 0) return <View className="flex-1" />;
+
+    // Samples auf maxBars normalisieren (Downsampling oder Padding)
+    let displaySamples;
+    if (samples.length >= maxBars) {
+      const step = samples.length / maxBars;
+      displaySamples = Array.from({ length: maxBars }, (_, i) => {
+        const idx = Math.floor(i * step);
+        return samples[Math.min(idx, samples.length - 1)];
+      });
+    } else {
+      displaySamples = [...samples];
+      while (displaySamples.length < maxBars) displaySamples.push(0.15);
+    }
+
+    // Fortschritt berechnen: welcher Anteil der Bars ist „abgespielt"
+    const progress = previewStatus.duration > 0
+      ? previewStatus.currentTime / previewStatus.duration
+      : 0;
+    const activeBars = Math.floor(progress * displaySamples.length);
+
+    return (
+      <View className="flex-1 flex-row items-center justify-center gap-[2.5px]">
+        {displaySamples.map((v, i) => {
+          const isActive = i <= activeBars;
+          return (
+            <View
+              key={i}
+              style={{
+                width: 3,
+                height: Math.max(4, v * 24),
+                borderRadius: 1.5,
+                backgroundColor: isActive
+                  ? theme.colors.primary.main3
+                  : theme.colors.neutral.gray[300],
+              }}
+            />
+          );
+        })}
+      </View>
+    );
+  };
+
+  // Bestimme welcher Modus aktiv ist
+  const isNormal = !recBarVisible && !showPreview;
+
   // ============================
-  // RENDER – Drei Modi (ohne Schatten, duenne Trennlinie oben wie Screenshot)
+  // RENDER
   // ============================
   return (
     <Fragment>
-    {/* Wrapper: duenne Linie oben trennt Input vom Chat, mehr Platz nach oben, clean */}
     <View className="bg-white border-t border-gray-200 px-4 pt-5 pb-4">
       <View className="flex-row items-center gap-3 min-h-[56px]">
-      {recording ? (
-        /* ========== RECORDING-MODUS ========== */
-        <>
-          <Pressable className="w-10 h-10 items-center justify-center" onPress={handleDiscardRecording}>
-            <TrashIcon size={24} strokeWidth={2} color="#EF4444" />
-          </Pressable>
-          <View className="flex-1 flex-row items-center justify-center mx-2">
-            <View className="w-2.5 h-2.5 rounded-full bg-red-500 mr-2" />
-            <Text className="text-lg font-bold text-gray-900 mr-2" style={{ fontFamily: 'Manrope_700Bold' }}>
-              {formatRecordingTime(recorderState.durationMillis)}
-            </Text>
-            <Text className="text-sm text-gray-500" style={{ fontFamily: 'Manrope_400Regular' }}>Aufnahme...</Text>
-          </View>
+
+      {/* ── PREVIEW-MODUS: Waveform + Play/Pause + Send ── */}
+      {showPreview && (
+        <Animated.View
+          entering={FadeIn.duration(MODE_FADE_MS)}
+          exiting={FadeOut.duration(MODE_FADE_MS)}
+          className="flex-1 flex-row items-center gap-3"
+        >
+          {/* Verwerfen */}
           <Pressable
-            className="w-10 h-10 rounded-full bg-red-500 items-center justify-center"
-            onPress={handleStopRecording}
+            className="w-10 h-10 items-center justify-center rounded-full"
+            style={{ backgroundColor: '#FEE2E2' }}
+            onPress={handleDiscardRecording}
           >
-            <StopIcon size={18} color="#FFFFFF" />
+            <TrashIcon size={20} strokeWidth={2} color="#EF4444" />
           </Pressable>
-        </>
-      ) : recordedUri ? (
-        /* ========== PREVIEW-MODUS ========== */
-        <>
-          <Pressable className="w-10 h-10 items-center justify-center" onPress={handleDiscardRecording}>
-            <TrashIcon size={24} strokeWidth={2} color="#EF4444" />
-          </Pressable>
-          <View className="flex-1 flex-row items-center bg-gray-100 rounded-3xl px-3 py-2.5 mx-2">
-            <Pressable onPress={togglePreviewPlayback} className="w-8 h-8 rounded-full bg-white items-center justify-center mr-2.5">
+
+          {/* Player-Pill mit Waveform */}
+          <View className="flex-1 flex-row items-center bg-gray-100 rounded-full px-3 py-3">
+            {/* Play/Pause in Lila */}
+            <Pressable
+              onPress={togglePreviewPlayback}
+              className="w-8 h-8 rounded-full items-center justify-center mr-2.5"
+              style={{ backgroundColor: theme.colors.primary.main }}
+            >
               {previewStatus.playing ? (
-                <PauseIcon size={16} color={theme.colors.primary.main} />
+                <PauseIcon size={14} color="#FFFFFF" />
               ) : (
-                <PlayIcon size={16} color={theme.colors.primary.main} />
+                <PlayIcon size={14} color="#FFFFFF" />
               )}
             </Pressable>
-            <View className="flex-1 h-1 rounded bg-gray-200 overflow-hidden">
-              <View
-                className="h-full rounded bg-n8tly-blue"
-                style={{ width: `${previewStatus.duration > 0 ? (previewStatus.currentTime / previewStatus.duration) * 100 : 0}%` }}
-              />
-            </View>
-            <Text className="text-xs font-semibold text-gray-600 ml-2.5 min-w-[32px]" style={{ fontFamily: 'Manrope_600SemiBold' }}>
+
+            {/* Waveform statt Fortschrittsbalken */}
+            {renderPreviewWaveform()}
+
+            <Text
+              className="text-xs text-gray-500 ml-2.5 min-w-[32px] text-right"
+              style={{ fontFamily: 'Manrope_600SemiBold' }}
+            >
               {formatRecordingTime(
                 previewStatus.playing || previewStatus.currentTime > 0
                   ? previewStatus.currentTime * 1000
@@ -527,69 +451,119 @@ const MessageInput = forwardRef(function MessageInput(
               )}
             </Text>
           </View>
-          <Pressable
-            className="w-10 h-10 rounded-full bg-n8tly-blue items-center justify-center"
-            onPress={handleSendVoice}
-            disabled={uploadingVoice}
-          >
-            {uploadingVoice ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <PaperAirplaneIcon size={20} strokeWidth={2.5} color="#FFFFFF" />
-            )}
-          </Pressable>
-        </>
-      ) : (
-        /* ========== NORMALER MODUS – Screenshot: + | Input (weiss, duenne Border) | Send ========== */
-        <>
-          {/* Plus-Button: hellgrau, circular (kann waehrend Dokument-Upload kurz blockiert sein) */}
-          <Pressable
-            className="w-10 h-10 rounded-full bg-gray-200 items-center justify-center shrink-0"
-            onPress={onOpenShareSheet}
-            disabled={uploadingFile}
-          >
-            {uploadingFile ? (
-              <ActivityIndicator size="small" color={theme.colors.neutral.gray[800]} />
-            ) : (
-              <PlusIcon size={22} strokeWidth={2.5} color={theme.colors.neutral.gray[800]} />
-            )}
-          </Pressable>
 
-          {/* Eingabefeld: weiss, staerkere Umrandung, pill-foermig */}
-          <TextInput
-            className="flex-1 bg-gray-50 border-2 border-gray-300 rounded-full px-4 py-3 text-base text-gray-900 max-h-[100px]"
-            placeholder="Nachricht eingeben..."
-            placeholderTextColor={theme.colors.neutral.gray[400]}
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-            maxLength={2000}
-            style={{ fontFamily: 'Manrope_400Regular' }}
-          />
-
-          {/* Sende-Button: animierter Uebergang inaktiv (hellgrau) → aktiv (dunkelgrau) */}
-          <Pressable
-            onPress={handleSend}
-            disabled={!hasContent || sending}
-            className="shrink-0"
-          >
-            <Animated.View
+          {/* Send — immer aktiv */}
+          <Pressable onPress={handleSendVoice} disabled={uploadingVoice} className="shrink-0">
+            <View
               className="w-10 h-10 rounded-full items-center justify-center"
-              style={sendBtnAnimStyle}
+              style={{ backgroundColor: "#74C365" }}
             >
-              {sending ? (
+              {uploadingVoice ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <PaperAirplaneIcon size={20} strokeWidth={2.5} color="#FFFFFF" />
               )}
-            </Animated.View>
+            </View>
           </Pressable>
-        </>
+        </Animated.View>
       )}
+
+      {/* ── NORMALER MODUS + RECORDING-MODUS ── */}
+      {!showPreview && (
+        <Animated.View
+          entering={FadeIn.duration(MODE_FADE_MS)}
+          exiting={FadeOut.duration(MODE_FADE_MS)}
+          className="flex-1 flex-row items-center gap-3"
+        >
+          {/* Plus-Button */}
+          {!recBarVisible && (
+            <Pressable
+              className="w-10 h-10 rounded-full bg-gray-200 items-center justify-center shrink-0"
+              onPress={onOpenShareSheet}
+              disabled={uploadingFile}
+            >
+              {uploadingFile ? (
+                <ActivityIndicator size="small" color={theme.colors.neutral.gray[800]} />
+              ) : (
+                <PlusIcon size={22} strokeWidth={2.5} color={theme.colors.neutral.gray[800]} />
+              )}
+            </Pressable>
+          )}
+
+          {/* Textfeld */}
+          {!recBarVisible && (
+            <TextInput
+              className="flex-1 bg-gray-50 border-2 border-gray-300 rounded-full px-4 py-3 text-base text-gray-900 max-h-[100px]"
+              placeholder="Nachricht eingeben..."
+              placeholderTextColor={theme.colors.neutral.gray[400]}
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+              maxLength={2000}
+              style={{ fontFamily: 'Manrope_400Regular' }}
+            />
+          )}
+
+          {/* ── Mic / Recording-Pill ── */}
+          <Animated.View
+            style={[
+              s.recPillWrap,
+              recPillStyle,
+              recBarVisible && { flex: 1 },
+            ]}
+          >
+            <View style={[StyleSheet.absoluteFillObject, { borderRadius: 999, backgroundColor: theme.colors.primary.main }]} />
+
+            {/* Mic-Icon (collapsed) */}
+            <Animated.View style={[s.micIconWrap, micIconStyle]} pointerEvents={recBarVisible ? 'none' : 'auto'}>
+              <Pressable onPress={handleMicPress} hitSlop={8}>
+                <MicrophoneIcon size={22} color="#FFFFFF" />
+              </Pressable>
+            </Animated.View>
+
+            {/* Recording-Controls (expanded) */}
+            <Animated.View style={[s.recControlsWrap, recControlsStyle]} pointerEvents={recBarVisible ? 'auto' : 'none'}>
+              <Pressable onPress={handleStopRecording} className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.25)' }}>
+                <PauseIcon size={18} color="#FFFFFF" />
+              </Pressable>
+
+              {renderRecordingWaveform()}
+
+              <Pressable onPress={handleRecDismiss} className="w-9 h-9 rounded-full bg-white items-center justify-center">
+                <XMarkOutline size={18} strokeWidth={2.5} color={theme.colors.primary.main2} />
+              </Pressable>
+            </Animated.View>
+          </Animated.View>
+
+          {/* Send (normal mode) */}
+          {!recBarVisible && renderSendButton({ onPress: handleSend, disabled: !hasContent || sending, isLoading: sending })}
+        </Animated.View>
+      )}
+
       </View>
     </View>
     </Fragment>
   );
+});
+
+const s = StyleSheet.create({
+  recPillWrap: {
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+  },
+  micIconWrap: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recControlsWrap: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
 });
 
 export default MessageInput;

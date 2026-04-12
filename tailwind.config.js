@@ -11,8 +11,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // N8TLY Brand Blue (Chat-Bubbles, Buttons)
-        'n8tly-blue': '#0066FF',
+        // N8LY Brand Blue (Chat-Bubbles, Buttons)
+        'N8LY-blue': '#0066FF',
         // Minimalistische Farbpalette
         primary: {
           DEFAULT: '#1F2937',

@@ -237,7 +237,7 @@ export default function StoryCamera({ onCaptured, onOpenGallery, onClose }) {
   if (!camPerm.granted) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.hint}>Kamerazugriff wird benoetigt.</Text>
+        <Text style={styles.hint}>Kamerazugriff wird benötigt.</Text>
         <Pressable onPress={requestCamPerm} style={styles.btnLight}>
           <Text style={styles.btnLightText}>Erlauben</Text>
         </Pressable>

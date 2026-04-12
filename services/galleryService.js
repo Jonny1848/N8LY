@@ -3,7 +3,7 @@
  * Gallery Service – Bildergalerie/Collage pro Chat (USP!)
  * =============================================================
  *
- * Verwaltet die Chat-Gallery – das Alleinstellungsmerkmal von N8TLY.
+ * Verwaltet die Chat-Gallery – das Alleinstellungsmerkmal von N8LY.
  * Jeder Chat hat eine eigene Medien-Galerie, in der alle geteilten
  * Bilder als Collage/Grid angezeigt werden koennen.
  *

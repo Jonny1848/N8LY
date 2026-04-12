@@ -24,11 +24,13 @@ import {
  * Emoji-Kapsel: iOS Liquid Glass wenn verfuegbar, sonst Blur + mattes Overlay.
  * isSelected: Ring + leichte Skalierung (eigene Reaktion bzw. Smiley wenn schon gewaehlt).
  * Press: tieferes Eindruecken, kurzer Pop beim Loslassen.
+ * disabled: z. B. eigene Story — Anzeige bleibt, keine Reaktion moeglich.
  */
 export function StoryReactionGlassChip({
   useGlass,
   isRound,
   isSelected = false,
+  disabled = false,
   onPress,
   accessibilityLabel,
   children,
@@ -50,10 +52,12 @@ export function StoryReactionGlassChip({
   }));
 
   const onPressIn = () => {
+    if (disabled) return;
     scale.value = withTiming(STORY_REACTION_PRESS_IN_SCALE, { duration: STORY_REACTION_PRESS_IN_MS });
     opacitySv.value = withTiming(STORY_PRESS_IN_OPACITY, { duration: STORY_REACTION_PRESS_IN_MS });
   };
   const onPressOut = () => {
+    if (disabled) return;
     opacitySv.value = withSpring(1, STORY_PRESS_SPRING_CONFIG);
     scale.value = withSequence(
       withSpring(1.1, STORY_REACTION_PRESS_POP_SPRING),
@@ -95,10 +99,12 @@ export function StoryReactionGlassChip({
         style={[wrapStyle, selectedRingStyle]}
       >
         <Pressable
+          disabled={disabled}
           onPress={onPress}
           onPressIn={onPressIn}
           onPressOut={onPressOut}
           accessibilityRole="button"
+          accessibilityState={{ disabled }}
           accessibilityLabel={accessibilityLabel}
           className={pressableShellClass}
         >
@@ -120,10 +126,12 @@ export function StoryReactionGlassChip({
         style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(28,28,34,0.38)' }]}
       />
       <Pressable
+        disabled={disabled}
         onPress={onPress}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
         accessibilityRole="button"
+        accessibilityState={{ disabled }}
         accessibilityLabel={accessibilityLabel}
         className={pressableShellClass}
       >

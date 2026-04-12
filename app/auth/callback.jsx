@@ -1,5 +1,5 @@
 /**
- * OAuth Callback Screen – Deep-Link n8tly://auth/callback
+ * OAuth Callback Screen – Deep-Link N8LY://auth/callback
  *
  * Wird gemountet, wenn App per Deep-Link geöffnet wird (z.B. nach Google OAuth).
  * Linking.getInitialURL() liefert die URL mit #access_token=... & #refresh_token=...

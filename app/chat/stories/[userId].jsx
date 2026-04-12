@@ -144,7 +144,8 @@ export default function StoryViewerScreen() {
       }
       setActiveIndex((i) => {
         if (i >= stories.length - 1) {
-          router.back();
+          // Synchrones router.back() im Updater triggert „Cannot update component while rendering“ — erst nach diesem Commit.
+          queueMicrotask(() => router.back());
           return i;
         }
         return i + 1;
@@ -159,10 +160,12 @@ export default function StoryViewerScreen() {
   }, [stories.length]);
 
   const canStoryReactionGlass = Platform.OS === 'ios' && isGlassEffectAPIAvailable();
+  /* Reaktionszeile auch bei eigener Story sichtbar (nur Lesen) — gleicher Abstand zur Side-Rail */
   const sideRailBottomOffset =
     insets.bottom +
     REACTION_BOTTOM_PAD +
-    (isOwn ? 8 : REACTION_ROW_PILL_HEIGHT + REACTION_TO_SIDE_RAIL_GAP) +
+    REACTION_ROW_PILL_HEIGHT +
+    REACTION_TO_SIDE_RAIL_GAP +
     SIDE_RAIL_EXTRA_LIFT;
 
   const activeStory = stories[activeIndex];

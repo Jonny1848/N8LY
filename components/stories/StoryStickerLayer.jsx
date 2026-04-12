@@ -1,8 +1,10 @@
 /**
  * Sticker: Emoji-Schicht (Zeichen aus Emoji-Picker), verschiebbar; optional Skalierung (Groesse).
+ * Gestrichelter Rahmen nur, solange die Sticker-Style-Leiste aktiv ist (Bearbeitung),
+ * nicht bei reiner Auswahl ohne Leiste oder nach Export.
  */
 import { useRef } from 'react';
-import { View, Text, PanResponder, StyleSheet } from 'react-native';
+import { View, Text, PanResponder, StyleSheet, Platform } from 'react-native';
 
 const BASE_EMOJI_PX = 42;
 
@@ -14,16 +16,26 @@ const BASE_EMOJI_PX = 42;
  *   onSelect: (id: string) => void,
  *   canvasW: number,
  *   canvasH: number,
+ *   /** true, wenn Sticker-Leiste sichtbar (Groesse) — dann gestrichelter Rahmen am gewaehlten Sticker
+ *   showEditChrome?: boolean,
  * }} props
  */
-export default function StoryStickerLayer({ stickers, onStickerChange, selectedId, onSelect, canvasW, canvasH }) {
+export default function StoryStickerLayer({
+  stickers,
+  onStickerChange,
+  selectedId,
+  onSelect,
+  canvasW,
+  canvasH,
+  showEditChrome = false,
+}) {
   return (
     <>
       {stickers.map((s) => (
         <DraggableSticker
           key={s.id}
           sticker={s}
-          selected={selectedId === s.id}
+          showDashedChrome={showEditChrome && selectedId === s.id}
           onChange={(patch) => onStickerChange(s.id, patch)}
           onSelectSticker={() => onSelect(s.id)}
           canvasW={canvasW}
@@ -34,7 +46,7 @@ export default function StoryStickerLayer({ stickers, onStickerChange, selectedI
   );
 }
 
-function DraggableSticker({ sticker, selected, onChange, onSelectSticker, canvasW, canvasH }) {
+function DraggableSticker({ sticker, showDashedChrome, onChange, onSelectSticker, canvasW, canvasH }) {
   const start = useRef({ x: 0, y: 0 });
   const moved = useRef(false);
   const scale = sticker.scale ?? 1;
@@ -66,7 +78,7 @@ function DraggableSticker({ sticker, selected, onChange, onSelectSticker, canvas
       style={[
         styles.abs,
         { left: sticker.x, top: sticker.y, zIndex: 6 },
-        selected && styles.selectedRing,
+        showDashedChrome && styles.dashedEditChrome,
       ]}
       {...pan.panHandlers}
     >
@@ -77,11 +89,13 @@ function DraggableSticker({ sticker, selected, onChange, onSelectSticker, canvas
 
 const styles = StyleSheet.create({
   abs: { position: 'absolute' },
-  selectedRing: {
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: 'rgba(255,255,255,0.75)',
+  dashedEditChrome: {
     borderRadius: 12,
-    padding: 2,
+    padding: 4,
+    borderWidth: Platform.OS === 'android' ? 1.5 : 1,
+    borderColor: 'rgba(255,255,255,0.92)',
+    borderStyle: 'dashed',
+    backgroundColor: 'transparent',
   },
   emoji: {},
 });

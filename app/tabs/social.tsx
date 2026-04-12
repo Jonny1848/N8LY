@@ -53,7 +53,10 @@ const STORY_RING_IDLE_ON_BLUE = 'rgba(255,255,255,0.42)';
 /**
  * Untere Rundung der blauen Kopf-Karte zum weissen Chat-Bereich darunter.
  */
-const HEADER_CARD_BOTTOM_RADIUS = 44;
+const HEADER_CARD_BOTTOM_RADIUS = 0;
+
+/** Weissraum unter der Story-Karte, bevor die Chatliste optisch neu beginnt */
+const CHAT_LIST_TOP_SPACING = 28;
 
 export default function SocialScreen() {
   const userId = useAuthStore((s) => s.userId);
@@ -188,9 +191,9 @@ export default function SocialScreen() {
     }
   };
 
-  /** Plus-Button: oeffnet den kombinierten Neuer-Chat/Neue-Gruppe Screen */
+  /** Plus-Button: oeffnet „Neuer Chat" (Einzel- oder Mehrpersonen) */
   const onNewChatPress = useCallback(() => {
-    router.push('/new-group');
+    router.push('/new-chat');
   }, [router]);
 
   // ============================
@@ -448,16 +451,24 @@ export default function SocialScreen() {
   // EINZELNE CHAT-ZEILE
   // Runder Avatar, Name, Vorschau, Zeit, Unread-Badge
   // ============================
-  const renderConversationItem = ({ item }: { item: any }) => (
+  const renderConversationItem = ({ item }: { item: any }) => {
+    /** Gruppen: avatar_url aus DB, falls displayAvatar fehlt (z. B. nach Reload) */
+    const avatarUri =
+      (typeof item.displayAvatar === 'string' && item.displayAvatar.trim()) ||
+      (item.type === 'group' && typeof item.avatar_url === 'string' && item.avatar_url.trim()
+        ? item.avatar_url.trim()
+        : '');
+
+    return (
     <Pressable
       className="flex-row items-center px-5 py-3.5 active:opacity-70"
       onPress={() => router.push(`/chat/${item.id}`)}
     >
       {/* Runder Avatar */}
       <View className="relative">
-        {item.displayAvatar ? (
+        {avatarUri ? (
           <Image
-            source={{ uri: item.displayAvatar }}
+            source={{ uri: avatarUri }}
             className="w-[52px] h-[52px] rounded-full"
             style={{ backgroundColor: theme.colors.neutral.gray[100] }}
           />
@@ -526,12 +537,41 @@ export default function SocialScreen() {
         </View>
       </View>
     </Pressable>
-  );
+    );
+  };
 
   // ============================
   // LEERER ZUSTAND (keine Chats) — Layout wie gaengige „No messages“-Screens:
   // Illustration mit Kreis + Liste, darunter Headline + Subline (zentriert, ohne Rahmenkarte).
   // ============================
+  /**
+   * Trennt Story-Bereich und Chatliste: Abstand, kleine Sektionszeile, Haarlinie.
+   * Nur sichtbar wenn Konversationen vorhanden (sonst Empty State ohne Balken).
+   */
+  const renderChatListHeader = () => {
+    if (filteredConversations.length === 0) return null;
+    return (
+      <View className="bg-white" style={{ paddingTop: CHAT_LIST_TOP_SPACING }}>
+        <View className="px-5 pb-3">
+          <Text
+            className="text-[13px] mb-3"
+            style={{
+              fontFamily: 'Manrope_600SemiBold',
+              color: theme.colors.neutral.gray[500],
+              letterSpacing: 0.3,
+            }}
+          >
+            Konversationen
+          </Text>
+          <View
+            className="h-px w-full"
+            style={{ backgroundColor: theme.colors.neutral.gray[200] }}
+          />
+        </View>
+      </View>
+    );
+  };
+
   const renderEmptyState = () => (
     <View className="flex-1 items-center justify-center px-6">
       <ChatsEmptyStateIllustration />
@@ -549,7 +589,7 @@ export default function SocialScreen() {
           maxWidth: 300,
         }}
       >
-        Lade jemanden aus deiner Community zum Chat ein
+        Lade jemanden aus deiner Community zum Chat ein!
       </Text>
     </View>
   );
@@ -561,27 +601,37 @@ export default function SocialScreen() {
       {/* Helle Icons in der Statusleiste auf blauem Kopf */}
       <StatusBar style="light" />
       {/*
-        Kopf: LinearGradient vertikal — main oben, main2 unten (y: 0 → y: 1).
+        Kopf: Schatten auf einem Wrapper (iOS: zuverlaessiger als nur am Gradient).
+        LinearGradient innen mit gleicher unterer Rundung.
       */}
-      <LinearGradient
-        colors={[theme.colors.primary.main3, theme.colors.primary.main2]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
+      <View
         style={{
-          paddingTop: insets.top,
+          zIndex: 2,
           borderBottomLeftRadius: HEADER_CARD_BOTTOM_RADIUS,
           borderBottomRightRadius: HEADER_CARD_BOTTOM_RADIUS,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: 12 },
-          shadowOpacity: 0.14,
-          shadowRadius: 24,
-          elevation: 10,
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.22,
+          shadowRadius: 18,
+          elevation: 14,
         }}
       >
-        {renderHeader()}
-        {renderSearchBar()}
-        {renderStorySection()}
-      </LinearGradient>
+        <LinearGradient
+          colors={[theme.colors.primary.main3, theme.colors.primary.main3]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={{
+            paddingTop: insets.top,
+            borderBottomLeftRadius: HEADER_CARD_BOTTOM_RADIUS,
+            borderBottomRightRadius: HEADER_CARD_BOTTOM_RADIUS,
+            overflow: 'hidden',
+          }}
+        >
+          {renderHeader()}
+          {renderSearchBar()}
+          {renderStorySection()}
+        </LinearGradient>
+      </View>
 
       {loading ? (
         <View className="flex-1 items-center justify-center bg-white">
@@ -593,6 +643,7 @@ export default function SocialScreen() {
           data={filteredConversations}
           keyExtractor={(item) => item.id}
           renderItem={renderConversationItem}
+          ListHeaderComponent={renderChatListHeader}
           ListEmptyComponent={renderEmptyState}
           ItemSeparatorComponent={() => (
             <View className="h-px bg-gray-200 mx-5" />

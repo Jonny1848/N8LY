@@ -12,7 +12,7 @@ import {
   PhotoIcon,
   MapPinIcon,
   CameraIcon,
-  MicrophoneIcon,
+  ClipboardDocumentListIcon,
   UserGroupIcon,
 } from 'react-native-heroicons/outline';
 
@@ -38,10 +38,10 @@ const SHARE_OPTIONS = [
     iconColor: '#2563EB',
   },
   {
-    key: 'voice',
-    Icon: MicrophoneIcon,
-    label: 'Sprachnachricht',
-    subtitle: 'Audio aufnehmen',
+    key: 'poll',
+    Icon: ClipboardDocumentListIcon,
+    label: 'Umfrage',
+    subtitle: 'Abstimmung erstellen',
     iconBgClass: 'bg-purple-50',
     iconColor: '#9333EA',
   },

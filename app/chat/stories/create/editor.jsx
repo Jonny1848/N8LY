@@ -287,6 +287,9 @@ export default function StoryEditorScreen() {
         ? 'text'
         : 'effects';
 
+  /** Gestrichelte Sticker-Umrandung nur mit Sticker-Style-Leiste (nicht bei Effekt-Palette / nur markiert) */
+  const showStickerEditChrome = styleBarVisible && styleBarVariant === 'sticker';
+
   const proceedPhoto = async () => {
     if (!clip || !shotRef.current) return;
     try {
@@ -413,10 +416,11 @@ export default function StoryEditorScreen() {
           <StoryTextOverlay
             items={texts}
             onItemChange={(id, patch) => changeTextItem(id, patch)}
-            selectedId={selectedTextId}
             onSelect={onSelectText}
             canvasW={previewW}
             canvasH={previewH}
+            editingTextId={editingTextId}
+            textModalOpen={textModal}
           />
           <StoryStickerLayer
             stickers={stickers}
@@ -425,6 +429,7 @@ export default function StoryEditorScreen() {
             onSelect={onSelectSticker}
             canvasW={previewW}
             canvasH={previewH}
+            showEditChrome={showStickerEditChrome}
           />
           <StoryDrawLayer
             width={previewW}

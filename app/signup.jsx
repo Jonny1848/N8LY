@@ -125,7 +125,7 @@ export default function SignUp() {
     try {
       console.log("[SIGNUP] Google Sign-In initiated");
       setErrorMsg("");
-      const redirectUri = makeRedirectUri({ scheme: "n8tly", path: "auth/callback" });
+      const redirectUri = makeRedirectUri({ scheme: "N8LY", path: "auth/callback" });
       console.log("[SIGNUP] Redirect URI:", redirectUri);
 
       const { data, error } = await supabase.auth.signInWithOAuth({

@@ -1,51 +1,60 @@
 /**
  * Untere Leiste fuer Story-Editor:
- * - Text: Instagram-aehnlich — „Aa“ oeffnet Schrift-Pills + vertikalen Groessen-Regler;
- *   Regenbogen-Knopf oeffnet grosses Farbraster.
- * - Sticker / Effekte: wie zuvor kompakt.
+ * - Text: Font-Pills + vertikaler Groessen-Regler + Farbpalette.
+ * - Sticker: Groessen-Slider.
+ * - Effekte: huebsche animierte Kapseln mit Emoji + Label.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolateColor,
+} from 'react-native-reanimated';
 import { STORY_TEXT_FONT_PRESETS } from '../../constants/storyEditorFonts';
-import { STORY_IMAGE_EFFECT_IDS, STORY_EFFECT_LABELS } from '../../constants/storyImageEffects';
+import { STORY_IMAGE_EFFECT_IDS, STORY_EFFECT_LABELS, STORY_EFFECT_EMOJI } from '../../constants/storyImageEffects';
 import { STORY_COLORS_HORIZONTAL_ORDER } from '../../constants/storyTextColors';
+import { theme } from '../../constants/theme';
 
-/**
- * Hoehe des vertikalen Groessen-Reglers (optisch wie IG-Rahmen im Screenshot).
- * Hinweis: @react-native-community/slider v5 hat kein `vertical`-Prop mehr — wir drehen
- * einen horizontalen Slider per transform, damit er auf iOS und Android senkrecht wirkt.
- * +90°: oben großes „A“ = hoher fontSize (Maximum), unten kleines „a“ = Minimum.
- */
 const VERTICAL_SLIDER_HEIGHT = 88;
-/** Sensibler Querschnitt des gedrehten Sliders (Touch / Daumen) */
 const VERTICAL_SLIDER_THICKNESS = 34;
 
-// liftAboveFooterPx: Abstand vom unteren Rand, damit die Leiste ueber dem Weiter-FAB sitzt.
-
 /**
- * @param {{
- *   visible: boolean,
- *   variant: 'text' | 'sticker' | 'effects',
- *   textSelectionKey?: string | null,
- *   fontKey?: string,
- *   onFontKeyChange?: (key: string) => void,
- *   fontSize?: number,
- *   onFontSizeChange?: (n: number) => void,
- *   onFontSizeCommit?: () => void,
- *   textColor?: string,
- *   onTextColorChange?: (c: string) => void,
- *   textAlign?: 'left'|'center'|'right',
- *   onTextAlignChange?: (a: 'left'|'center'|'right') => void,
- *   stickerScale?: number,
- *   onStickerScaleChange?: (n: number) => void,
- *   onStickerScaleCommit?: () => void,
- *   effectId?: string,
- *   onEffectChange?: (id: string) => void,
- *   liftAboveFooterPx?: number,
- * }} props
+ * Einzelner Effekt-Button mit animiertem aktiv/inaktiv-Uebergang.
  */
+function EffectButton({ id, label, emoji, isActive, onPress }) {
+  const active = useSharedValue(isActive ? 1 : 0);
+
+  useEffect(() => {
+    active.value = withTiming(isActive ? 1 : 0, { duration: 220 });
+  }, [isActive, active]);
+
+  const chipStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      active.value,
+      [0, 1],
+      ['rgba(50,50,55,0.85)', theme.colors.primary.main2],
+    ),
+    transform: [{ scale: active.value * 0.06 + 0.94 }],
+  }));
+
+  const labelStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(active.value, [0, 1], ['#cccccc', '#ffffff']),
+  }));
+
+  return (
+    <Pressable onPress={() => onPress(id)}>
+      <Animated.View style={[styles.effectChip, chipStyle]}>
+        <Text style={styles.effectEmoji}>{emoji}</Text>
+        <Animated.Text style={[styles.effectLabel, labelStyle]}>{label}</Animated.Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 export default function StoryEditorStyleBar({
   visible,
   variant,
@@ -66,9 +75,7 @@ export default function StoryEditorStyleBar({
   onEffectChange,
   liftAboveFooterPx = 0,
 }) {
-  /** Welcher Text-Unterdialog aktiv ist (wie Instagram: Schrift vs. Farbe) */
-  const [textPanel, setTextPanel] = useState(/** @type {'font'|'color'} */ ('font'));
-  /** Scroll-Fortschritt der Farbleiste fuer die Punkt-Navigation unter der Reihe */
+  const [textPanel, setTextPanel] = useState('font');
   const [colorScrollDotIdx, setColorScrollDotIdx] = useState(0);
 
   useEffect(() => {
@@ -79,34 +86,26 @@ export default function StoryEditorStyleBar({
     setColorScrollDotIdx(0);
   }, [textPanel]);
 
-  // Alle Hooks muessen VOR jedem bedingten return laufen (Scroll-Handler ist keine Hook-Funktion).
   if (!visible) return null;
 
   const normHex = (c) => (c || '').trim().toLowerCase();
 
-  /** Mappt Scroll-Position grob auf 3 Punkte (wie im Story-Screenshot); kein Hook, darf nach dem visible-Guard stehen. */
   const onColorRowScroll = (e) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
     const maxScroll = Math.max(0, contentSize.width - layoutMeasurement.width);
-    if (maxScroll <= 0) {
-      setColorScrollDotIdx(0);
-      return;
-    }
+    if (maxScroll <= 0) { setColorScrollDotIdx(0); return; }
     const ratio = contentOffset.x / maxScroll;
-    const idx = ratio < 0.34 ? 0 : ratio < 0.67 ? 1 : 2;
-    setColorScrollDotIdx(idx);
+    setColorScrollDotIdx(ratio < 0.34 ? 0 : ratio < 0.67 ? 1 : 2);
   };
 
   return (
     <View style={[styles.wrap, { bottom: liftAboveFooterPx }]} pointerEvents="box-none">
       {variant === 'text' ? (
         <>
-          {/* Schrift: links vertikaler Groessen-Regler, rechts horizontal durch die Fonts scrollen */}
           {textPanel === 'font' ? (
             <View style={styles.fontLayout}>
               <View style={styles.verticalSliderColumn}>
                 <Text style={styles.sizeCap}>A</Text>
-                {/* Horizontaler Slider, -90° gedreht = zuverlaessig vertikal (v5 API) */}
                 <View style={styles.verticalSliderHost}>
                   <Slider
                     style={styles.verticalSliderRotated}
@@ -116,7 +115,7 @@ export default function StoryEditorStyleBar({
                     value={fontSize}
                     onValueChange={onFontSizeChange}
                     onSlidingComplete={onFontSizeCommit}
-                    minimumTrackTintColor="theme.colors.primary.main2"
+                    minimumTrackTintColor={theme.colors.primary.main2}
                     maximumTrackTintColor="rgba(120,120,120,0.45)"
                     thumbTintColor="#ffffff"
                   />
@@ -154,7 +153,6 @@ export default function StoryEditorStyleBar({
             </View>
           ) : null}
 
-          {/* Farbe: horizontale Leiste mit weissem Rand um jede Kachel (Instagram-Stil) */}
           {textPanel === 'color' ? (
             <View style={styles.colorRowSection}>
               <ScrollView
@@ -165,7 +163,6 @@ export default function StoryEditorStyleBar({
                 scrollEventThrottle={16}
                 contentContainerStyle={styles.colorRowScrollContent}
               >
-               
                 {STORY_COLORS_HORIZONTAL_ORDER.map((c) => {
                   const active = normHex(textColor) === normHex(c);
                   const isWhite = normHex(c) === '#ffffff';
@@ -196,7 +193,7 @@ export default function StoryEditorStyleBar({
             </View>
           ) : null}
 
-          {/* Untere Icon-Leiste: Schrift, Farbe, Ausrichtung (Zyklus wie Instagram) */}
+          {/* Untere Icon-Leiste: Schrift, Farbe, Ausrichtung */}
           <View style={styles.textIconToolbar}>
             <Pressable
               onPress={() => setTextPanel('font')}
@@ -219,22 +216,15 @@ export default function StoryEditorStyleBar({
                 style={styles.rainbowDisk}
               />
             </Pressable>
-            {/* Ein Tipp schaltet links → mitte → rechts (kein extra Panel, nur Zustand am Text) */}
             <Pressable
               onPress={() => {
-                const order = /** @type {const} */ (['left', 'center', 'right']);
+                const order = ['left', 'center', 'right'];
                 const cur = order.includes(textAlign) ? textAlign : 'left';
                 const next = order[(order.indexOf(cur) + 1) % order.length];
                 onTextAlignChange?.(next);
               }}
               style={styles.iconCircle}
-              accessibilityLabel={
-                textAlign === 'center'
-                  ? 'Textausrichtung Mitte — tippe fuer Rechts'
-                  : textAlign === 'right'
-                    ? 'Textausrichtung Rechts — tippe fuer Links'
-                    : 'Textausrichtung Links — tippe fuer Mitte'
-              }
+              accessibilityLabel="Textausrichtung"
               accessibilityRole="button"
             >
               <TextAlignIgIcon align={textAlign} />
@@ -256,7 +246,7 @@ export default function StoryEditorStyleBar({
               value={stickerScale}
               onValueChange={onStickerScaleChange}
               onSlidingComplete={onStickerScaleCommit}
-              minimumTrackTintColor="#7eb6ff"
+              minimumTrackTintColor={theme.colors.primary.main2}
               maximumTrackTintColor="#444"
               thumbTintColor="#fff"
             />
@@ -267,18 +257,21 @@ export default function StoryEditorStyleBar({
 
       {variant === 'effects' ? (
         <>
-          <Text style={styles.sectionLabel}>Effekte (Filter)</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.effectRow}>
+          <Text style={styles.sectionLabel}>Effekte</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.effectRow}
+          >
             {STORY_IMAGE_EFFECT_IDS.map((id) => (
-              <Pressable
+              <EffectButton
                 key={id}
-                onPress={() => onEffectChange?.(id)}
-                style={[styles.effectChip, effectId === id && styles.effectChipOn]}
-              >
-                <Text style={[styles.effectChipTxt, effectId === id && styles.effectChipTxtOn]}>
-                  {STORY_EFFECT_LABELS[id] ?? id}
-                </Text>
-              </Pressable>
+                id={id}
+                label={STORY_EFFECT_LABELS[id] ?? id}
+                emoji={STORY_EFFECT_EMOJI[id] ?? '●'}
+                isActive={effectId === id}
+                onPress={onEffectChange}
+              />
             ))}
           </ScrollView>
         </>
@@ -287,13 +280,9 @@ export default function StoryEditorStyleBar({
   );
 }
 
-/**
- * Drei Linien wie im Instagram-Story-Editor; gemeinsame Kanten spiegeln links / mitte / rechts.
- */
 function TextAlignIgIcon({ align }) {
   const rowAlign =
     align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start';
-  // Leicht unterschiedliche Laengen pro Zeile (klassisches „Text“-Symbol)
   const widths =
     align === 'center' ? [0.72, 1, 0.78] : align === 'right' ? [0.62, 0.88, 0.74] : [1, 0.76, 0.58];
   return (
@@ -325,7 +314,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.12)',
     zIndex: 18,
-    maxHeight: 198,
+    maxHeight: 220,
   },
   fontLayout: {
     flexDirection: 'row',
@@ -351,7 +340,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Manrope_600SemiBold',
     marginTop: 1,
   },
-  /** Platz fuer gedrehten Slider: Breite/Hoehe nach Rotation ~ vertikal */
   verticalSliderHost: {
     width: VERTICAL_SLIDER_THICKNESS + 8,
     height: VERTICAL_SLIDER_HEIGHT,
@@ -364,9 +352,7 @@ const styles = StyleSheet.create({
     height: VERTICAL_SLIDER_THICKNESS,
     transform: [{ rotate: '90deg' }],
   },
-  fontScrollFlex: {
-    flex: 1,
-  },
+  fontScrollFlex: { flex: 1 },
   fontRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -381,45 +367,18 @@ const styles = StyleSheet.create({
     maxHeight: 32,
     justifyContent: 'center',
   },
-  /** Inaktiv: dunkle Kapsel / aktiv: helle Kapsel wie Instagram */
-  fontChipOffIg: {
-    backgroundColor: '#2c2c2e',
-  },
-  fontChipOnIg: {
-    backgroundColor: '#f2f2f7',
-  },
-  fontChipLabel: {
-    fontSize: 12,
-  },
-  fontChipLabelOffIg: {
-    color: '#f5f5f7',
-  },
-  fontChipLabelOnIg: {
-    color: '#1c1c1e',
-  },
-  colorRowSection: {
-    marginBottom: 3,
-    paddingTop: 2,
-  },
+  fontChipOffIg: { backgroundColor: '#2c2c2e' },
+  fontChipOnIg: { backgroundColor: '#f2f2f7' },
+  fontChipLabel: { fontSize: 12 },
+  fontChipLabelOffIg: { color: '#f5f5f7' },
+  fontChipLabelOnIg: { color: '#1c1c1e' },
+  colorRowSection: { marginBottom: 3, paddingTop: 2 },
   colorRowScrollContent: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 4,
     paddingHorizontal: 4,
   },
-  /** Weisser Kreis mit Pipette wie im Story-Screenshot */
-  eyedropperBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  /**
-   * Abgerundetes Quadrat mit kraeftigem weissen Rand wie im Story-Screenshot.
-   */
   swatchTile: {
     width: 36,
     height: 36,
@@ -432,7 +391,6 @@ const styles = StyleSheet.create({
     borderWidth: 4.5,
     transform: [{ scale: 1.07 }],
   },
-  /** Reine Weiss-Kachel: duenner Rand nach aussen, damit sie vom Hintergrund loesbar bleibt */
   swatchTileWhite: {
     borderWidth: 3.5,
     borderColor: 'rgba(255,255,255,0.95)',
@@ -471,9 +429,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconCircleActive: {
-    backgroundColor: 'rgba(255,255,255,0.28)',
-  },
+  iconCircleActive: { backgroundColor: 'rgba(255,255,255,0.28)' },
   iconAa: {
     color: '#fff',
     fontSize: 17,
@@ -484,7 +440,6 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
   },
-  /** Feste Breite: Prozent-Linien im Ausrichtungs-Icon */
   alignIconBox: {
     width: 22,
     height: 15,
@@ -497,22 +452,39 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     color: '#aaa',
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: 'Manrope_600SemiBold',
-    marginBottom: 6,
+    marginBottom: 8,
     marginTop: 4,
+    letterSpacing: 0.3,
   },
   sliderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   slider: { flex: 1, height: 36 },
   sliderHint: { color: '#888', fontSize: 10, width: 40, fontFamily: 'Manrope_400Regular' },
-  effectRow: { gap: 8, paddingBottom: 8, flexDirection: 'row' },
+  effectRow: {
+    gap: 10,
+    paddingBottom: 10,
+    paddingRight: 8,
+    flexDirection: 'row',
+  },
+  /** Effekt-Kapsel mit Emoji + Label */
   effectChip: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#333',
+    borderRadius: 16,
+    minWidth: 64,
+    gap: 3,
   },
-  effectChipOn: { backgroundColor: '#5b8cff' },
-  effectChipTxt: { color: '#ddd', fontSize: 12, fontFamily: 'Manrope_500Medium' },
-  effectChipTxtOn: { color: '#fff' },
+  effectEmoji: {
+    fontSize: 20,
+    textAlign: 'center',
+  },
+  effectLabel: {
+    fontSize: 11,
+    fontFamily: 'Manrope_600SemiBold',
+    textAlign: 'center',
+  },
 });

@@ -77,7 +77,7 @@ export default function StoryDrawLayer({
 
   return (
     <View
-      style={[StyleSheet.absoluteFill, { width, height }]}
+      style={[StyleSheet.absoluteFill, { width, height, zIndex: active ? 10 : 0 }]}
       pointerEvents={active ? 'auto' : 'none'}
       {...panResponder.panHandlers}
     >

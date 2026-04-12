@@ -184,7 +184,7 @@ export default function Login() {
       setErrorMsg("");
 
       const redirectUri = makeRedirectUri({
-        scheme: 'n8tly',
+        scheme: 'N8LY',
         path: 'auth/callback'
       });
 
@@ -321,7 +321,7 @@ export default function Login() {
 
           {/* Email Input */}
           <View className="mb-4">
-            <View className="flex-row items-center border border-gray-300 rounded-xl px-4 bg-white" style={{ minHeight: 56, paddingVertical: 16 }}>
+            <View className="flex-row items-center border border-gray-300 rounded-xl px-4 bg-white" style={{ height: 56 }}>
               <EnvelopeIcon size={20} color={theme.colors.neutral.gray[500]} />
               <TextInput
                 className="flex-1 ml-3 text-base text-black"
@@ -331,7 +331,7 @@ export default function Login() {
                 onChangeText={setEmail}
                 autoCapitalize="none"
                 keyboardType="email-address"
-                style={{ paddingVertical: 0, lineHeight: 20 }}
+                style={{ height: 56, textAlignVertical: 'center' }}
               />
               {emailValid && email.length > 0 && (
                 <CheckIcon size={20} color={theme.colors.success} />
@@ -346,7 +346,7 @@ export default function Login() {
 
           {/* Password Input */}
           <View className="mb-6">
-            <View className="flex-row items-center border border-gray-300 rounded-xl px-4 bg-white" style={{ minHeight: 56, paddingVertical: 16 }}>
+            <View className="flex-row items-center border border-gray-300 rounded-xl px-4 bg-white" style={{ height: 56 }}>
               <TextInput
                 className="flex-1 text-base text-black"
                 placeholder="Passwort"
@@ -354,7 +354,7 @@ export default function Login() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
-                style={{ paddingVertical: 0, lineHeight: 20 }}
+                style={{ height: 56, textAlignVertical: 'center' }}
               />
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
                 {showPassword ? (

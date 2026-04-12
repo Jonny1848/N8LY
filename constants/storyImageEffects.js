@@ -5,7 +5,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, View } from 'react-native';
 
-/** Story-Effekt-IDs; 'none' = keine Ueberlagerung */
 export const STORY_IMAGE_EFFECT_IDS = [
   'none',
   'warm',
@@ -15,9 +14,15 @@ export const STORY_IMAGE_EFFECT_IDS = [
   'vivid',
   'midnight',
   'fade',
+  'sepia',
+  'teal',
+  'rose',
+  'golden',
+  'arctic',
+  'neon',
 ];
 
-/** Kurzbeschriftung fuer die UI */
+/** Kurzbeschriftung + Emoji fuer die UI */
 export const STORY_EFFECT_LABELS = {
   none: 'Normal',
   warm: 'Warm',
@@ -27,10 +32,34 @@ export const STORY_EFFECT_LABELS = {
   vivid: 'Lebendig',
   midnight: 'Night',
   fade: 'Weich',
+  sepia: 'Sepia',
+  teal: 'Ocean',
+  rose: 'Rosé',
+  golden: 'Gold',
+  arctic: 'Arktis',
+  neon: 'Neon',
+};
+
+/** Emoji pro Effekt fuer visuelle Vorschau in den Buttons */
+export const STORY_EFFECT_EMOJI = {
+  none: '○',
+  warm: '☀️',
+  cool: '❄️',
+  mono: '⚫',
+  sunset: '🌅',
+  vivid: '🌈',
+  midnight: '🌙',
+  fade: '🌫️',
+  sepia: '📜',
+  teal: '🌊',
+  rose: '🌸',
+  golden: '✨',
+  arctic: '🧊',
+  neon: '💜',
 };
 
 /**
- * Halbtransparente Verlaeufe ueber dem Foto (pointerEvents none fuer Touch-Durchreichung).
+ * Halbtransparente Verlaeufe ueber dem Foto.
  * @param {{ effectId: string, width: number, height: number, borderRadius?: number }} props
  */
 export function StoryImageEffectOverlay({ effectId, width, height, borderRadius = 18 }) {
@@ -65,15 +94,7 @@ export function StoryImageEffectOverlay({ effectId, width, height, borderRadius 
       );
     case 'mono':
       return (
-        <View
-          style={[
-            common,
-            {
-              backgroundColor: 'rgba(128,128,128,0.42)',
-              // Grau-Overlay entsaettigt optisch (echtes Desaturate waere teurer).
-            },
-          ]}
-        />
+        <View style={[common, { backgroundColor: 'rgba(128,128,128,0.42)' }]} />
       );
     case 'sunset':
       return (
@@ -109,6 +130,60 @@ export function StoryImageEffectOverlay({ effectId, width, height, borderRadius 
           style={common}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
+        />
+      );
+    case 'sepia':
+      return (
+        <LinearGradient
+          colors={['rgba(180,130,70,0.35)', 'rgba(120,80,40,0.28)', 'rgba(80,50,20,0.15)']}
+          style={common}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+        />
+      );
+    case 'teal':
+      return (
+        <LinearGradient
+          colors={['rgba(0,180,180,0.28)', 'rgba(0,100,120,0.22)', 'transparent']}
+          style={common}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+      );
+    case 'rose':
+      return (
+        <LinearGradient
+          colors={['rgba(255,150,180,0.30)', 'rgba(200,100,140,0.22)', 'transparent']}
+          style={common}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+      );
+    case 'golden':
+      return (
+        <LinearGradient
+          colors={['rgba(255,215,0,0.30)', 'rgba(255,180,50,0.20)', 'transparent']}
+          style={common}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+        />
+      );
+    case 'arctic':
+      return (
+        <LinearGradient
+          colors={['rgba(200,230,255,0.40)', 'rgba(150,200,240,0.25)', 'rgba(100,150,220,0.12)']}
+          style={common}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+        />
+      );
+    case 'neon':
+      return (
+        <LinearGradient
+          colors={['rgba(180,0,255,0.22)', 'rgba(0,255,200,0.15)', 'rgba(255,0,100,0.12)']}
+          style={common}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
         />
       );
     default:

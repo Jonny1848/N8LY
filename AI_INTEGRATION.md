@@ -1,6 +1,6 @@
-# KI-Integration für N8TLY Event-App 🤖
+# KI-Integration für N8LY Event-App 🤖
 
-Dieses Dokument beschreibt strategische Möglichkeiten zur Integration von Künstlicher Intelligenz in die N8TLY App.
+Dieses Dokument beschreibt strategische Möglichkeiten zur Integration von Künstlicher Intelligenz in die N8LY App.
 
 ---
 

@@ -64,7 +64,7 @@ export default function ProfileScreen() {
 
         {/* App Version */}
         <View className="items-center py-4">
-          <Text className="text-xs text-gray-500" style={{ fontFamily: 'Manrope_400Regular' }}>N8TLY Version 1.0.0</Text>
+          <Text className="text-xs text-gray-500" style={{ fontFamily: 'Manrope_400Regular' }}>N8LY Version 1.0.0</Text>
         </View>
 
         {/* Bottom Spacing */}

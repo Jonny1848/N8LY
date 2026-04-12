@@ -35,6 +35,7 @@ import {
   markConversationAsRead as apiMarkAsRead,
   createDirectConversation,
   createGroupConversation,
+  updateGroupConversation as apiUpdateGroupConversation,
 } from '../services/chatService';
 import { supabase } from '../lib/supabase';
 
@@ -142,6 +143,15 @@ interface ChatState {
     memberIds: string[],
     avatarUrl?: string | null,
   ) => Promise<string | null>;
+
+  /**
+   * Aktualisiert Gruppenname und/oder Gruppenbild und refresht aktive Konversation + Liste.
+   */
+  updateGroupConversation: (
+    conversationId: string,
+    userId: string,
+    updates: { name?: string | null; avatar_url?: string | null; description?: string | null },
+  ) => Promise<void>;
 
   /** Startet das Realtime-Abo fuer Nachrichten einer Konversation */
   subscribeMessages: (conversationId: string, userId: string) => void;
@@ -330,6 +340,12 @@ const useChatStore = create<ChatState>((set, get) => ({
       console.error('[CHAT STORE] Fehler beim Erstellen der Gruppe:', err);
       return null;
     }
+  },
+
+  updateGroupConversation: async (conversationId, userId, updates) => {
+    await apiUpdateGroupConversation(conversationId, updates);
+    await get().loadConversationDetails(conversationId, userId);
+    await get().loadConversations(userId);
   },
 
   subscribeMessages: (conversationId, userId) => {

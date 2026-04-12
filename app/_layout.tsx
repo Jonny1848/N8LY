@@ -14,7 +14,7 @@ import "../global.css";
  *
  * 3) Google OAuth – zwei Einstiegspunkte:
  *    A) login.jsx: WebBrowser öffnet, User kehrt zurück → setSession() → fetchProfileWithToken() → setOauthRedirectTo → <Redirect>
- *    B) auth/callback: Deep-Link n8tly://auth/callback → setSession() → fetchProfileWithToken() → router.replace()
+ *    B) auth/callback: Deep-Link N8LY://auth/callback → setSession() → fetchProfileWithToken() → router.replace()
  *    Zusätzlich: onAuthStateChange(SIGNED_IN) → handleAuthenticated(session, 'SIGNED_IN') → fetchProfileWithToken() → safeReplace()
  *
  * WICHTIG (OAuth): Der Supabase-Client sendet den JWT manchmal nicht mit der ersten Anfrage nach setSession.
@@ -188,9 +188,10 @@ function RootLayoutContent() {
         <Stack.Screen name="login" options={{ animation: 'fade' }} />
         <Stack.Screen name="signup" options={{ animation: 'fade' }} />
         <Stack.Screen name="chat/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="chat/group-info/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="user/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="new-chat" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="new-group" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="new-group-details" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="new-chat-details" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="chat/stories/create" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="chat/stories/[userId]" options={{ animation: 'fade' }} />
       </Stack>

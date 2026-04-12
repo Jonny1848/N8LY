@@ -1,10 +1,10 @@
 /**
- * Neue Gruppe – Schritt 2: Gruppenname, Gruppenbild und Erstellen.
+ * Neuer Chat – Schritt 2: Name und Bild fuer Mehrpersonen-Chat, dann Erstellen.
  *
  * Referenz-Design:
- * - Header: umrandeter Zurück-Button + „Neue Gruppe" + „Erstellen" (blau)
- * - „GROUP NAME" Uppercase-Label + Eingabe mit UserGroup-Icon + blaue Unterlinie
- * - „GROUP IMAGE" Uppercase-Label + Upload-Card (110×110)
+ * - Header: umrandeter Zurück-Button + „Chat einrichten" + „Erstellen" (blau)
+ * - „CHATNAME" Uppercase-Label + Eingabe mit UserGroup-Icon + blaue Unterlinie
+ * - „CHATBILD" Uppercase-Label + Upload-Card (110×110)
  * - „Participants: N" + horizontale Avatare mit ×-Badge
  *
  * Styling durchgehend NativeWind/Tailwind.
@@ -17,6 +17,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useMemo, useEffect } from 'react';
@@ -34,10 +35,18 @@ import {
   UserGroupIcon,
 } from 'react-native-heroicons/outline';
 import { Image } from 'expo-image';
+import { File } from 'expo-file-system';
 import { theme } from '../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
 import useAuthStore from '../stores/useAuthStore';
 import useChatStore from '../stores/useChatStore';
 import { supabase } from '../lib/supabase';
+
+/** RN: fetch().blob() liefert oft 0 Bytes — gleiche Strategie wie storageService.js */
+async function readLocalUriAsArrayBuffer(uri) {
+  const file = new File(uri);
+  return file.arrayBuffer();
+}
 
 // ── Avatar-Hilfsfunktionen ──
 
@@ -105,7 +114,7 @@ function RoundAvatar({ url, name, size = 48 }) {
 
 // ── Komponente ──
 
-export default function NewGroupDetailsScreen() {
+export default function NewChatDetailsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const userId = useAuthStore((s) => s.userId);
@@ -121,17 +130,13 @@ export default function NewGroupDetailsScreen() {
     }
   }, [raw]);
 
-  const [groupName, setGroupName] = useState('');
+  const [chatName, setChatName] = useState('');
   const [members, setMembers] = useState(initialMembers);
-  const [groupImageUri, setGroupImageUri] = useState(null);
+  const [chatImageUri, setChatImageUri] = useState(null);
   const [creating, setCreating] = useState(false);
 
-  const removeMember = (id) => {
-    setMembers((prev) => prev.filter((m) => m.id !== id));
-  };
-
-  /** Gruppenbild per ImagePicker waehlen */
-  const pickGroupImage = async () => {
+  /** Chat-Bild per ImagePicker waehlen */
+  const pickChatImage = async () => {
     try {
       const ImagePicker = require('expo-image-picker');
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -146,52 +151,51 @@ export default function NewGroupDetailsScreen() {
         quality: 0.8,
       });
       if (!result.canceled && result.assets?.[0]?.uri) {
-        setGroupImageUri(result.assets[0].uri);
+        setChatImageUri(result.assets[0].uri);
       }
     } catch (e) {
-      console.warn('[NEW GROUP] ImagePicker:', e);
+      console.warn('[NEW CHAT] ImagePicker:', e);
       Alert.alert('Fehler', 'Das Bild konnte nicht geladen werden.', [{ text: 'OK' }]);
     }
   };
 
-  /** Gruppenbild in Supabase Storage hochladen → public URL */
-  const uploadGroupImage = async () => {
-    if (!groupImageUri) return null;
+  /** Bild in Supabase Storage hochladen → public URL */
+  const uploadChatImage = async () => {
+    if (!chatImageUri) return null;
     try {
-      const fileName = `group_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-      const response = await fetch(groupImageUri);
-      const blob = await response.blob();
+      const fileName = `chat_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+      const arrayBuffer = await readLocalUriAsArrayBuffer(chatImageUri);
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(fileName, blob, { contentType: 'image/jpeg', upsert: true });
+        .upload(fileName, arrayBuffer, { contentType: 'image/jpeg', upsert: true });
 
       if (uploadError) {
-        console.error('[NEW GROUP] Upload Fehler:', uploadError);
+        console.error('[NEW CHAT] Upload Fehler:', uploadError);
         return null;
       }
-      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
-      return publicUrl;
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
+      return urlData?.publicUrl ?? null;
     } catch (e) {
-      console.error('[NEW GROUP] Upload:', e);
+      console.error('[NEW CHAT] Upload:', e);
       return null;
     }
   };
 
-  /** Gruppe erstellen (Name + optionaler Avatar-Upload) */
+  /** Mehrpersonen-Chat erstellen (Name + optionaler Avatar-Upload) */
   const onCreate = async () => {
-    const name = groupName.trim();
+    const name = chatName.trim();
     if (!userId || !name) {
-      Alert.alert('Gruppe', 'Bitte gib einen Gruppennamen ein.', [{ text: 'OK' }]);
+      Alert.alert('Chat', 'Bitte gib einen Chatnamen ein.', [{ text: 'OK' }]);
       return;
     }
     if (members.length === 0) {
-      Alert.alert('Gruppe', 'Mindestens ein Mitglied erforderlich.', [{ text: 'OK' }]);
+      Alert.alert('Chat', 'Mindestens ein Mitglied erforderlich.', [{ text: 'OK' }]);
       return;
     }
     setCreating(true);
     try {
-      const avatarUrl = await uploadGroupImage();
+      const avatarUrl = await uploadChatImage();
       const conversationId = await createGroupChat(
         userId,
         name,
@@ -199,7 +203,7 @@ export default function NewGroupDetailsScreen() {
         avatarUrl,
       );
       if (!conversationId) {
-        Alert.alert('Gruppe', 'Die Gruppe konnte nicht erstellt werden.', [{ text: 'OK' }]);
+        Alert.alert('Chat', 'Der Chat konnte nicht erstellt werden.', [{ text: 'OK' }]);
         return;
       }
       router.replace(`/chat/${conversationId}`);
@@ -208,28 +212,33 @@ export default function NewGroupDetailsScreen() {
     }
   };
 
-  const canCreate = groupName.trim().length > 0 && members.length > 0;
+  const canCreate = chatName.trim().length > 0 && members.length > 0;
+  /** Wie MessageInput Send: aktiv auch waehrend creating, sonst faellt das Gradient sofort zurueck */
+  const createLooksActive = canCreate || creating;
 
-  /** Animierter Uebergang fuer den „Erstellen"-Button (Opacity + Hintergrund) */
+  /** Gleiches Muster wie MessageInput: Skalierung + Crossfade zweier LinearGradients */
   const createActive = useSharedValue(0);
   useEffect(() => {
-    createActive.value = withTiming(canCreate ? 1 : 0, { duration: 300 });
-  }, [canCreate]);
+    createActive.value = withTiming(createLooksActive ? 1 : 0, { duration: 260 });
+  }, [createLooksActive]);
 
-  const createBtnStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(
-      createActive.value,
-      [0, 1],
-      [theme.colors.neutral.gray[100], theme.colors.primary.main],
-    ),
-    transform: [{ scale: createActive.value * 0.05 + 0.95 }],
+  const createBtnScaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: createActive.value * 0.06 + 0.94 }],
+  }));
+
+  const createInactiveGradOpacity = useAnimatedStyle(() => ({
+    opacity: 1 - createActive.value,
+  }));
+
+  const createActiveGradOpacity = useAnimatedStyle(() => ({
+    opacity: createActive.value,
   }));
 
   const createLabelStyle = useAnimatedStyle(() => ({
     color: interpolateColor(
       createActive.value,
       [0, 1],
-      [theme.colors.neutral.gray[400], '#ffffff'],
+      [theme.colors.neutral.gray[500], '#ffffff'],
     ),
   }));
 
@@ -250,16 +259,38 @@ export default function NewGroupDetailsScreen() {
           className="flex-1 text-2xl text-gray-800 ml-3"
           style={{ fontFamily: 'Manrope_700Bold' }}
         >
-          Neue Gruppe
+          Chat einrichten
         </Text>
-        {/* „Erstellen" als gefuellter Pill-Button */}
+        {/* „Erstellen": wie MessageInput-Sendebutton — Animated.View + LinearGradient-Crossfade */}
         <Pressable onPress={onCreate} disabled={!canCreate || creating}>
           <Animated.View
-            className="rounded-full px-5 py-2.5"
-            style={createBtnStyle}
+            className="rounded-full overflow-hidden px-5 py-2.5 items-center justify-center min-w-[104px]"
+            style={createBtnScaleStyle}
           >
+            <Animated.View
+              pointerEvents="none"
+              style={[StyleSheet.absoluteFillObject, createInactiveGradOpacity]}
+            >
+              <LinearGradient
+                colors={[theme.colors.neutral.gray[300], theme.colors.neutral.gray[200]]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+            </Animated.View>
+            <Animated.View
+              pointerEvents="none"
+              style={[StyleSheet.absoluteFillObject, createActiveGradOpacity]}
+            >
+              <LinearGradient
+                colors={[theme.colors.primary.main, theme.colors.primary.main2]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+            </Animated.View>
             {creating ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <Animated.Text
                 style={[
@@ -279,45 +310,45 @@ export default function NewGroupDetailsScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingBottom: 40 }}
       >
-        {/* ── GRUPPENNAME ── */}
+        {/* ── CHATNAME ── */}
         <Text
           className="px-4 mt-5 mb-2 text-xs tracking-widest text-gray-400"
           style={{ fontFamily: 'Manrope_600SemiBold' }}
         >
-          GRUPPENNAME
+          CHATNAME
         </Text>
-        <View className="mx-4 flex-row items-center border-b-[1.5px] pb-3 border-blue-400">
+        <View className="mx-4 flex-row items-center border-b-[1.5px] pb-3 border-blue-800">
           <UserGroupIcon size={24} color={theme.colors.neutral.gray[400]} />
           <TextInput
             className="flex-1 ml-3 text-lg text-gray-900"
             placeholder="z. B. Wochenend-Trip"
             placeholderTextColor={theme.colors.neutral.gray[400]}
-            value={groupName}
-            onChangeText={setGroupName}
+            value={chatName}
+            onChangeText={setChatName}
             autoFocus
             style={{ fontFamily: 'Manrope_400Regular', paddingVertical: 0 }}
           />
         </View>
 
-        {/* ── GRUPPENBILD (zentriert, rund wie finales Avatar) ── */}
+        {/* ── CHATBILD (zentriert, rund wie finales Avatar) ── */}
         <Text
           className="px-4 mt-8 mb-4 text-xs tracking-widest text-gray-400"
           style={{ fontFamily: 'Manrope_600SemiBold' }}
         >
-          GRUPPENBILD
+          CHATBILD
         </Text>
-        <Pressable onPress={pickGroupImage} className="self-center">
-          {groupImageUri ? (
+        <Pressable onPress={pickChatImage} className="self-center">
+          {chatImageUri ? (
             <View className="rounded-full overflow-hidden w-[180px] h-[180px]">
               <Image
-                source={{ uri: groupImageUri }}
+                source={{ uri: chatImageUri }}
                 style={{ width: 180, height: 180 }}
                 contentFit="cover"
               />
             </View>
           ) : (
             <View className="rounded-full items-center justify-center w-[180px] h-[180px] bg-gray-50 border-2 border-dashed border-gray-300">
-              <PhotoIcon size={36} color={theme.colors.primary.main2} />
+              <PhotoIcon size={36} color={theme.colors.neutral.gray[800]} />
               <Text
                 className="mt-2 text-center text-xs leading-4 text-gray-400"
                 style={{ fontFamily: 'Manrope_500Medium' }}

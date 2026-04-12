@@ -15,10 +15,11 @@
  * Route: /chat/[id] – Die ID ist die conversation_id aus Supabase.
  */
 import { FlatList, KeyboardAvoidingView, Platform, View, Text, ActivityIndicator, StyleSheet, Animated as RNAnimated } from 'react-native';
-import Reanimated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
+import Reanimated, { useAnimatedKeyboard, useAnimatedStyle, runOnJS } from 'react-native-reanimated';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 // Zustand: Globale Stores fuer Auth und Chat
@@ -38,8 +39,9 @@ import { theme } from '../../constants/theme';
 const EMPTY_MESSAGES = [];
 
 export default function ChatDetailScreen() {
-  // Konversations-ID aus der Route
-  const { id: conversationId } = useLocalSearchParams();
+  // Konversations-ID aus der Route (expo-router kann string | string[] liefern)
+  const rawId = useLocalSearchParams().id;
+  const conversationId = Array.isArray(rawId) ? rawId[0] : rawId;
   const router = useRouter();
 
   // ============================
@@ -179,20 +181,20 @@ export default function ChatDetailScreen() {
     [conversationId, userId],
   );
 
-  /** Share Sheet Optionsauswahl – Kamera, Medien, Sprachnachricht, Dokumente an MessageInput */
+  /** Share Sheet Optionsauswahl – Kamera, Medien, Umfrage, Dokumente an MessageInput */
   const handleShareSelect = useCallback((key) => {
     if (key === 'camera') {
       setTimeout(() => messageInputRef.current?.openCamera?.(), 300);
     } else if (key === 'media') {
       setTimeout(() => messageInputRef.current?.openMediaLibrary?.(), 300);
-    } else if (key === 'voice') {
-      setTimeout(() => messageInputRef.current?.startVoiceRecording?.(), 300);
     } else if (key === 'documents') {
       setTimeout(() => messageInputRef.current?.openDocumentPicker?.(), 300);
     } else if (key === 'contact') {
-      setTimeout(() => messageInputRef.current?.openContactsPicker?.(), 300); 
-    } 
-    else {
+      setTimeout(() => messageInputRef.current?.openContactsPicker?.(), 300);
+    } else if (key === 'poll') {
+      // TODO: Umfrage-Erstellung oeffnen
+      console.log('[SHARE] Umfrage noch nicht implementiert');
+    } else {
       console.log('[SHARE] Option gewaehlt:', key);
     }
   }, []);
@@ -204,6 +206,31 @@ export default function ChatDetailScreen() {
   const handleImagePress = useCallback((uri) => {
     if (uri) setImagePreviewUri(uri);
   }, []);
+
+  /** Gruppeninfo oeffnen — gleiche Ziel-Route wie Tipp auf Header (Avatar/Name) */
+  const openGroupInfo = useCallback(() => {
+    if (conversation?.type === 'group' && conversationId) {
+      router.push(`/chat/group-info/${conversationId}`);
+    }
+  }, [conversation?.type, conversationId, router]);
+
+  /**
+   * Rechter Rand: Wisch von rechts nach links oeffnet die Gruppeninfo (nur Gruppenchats).
+   * Schmales Overlay, damit die Nachrichtenliste weiterhin normal scrollt.
+   */
+  const edgeOpenGroupGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(!!conversationId && conversation?.type === 'group')
+        .activeOffsetX(-12)
+        .failOffsetY([-12, 12])
+        .onEnd((e) => {
+          if (e.translationX < -48) {
+            runOnJS(openGroupInfo)();
+          }
+        }),
+    [conversation?.type, conversationId, openGroupInfo],
+  );
 
   // Empty-State mit Schatten: Loading oder freundlicher Hinweis bei leerem Chat
   const renderEmptyList = () => {
@@ -274,19 +301,32 @@ export default function ChatDetailScreen() {
      * Aeusserer Container: Blur als Geschwister von SafeAreaView mit absoluteFill deckt den
      * kompletten Bildschirm inkl. Statusleiste/Notch ab (SafeAreaView puffert nur den Chat-Inhalt).
      */
-    <View className="flex-1 bg-white">
-      <SafeAreaView className="flex-1 bg-white" edges={['top']}>
-        {/*
-         * Kein overflow-hidden um den KeyboardAvoidingView: Auf iOS (und teils Android)
-         * kann clipping am Parent verhindern, dass das Layout korrekt nach oben geschoben wird,
-         * wenn die Tastatur erscheint — dann liegt das Eingabefeld visuell / interaktiv unter der Tastatur.
-         */}
-        <View className="flex-1">
-          {/* Header ausserhalb des Keyboard-Wrappers: bleibt oben fix, darunter animiert nur Chat + Input */}
-          <ChatHeader
-            conversation={conversation}
-            onBack={() => router.back()}
-          />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View className="flex-1 bg-white">
+        <SafeAreaView className="flex-1 bg-white" edges={['top']}>
+          {/*
+           * Kein overflow-hidden um den KeyboardAvoidingView: Auf iOS (und teils Android)
+           * kann clipping am Parent verhindern, dass das Layout korrekt nach oben geschoben wird,
+           * wenn die Tastatur erscheint — dann liegt das Eingabefeld visuell / interaktiv unter der Tastatur.
+           */}
+          <View className="flex-1">
+            {/* Rechter Rand: Wisch-Geste fuer Gruppeninfo */}
+            {conversation?.type === 'group' ? (
+              <GestureDetector gesture={edgeOpenGroupGesture}>
+                <View
+                  pointerEvents="box-only"
+                  style={styles.edgeSwipeStrip}
+                  collapsable={false}
+                />
+              </GestureDetector>
+            ) : null}
+
+            {/* Header ausserhalb des Keyboard-Wrappers: bleibt oben fix, darunter animiert nur Chat + Input */}
+            <ChatHeader
+              conversation={conversation}
+              onBack={() => router.back()}
+              onPressProfile={conversation?.type === 'group' ? openGroupInfo : undefined}
+            />
 
           {Platform.OS === 'ios' ? (
             /*
@@ -304,8 +344,8 @@ export default function ChatDetailScreen() {
               {chatListAndInput}
             </KeyboardAvoidingView>
           )}
-        </View>
-      </SafeAreaView>
+          </View>
+        </SafeAreaView>
 
       {/*
         Unschaerfe ueber dem gesamten Screen (inkl. Top-Safe-Area), animiert wie Sheet (200ms).
@@ -332,7 +372,8 @@ export default function ChatDetailScreen() {
         imageUri={imagePreviewUri}
         onClose={() => setImagePreviewUri(null)}
       />
-    </View>
+      </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -340,6 +381,15 @@ export default function ChatDetailScreen() {
 // Styles – Loading/Empty State mit Schatten
 // ============================
 const styles = StyleSheet.create({
+  /** Schmaler Streifen am rechten Rand fuer Pan-Geste (Gruppeninfo) */
+  edgeSwipeStrip: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 28,
+    zIndex: 20,
+  },
   list: {
     flex: 1,
     backgroundColor: '#FFFFFF',

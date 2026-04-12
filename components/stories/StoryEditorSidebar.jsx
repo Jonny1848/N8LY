@@ -1,16 +1,18 @@
 /**
  * Vertikale Werkzeugleiste rechts (Instagram-Stil): Text, Sticker, Musik, Effekte, Mehr.
- * „Mehr“ klappt mit Reanimated (Feder + Einblenden) auf und zu.
+ * „Mehr" klappt mit Reanimated auf — enthält Stift, Farbspektrum-Slider und Undo.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
   interpolate,
   Extrapolation,
 } from 'react-native-reanimated';
+import ColorPicker, { HueSlider } from 'reanimated-color-picker';
 import {
   FaceSmileIcon,
   MusicalNoteIcon,
@@ -18,11 +20,9 @@ import {
   ChevronDownIcon,
   PencilIcon,
 } from 'react-native-heroicons/solid';
+import { theme } from '../../constants/theme';
 
-const COLORS = ['#ffffff', '#000000', '#ff3040', '#ffdc00', '#4cd964', '#5856d6'];
-
-/** Maximale Hoehe des aufgeklappten „Mehr“-Blocks (genug fuer Stift + Farben + Undo) */
-const MORE_PANEL_MAX_H = 268;
+const MORE_PANEL_MAX_H = 300;
 
 const SPRING_CFG = {
   damping: 18,
@@ -33,7 +33,7 @@ const SPRING_CFG = {
 /**
  * @param {{
  *   mode: 'none'|'text'|'sticker'|'draw',
- *   onModeChange: (m: 'none'|'text'|'sticker'|'draw') => void,
+ *   onModeChange: (m: string) => void,
  *   onOpenText: () => void,
  *   strokeColor: string,
  *   onColorChange: (c: string) => void,
@@ -84,9 +84,26 @@ export default function StoryEditorSidebar({
     ],
   }));
 
+  /** Stift-Button Aktiv-Animation */
+  const penActive = useSharedValue(0);
+  useEffect(() => {
+    penActive.value = withTiming(mode === 'draw' ? 1 : 0, { duration: 200 });
+  }, [mode, penActive]);
+
+  const penBtnStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolate(penActive.value, [0, 1], [0, 1]) > 0.5
+      ? 'rgba(255,255,255,0.2)' : 'transparent',
+    transform: [{ scale: interpolate(penActive.value, [0, 1], [1, 1.12], Extrapolation.CLAMP) }],
+  }));
+
+  /** Color Picker: nimmt Farbwechsel entgegen */
+  const handleColorComplete = useCallback(({ hex }) => {
+    onColorChange(hex);
+  }, [onColorChange]);
+
   return (
     <View style={styles.column}>
-      {/* Aa: oeffnet Vollbild-Texteingabe; erneuter Tap schliesst Editor inkl. Modal (wie IG abbrechen) */}
+      {/* Aa */}
       <Pressable
         onPress={() => {
           if (mode === 'text') {
@@ -101,6 +118,7 @@ export default function StoryEditorSidebar({
         <Text style={[styles.aa, mode === 'text' && styles.aaActive]}>Aa</Text>
       </Pressable>
 
+      {/* Sticker */}
       <Pressable
         onPress={() => onModeChange(mode === 'sticker' ? 'none' : 'sticker')}
         style={styles.hit}
@@ -109,12 +127,12 @@ export default function StoryEditorSidebar({
         <FaceSmileIcon size={28} color="#fff" style={styles.iconShadow} />
       </Pressable>
 
-      {/* Musik: noch ohne Aktion – spaeter z. B. Audio aus Bibliothek */}
+      {/* Musik (Platzhalter) */}
       <Pressable style={styles.hit} hitSlop={8} onPress={() => undefined} accessibilityLabel="Musik (bald)">
         <MusicalNoteIcon size={28} color="#fff" style={styles.iconShadow} />
       </Pressable>
 
-      {/* Effekte: oeffnet die Filter-Leiste unten (Farbtueberlagerungen wie IG-Light) */}
+      {/* Effekte */}
       <Pressable
         style={styles.hit}
         hitSlop={8}
@@ -123,42 +141,60 @@ export default function StoryEditorSidebar({
       >
         <SparklesIcon
           size={28}
-          color={effectsActive ? '#7eb6ff' : '#fff'}
+          color={effectsActive ? theme.colors.primary.main2 : '#fff'}
           style={styles.iconShadow}
         />
       </Pressable>
 
+      {/* „Mehr"-Block: Stift + Farbspektrum + Undo */}
       <Animated.View
         style={[styles.moreOuter, morePanelStyle]}
         pointerEvents={moreOpen ? 'auto' : 'none'}
       >
         <View style={styles.moreBlock}>
+          {/* Stift-Button mit Animierung */}
           <Pressable
             onPress={() => onModeChange(mode === 'draw' ? 'none' : 'draw')}
-            style={styles.hit}
             hitSlop={8}
           >
-            <PencilIcon size={26} color={mode === 'draw' ? '#7eb6ff' : '#fff'} style={styles.iconShadow} />
-          </Pressable>
-          <View style={styles.colorStack}>
-            {COLORS.map((c) => (
-              <Pressable
-                key={c}
-                onPress={() => onColorChange(c)}
-                style={[
-                  styles.colorDot,
-                  { backgroundColor: c },
-                  strokeColor === c && styles.colorDotRing,
-                ]}
+            <Animated.View style={[styles.penBtn, penBtnStyle]}>
+              <PencilIcon
+                size={24}
+                color={mode === 'draw' ? theme.colors.primary.main2 : '#fff'}
+                style={styles.iconShadow}
               />
-            ))}
+            </Animated.View>
+          </Pressable>
+
+          {/* Aktive Farbvorschau */}
+          <View style={[styles.activeColorPreview, { backgroundColor: strokeColor }]} />
+
+          {/* Farbspektrum-Slider (Hue) statt 6 Farbpunkte */}
+          <View style={styles.hueSliderWrap}>
+            <ColorPicker
+              value={strokeColor}
+              onCompleteJS={handleColorComplete}
+              style={styles.colorPickerContainer}
+            >
+              <HueSlider
+                vertical
+                style={styles.hueSlider}
+                thumbShape="circle"
+                thumbSize={18}
+                thumbColor="#fff"
+                sliderThickness={14}
+              />
+            </ColorPicker>
           </View>
+
+          {/* Undo */}
           <Pressable onPress={onUndo} disabled={!canUndo} style={[styles.hit, !canUndo && styles.disabled]}>
             <Text style={styles.undoTxt}>Undo</Text>
           </Pressable>
         </View>
       </Animated.View>
 
+      {/* Chevron: Mehr auf/zu */}
       <Pressable
         onPress={() => setMoreOpen((v) => !v)}
         style={styles.hit}
@@ -196,18 +232,39 @@ const styles = StyleSheet.create({
   },
   moreBlock: {
     alignItems: 'center',
-    gap: 14,
+    gap: 12,
     paddingVertical: 6,
   },
-  colorStack: { flexDirection: 'column', gap: 8, alignItems: 'center' },
-  colorDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+  penBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  colorDotRing: {
+  /** Kleine runde Vorschau der aktuellen Stiftfarbe */
+  activeColorPreview: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     borderWidth: 2,
     borderColor: '#fff',
+  },
+  /** Container fuer den vertikalen Hue-Slider */
+  hueSliderWrap: {
+    width: 36,
+    height: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  colorPickerContainer: {
+    width: 36,
+    height: 120,
+  },
+  hueSlider: {
+    width: 14,
+    height: 120,
+    borderRadius: 7,
   },
   undoTxt: {
     color: '#fff',

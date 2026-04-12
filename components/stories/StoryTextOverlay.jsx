@@ -1,9 +1,12 @@
 /**
  * Verschiebbare Text-Bloecke auf der Story (PanResponder).
  * Tap ohne Bewegung: Parent oeffnet die Texteingabe (Instagram: direkt tippen).
+ * Die „Eingabepille" ist nur waehrend der aktiven Textbearbeitung (Modal) als
+ * gestrichelter Rahmen sichtbar — keine Fuellung, damit der Export/Viewer keinen
+ * dauerhaften Pill-Hintergrund zeigt.
  */
-import { useRef } from 'react';
-import { View, Text, PanResponder, StyleSheet } from 'react-native';
+import { useRef, useEffect } from 'react';
+import { View, Text, PanResponder, StyleSheet, Platform } from 'react-native';
 import { storyFontFamilyForKey } from '../../constants/storyEditorFonts';
 
 /**
@@ -20,20 +23,29 @@ import { storyFontFamilyForKey } from '../../constants/storyEditorFonts';
  *     pillColor?: string|null,
  *   }>,
  *   onItemChange: (id: string, patch: object) => void,
- *   selectedId: string|null,
  *   onSelect: (id: string) => void,
  *   canvasW: number,
  *   canvasH: number,
+ *   editingTextId?: string|null,
+ *   textModalOpen?: boolean,
  * }} props
  */
-export default function StoryTextOverlay({ items, onItemChange, selectedId, onSelect, canvasW, canvasH }) {
+export default function StoryTextOverlay({
+  items,
+  onItemChange,
+  onSelect,
+  canvasW,
+  canvasH,
+  editingTextId = null,
+  textModalOpen = false,
+}) {
   return (
     <>
       {items.map((item) => (
         <DraggableTextBlock
           key={item.id}
           item={item}
-          selected={selectedId === item.id}
+          showDashedEditChrome={Boolean(textModalOpen && editingTextId === item.id)}
           onChange={(patch) => onItemChange(item.id, patch)}
           onSelectBlock={() => onSelect(item.id)}
           canvasW={canvasW}
@@ -44,22 +56,23 @@ export default function StoryTextOverlay({ items, onItemChange, selectedId, onSe
   );
 }
 
-function DraggableTextBlock({ item, selected, onChange, onSelectBlock, canvasW, canvasH }) {
+function DraggableTextBlock({ item, showDashedEditChrome, onChange, onSelectBlock, canvasW, canvasH }) {
   const start = useRef({ x: 0, y: 0 });
   const moved = useRef(false);
+  /** Aktuelle Position als Ref — verhindert stale closure im PanResponder */
+  const posRef = useRef({ x: item.x, y: item.y });
+  const onChangeRef = useRef(onChange);
+  const onSelectRef = useRef(onSelectBlock);
+
+  useEffect(() => { posRef.current = { x: item.x, y: item.y }; }, [item.x, item.y]);
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+  useEffect(() => { onSelectRef.current = onSelectBlock; }, [onSelectBlock]);
 
   const fontSize = item.fontSize ?? 22;
   const fontFamily = storyFontFamilyForKey(item.fontKey ?? 'manropeBold');
   const textAlign = item.textAlign ?? 'left';
-  const pillColor = item.pillColor ?? null;
 
-  /**
-   * Feste Zeilenbreite von x bis zum rechten Rand (8px Rand): erst so wirkt textAlign
-   * (ohne volle Breite bleibt Text immer „optisch“ linksbuendig wie ein schmales RN-Text-Element).
-   */
   const maxBlockW = Math.max(28, canvasW - item.x - 8);
-
-  // Grobe Blockhoehe fuer Clamp (eine Zeile Minimum; mehrzeilig bleibt innerhalb maxWidth).
   const blockH = Math.max(28, fontSize * 1.35);
 
   const pan = useRef(
@@ -68,16 +81,16 @@ function DraggableTextBlock({ item, selected, onChange, onSelectBlock, canvasW, 
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
         moved.current = false;
-        start.current = { x: item.x, y: item.y };
+        start.current = { x: posRef.current.x, y: posRef.current.y };
       },
       onPanResponderMove: (_, gestureState) => {
         if (Math.abs(gestureState.dx) > 4 || Math.abs(gestureState.dy) > 4) moved.current = true;
         const nx = Math.max(0, Math.min(canvasW - 32, start.current.x + gestureState.dx));
         const ny = Math.max(0, Math.min(canvasH - blockH, start.current.y + gestureState.dy));
-        onChange({ x: nx, y: ny });
+        onChangeRef.current({ x: nx, y: ny });
       },
       onPanResponderRelease: () => {
-        if (!moved.current) onSelectBlock();
+        if (!moved.current) onSelectRef.current();
       },
     })
   ).current;
@@ -93,20 +106,12 @@ function DraggableTextBlock({ item, selected, onChange, onSelectBlock, canvasW, 
     },
   ];
 
-  // Pill im definierten Streifen je nach Modus einruecken (Canvas-Band bleibt gleich breit).
   const pillBandAlign =
     textAlign === 'center' ? 'center' : textAlign === 'right' ? 'flex-end' : 'flex-start';
 
-  const inner = pillColor ? (
+  const inner = showDashedEditChrome ? (
     <View style={[styles.pillBand, { alignItems: pillBandAlign }]}>
-      <View
-        style={[
-          styles.pill,
-          {
-            backgroundColor: pillColor,
-          },
-        ]}
-      >
+      <View style={styles.dashedEditChrome}>
         <Text style={textStyle}>{item.text}</Text>
       </View>
     </View>
@@ -125,7 +130,6 @@ function DraggableTextBlock({ item, selected, onChange, onSelectBlock, canvasW, 
           maxWidth: canvasW - 16,
           zIndex: 5,
         },
-        selected && styles.selectedRing,
       ]}
       {...pan.panHandlers}
     >
@@ -136,21 +140,18 @@ function DraggableTextBlock({ item, selected, onChange, onSelectBlock, canvasW, 
 
 const styles = StyleSheet.create({
   abs: { position: 'absolute' },
-  selectedRing: {
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: 'rgba(255,255,255,0.75)',
-    borderRadius: 10,
-    padding: 2,
-  },
-  /** Volle Bandbreite, damit die Pill selbst links/mitte/rechts sitzen kann */
   pillBand: {
     width: '100%',
   },
-  pill: {
+  dashedEditChrome: {
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
     maxWidth: '100%',
+    borderWidth: Platform.OS === 'android' ? 1.5 : 1,
+    borderColor: 'rgba(255,255,255,0.92)',
+    borderStyle: 'dashed',
+    backgroundColor: 'transparent',
   },
   txt: {
     textShadowColor: 'rgba(0,0,0,0.65)',

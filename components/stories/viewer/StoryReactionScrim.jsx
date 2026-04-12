@@ -9,7 +9,8 @@ import {
 import { StoryReactionGlassChip } from './StoryReactionGlassChip';
 
 /**
- * Unterer Verlauf + zentrierte Emoji-Pills (nur wenn bundleEng und nicht eigenes Profil).
+ * Unterer Verlauf + zentrierte Emoji-Pills bei bundleEng.
+ * Eigene Stories: Zaehler sichtbar, Preset-Chips deaktiviert; kein Smiley (kein Katalog).
  */
 export function StoryReactionScrim({
   insets,
@@ -24,7 +25,9 @@ export function StoryReactionScrim({
   onBumpReaction,
   onOpenPicker,
 }) {
-  const showPills = !!(activeStory && bundleEng && !isOwn);
+  const showPills = !!(activeStory && bundleEng);
+  /** Reagieren nur bei Fremd-Stories; eigene nur Statistik */
+  const canReact = !isOwn;
 
   return (
     <View
@@ -85,16 +88,19 @@ export function StoryReactionScrim({
                 <StoryReactionGlassChip
                   useGlass={useGlass}
                   isRound={false}
+                  disabled={!canReact}
                   isSelected={
-                    preset.key === 'heart'
+                    canReact &&
+                    (preset.key === 'heart'
                       ? !!bundleEng?.liked
-                      : bundleEng?.myEmojiReactionKey === preset.key
+                      : bundleEng?.myEmojiReactionKey === preset.key)
                   }
                   accessibilityLabel={`Reaktion ${preset.label}${
+                    canReact &&
                     (preset.key === 'heart' ? bundleEng?.liked : bundleEng?.myEmojiReactionKey === preset.key)
                       ? ', ausgewaehlt'
                       : ''
-                  }`}
+                  }${!canReact ? ' (nur Anzeige)' : ''}`}
                   onPress={() =>
                     preset.key === 'heart' ? onToggleHeart() : onBumpReaction(preset.key)
                   }
@@ -111,19 +117,21 @@ export function StoryReactionScrim({
                 </StoryReactionGlassChip>
               </View>
             ))}
-            {/* Smiley oeffnet nur den Katalog — kein Auswahl-Ring (besonderer Aktions-Button) */}
-            <StoryReactionGlassChip
-              useGlass={useGlass}
-              isRound
-              onPress={onOpenPicker}
-              accessibilityLabel={
-                bundleEng?.myEmojiReactionKey
-                  ? 'Emoji-Reaktion aendern'
-                  : 'Reaktion hinzufuegen'
-              }
-            >
-              <FaceSmileIcon size={24} color="#FFFFFF" />
-            </StoryReactionGlassChip>
+            {/* Katalog-Button nur bei Fremd-Stories; eigene Ansicht hat keine Emoji-Auswahl */}
+            {canReact ? (
+              <StoryReactionGlassChip
+                useGlass={useGlass}
+                isRound
+                onPress={onOpenPicker}
+                accessibilityLabel={
+                  bundleEng?.myEmojiReactionKey
+                    ? 'Emoji-Reaktion aendern'
+                    : 'Reaktion hinzufuegen'
+                }
+              >
+                <FaceSmileIcon size={24} color="#FFFFFF" />
+              </StoryReactionGlassChip>
+            ) : null}
           </ScrollView>
         ) : null}
       </View>

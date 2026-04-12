@@ -9,9 +9,9 @@
  */
 export default {
   expo: {
-    scheme: "n8tly",
-    name: "N8TLY_App",
-    slug: "N8TLY_App",
+    scheme: "N8LY",
+    name: "N8LY",
+    slug: "N8LY",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/N8LY9.png",
@@ -34,8 +34,8 @@ export default {
       },
       usesAppleSignIn: true,
       supportsTablet: true,
-      bundleIdentifier: "com.anonymous.n8tlyapp",
-      associatedDomains: ["applinks:n8tly.app"],
+      bundleIdentifier: "com.anonymous.N8LYapp",
+      associatedDomains: ["applinks:N8LY.app"],
     },
 
     // Android-spezifische Einstellungen
@@ -50,7 +50,7 @@ export default {
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
       ],
-      package: "com.anonymous.n8tlyapp",
+      package: "com.anonymous.N8LYapp",
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff",
@@ -61,7 +61,7 @@ export default {
           autoVerify: true,
           data: [
             {
-              scheme: "n8tly",
+              scheme: "N8LY",
               host: "auth",
               pathPrefix: "/callback",
             },
@@ -88,23 +88,23 @@ export default {
         {
           // iOS Mikrofon-Permission fuer Sprachnachrichten
           microphonePermission:
-            "N8TLY benoetigt Zugriff auf dein Mikrofon fuer Sprachnachrichten.",
+            "N8LY benoetigt Zugriff auf dein Mikrofon fuer Sprachnachrichten.",
         },
       ],
       [
         "expo-contacts",
         {
           contactsPermission:
-            "N8TLY benoetigt Zugriff auf deine Kontakte fuer den Kontakt-Teilen-Dialog.",
+            "N8LY benoetigt Zugriff auf deine Kontakte fuer den Kontakt-Teilen-Dialog.",
         },
       ],
       [
         "expo-camera",
         {
           cameraPermission:
-            "N8TLY benoetigt die Kamera, um Fotos und Videos fuer deine Story aufzunehmen.",
+            "N8LY benoetigt die Kamera, um Fotos und Videos fuer deine Story aufzunehmen.",
           microphonePermission:
-            "N8TLY benoetigt das Mikrofon fuer Video-Stories.",
+            "N8LY benoetigt das Mikrofon fuer Video-Stories.",
           recordAudioAndroid: true,
         },
       ],
@@ -112,9 +112,9 @@ export default {
         "expo-media-library",
         {
           photosPermission:
-            "N8TLY zeigt dein zuletzt aufgenommenes Foto als Galerie-Vorschau für Stories.",
+            "N8LY zeigt dein zuletzt aufgenommenes Foto als Galerie-Vorschau für Stories.",
           savePhotosPermission:
-            "N8TLY kann optional Aufnahmen in deiner Mediathek speichern.",
+            "N8LY kann optional Aufnahmen in deiner Mediathek speichern.",
         },
       ],
       [
