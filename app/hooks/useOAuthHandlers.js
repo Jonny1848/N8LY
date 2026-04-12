@@ -98,8 +98,9 @@ export function useOAuthHandlers({ setErrorMsg, mode, router }) {
     try {
       setErrorMsg?.('');
 
+      // Muss mit app.config.js scheme uebereinstimmen (N8LY)
       const redirectUri = makeRedirectUri({
-        scheme: 'n8tly',
+        scheme: 'N8LY',
         path: 'auth/callback',
       });
 
