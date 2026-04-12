@@ -23,25 +23,24 @@ import "../global.css";
 // app/_layout.jsx
 import 'react-native-url-polyfill/auto';
 import 'react-native-get-random-values';
-import { Slot, useRouter, usePathname, Stack } from 'expo-router';
+import { useRouter, usePathname, Stack } from 'expo-router';
 import { GluestackUIProvider } from '../components/ui/gluestack-ui-provider';
 import { supabase } from '../lib/supabase';
 import { useEffect, useRef, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native'
-import { IntroProvider, useIntro } from '../components/IntroContext';
-import { OnboardingProvider } from '../components/OnboardingContext';
 import { useFonts } from 'expo-font';
 import { storyEditorFontAssets } from '../lib/storyEditorFontAssets';
 // Zustand: Globaler Auth-Store (ersetzt lokale getSession()-Aufrufe)
 import useAuthStore from '../stores/useAuthStore';
+// Intro-Flag: app/index.jsx setzt introCompleted nach dem Logo-Screen
+import { useGeneralStore } from './store/generalStore';
 
-function RootLayoutContent() {
+export default function RootLayout() {
   // Manrope + Story-Editor-Google-Fonts (siehe lib/storyEditorFontAssets)
   const [fontsLoaded, fontError] = useFonts(storyEditorFontAssets);
 
   const router = useRouter();
   const pathname = usePathname();
-  const { introCompleted } = useIntro();
+  const introCompleted = useGeneralStore((s) => s.introCompleted);
   const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
 
   // Debug: Check if fonts are loaded
@@ -196,15 +195,5 @@ function RootLayoutContent() {
         <Stack.Screen name="chat/stories/[userId]" options={{ animation: 'fade' }} />
       </Stack>
     </GluestackUIProvider>
-  );
-}
-
-export default function RootLayout() {
-  return (
-    <IntroProvider>
-      <OnboardingProvider>
-        <RootLayoutContent />
-      </OnboardingProvider>
-    </IntroProvider>
   );
 }
