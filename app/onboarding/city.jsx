@@ -1,11 +1,11 @@
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet } from 'react-native';
 import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { useOnboarding } from '../../components/OnboardingContext';
 import { ChevronLeftIcon, MagnifyingGlassIcon, ArrowRightIcon } from 'react-native-heroicons/outline';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../../constants/theme';
 import ProgressBar from '../../components/ProgressBar';
+import { useUserStore } from '../store/userStore';
 
 // Liste deutscher Städte für die Auswahl
 const GERMAN_CITIES = [
@@ -23,7 +23,7 @@ const GERMAN_CITIES = [
 
 export default function City() {
   const router = useRouter();
-  const { profileData, updateProfileData } = useOnboarding();
+  const { profileData, updateProfileData } = useUserStore();
   const [selectedCity, setSelectedCity] = useState(profileData.favoriteCity || '');
   const [searchQuery, setSearchQuery] = useState('');
 

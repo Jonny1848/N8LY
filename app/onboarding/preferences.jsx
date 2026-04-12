@@ -1,11 +1,11 @@
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { useOnboarding } from '../../components/OnboardingContext';
 import { ChevronLeftIcon, ArrowRightIcon } from 'react-native-heroicons/outline';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../../constants/theme';
 import ProgressBar from '../../components/ProgressBar';
+import { useUserStore } from '../store/userStore';
 
 // Verfügbare Party-Präferenzen mit Icons
 const PARTY_PREFERENCES = [
@@ -23,7 +23,7 @@ const PARTY_PREFERENCES = [
 
 export default function Preferences() {
   const router = useRouter();
-  const { profileData, updateProfileData } = useOnboarding();
+  const { profileData, updateProfileData } = useUserStore();
   const [selectedParty, setSelectedParty] = useState(profileData.partyPreferences || []);
 
   const toggleParty = (party) => {

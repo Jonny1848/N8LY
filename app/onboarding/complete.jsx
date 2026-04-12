@@ -1,16 +1,16 @@
 import { View, Text, Pressable, ActivityIndicator, StyleSheet, ScrollView } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import { useOnboarding } from '../../components/OnboardingContext';
 import { supabase } from '../../lib/supabase';
 import { ExclamationCircleIcon } from 'react-native-heroicons/solid';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../../constants/theme';
+import { useUserStore } from '../store/userStore';
 
 
 export default function Complete() {
   const router = useRouter();
-  const { profileData, resetProfileData } = useOnboarding();
+  const { profileData, resetProfileData } = useUserStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 

@@ -4,22 +4,17 @@
  * Google OAuth: signInWithOAuth → WebBrowser → setSession → fetchProfileWithToken → Redirect
  * Apple (iOS): expo-apple-authentication → signInWithIdToken → fetchProfileWithToken → Redirect
  */
-import { View, Text, Pressable, Image, ActivityIndicator, ScrollView, TextInput, TouchableOpacity, StyleSheet, Platform } from "react-native";
-import { useState, useEffect } from "react";
+import { View, Text, Pressable, Image, ActivityIndicator, ScrollView, TextInput, TouchableOpacity, Platform } from "react-native";
+import { useState } from "react";
 import { useRouter, Redirect } from 'expo-router';
-import { supabase, fetchProfileWithToken } from "../lib/supabase";
-import { makeRedirectUri } from "expo-auth-session";
-import * as WebBrowser from 'expo-web-browser';
-import * as AppleAuthentication from 'expo-apple-authentication';
-import * as Crypto from 'expo-crypto';
-import { theme } from "../constants/theme";
+import { supabase } from "../lib/supabase";
+import { useOAuthHandlers } from "./hooks/useOAuthHandlers";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { EnvelopeIcon } from "react-native-heroicons/outline";
-import { EyeIcon, EyeSlashIcon } from "react-native-heroicons/outline";
-import { CheckIcon } from "react-native-heroicons/solid";
-
-// WICHTIG: Dies erlaubt dem Browser, die Auth-Session abzuschließen
-WebBrowser.maybeCompleteAuthSession();
+import AuthErrorBanner from "../components/auth/AuthErrorBanner";
+import AuthSubmitButton from "../components/auth/AuthSubmitButton";
+import AuthEmailInput from "../components/auth/AuthEmailInput";
+import AuthPasswordInput from "../components/auth/AuthPasswordInput";
+import { theme } from "../constants/theme";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -29,19 +24,18 @@ export default function Login() {
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("signin");
-  const [oauthRedirectTo, setOauthRedirectTo] = useState(null);
-  const [oauthProcessing, setOauthProcessing] = useState(false);
-  const [appleAuthAvailable, setAppleAuthAvailable] = useState(false);
   const router = useRouter();
 
-  // Apple Sign-In Verfügbarkeit prüfen (nur iOS)
-  useEffect(() => {
-    if (Platform.OS === 'ios') {
-      AppleAuthentication.isAvailableAsync().then(setAppleAuthAvailable);
-    }
-  }, []);
+  // OAuth-Logik zentral im Hook (Google + Apple)
+  const {
+    signInWithGoogle,
+    signInWithApple,
+    oauthProcessing,
+    oauthRedirectTo,
+    appleAuthAvailable,
+  } = useOAuthHandlers({ setErrorMsg, mode: 'login', router });
 
-  // Deklarativer Redirect nach OAuth - läuft im Render-Zyklus, zuverlässiger als router.replace
+  // Deklarativer Redirect nach OAuth
   if (oauthRedirectTo) {
     return <Redirect href={oauthRedirectTo} />;
   }
@@ -49,9 +43,9 @@ export default function Login() {
   // OAuth-Overlay: Login-Form verstecken, bis Weiterleitung – verhindert kurzes Aufblitzen des Login-Screens
   if (oauthProcessing) {
     return (
-      <View style={styles.oauthOverlay}>
+      <View className="flex-1 bg-white justify-center items-center">
         <ActivityIndicator size="large" color={theme.colors.primary.main} />
-        <Text style={styles.oauthOverlayText}>Anmeldung wird verarbeitet...</Text>
+        <Text className="mt-4 text-gray-700 text-base">Anmeldung wird verarbeitet...</Text>
       </View>
     );
   }
@@ -290,11 +284,11 @@ export default function Login() {
           </View>
 
           {/* Welcome Text */}
-          <View className="mb-8 items-center justify-center" style={{ alignItems: 'center' }}>
-            <Text className="text-3xl font-bold text-black mb-2" style={{ textAlign: 'center', fontFamily: 'Manrope_700Bold' }}>
+          <View className="mb-8 items-center justify-center">
+            <Text className="text-3xl font-bold text-black mb-2 text-center">
               Willkommen zurück
             </Text>
-            <Text className="text-base text-gray-500" style={{ textAlign: 'center', fontFamily: 'Manrope_400Regular' }}>
+            <Text className="text-base text-gray-500 text-center">
               Schön, dich wiederzusehen
             </Text>
           </View>
@@ -305,7 +299,7 @@ export default function Login() {
               onPress={() => setActiveTab("signin")}
               className={`flex-1 py-3 rounded-lg ${activeTab === "signin" ? "bg-white" : ""}`}
             >
-              <Text className={`text-center font-semibold ${activeTab === "signin" ? "text-black" : "text-gray-500"}`} style={{ fontFamily: 'Manrope_600SemiBold' }}>
+              <Text className={`text-center font-semibold ${activeTab === "signin" ? "text-black" : "text-gray-500"}`}>
                 Anmelden
               </Text>
             </Pressable>
@@ -372,37 +366,15 @@ export default function Login() {
           </View>
 
           {/* Error Message */}
-          {errorMsg && (
-            <View className="mb-4 p-3 bg-red-50 rounded-xl border border-red-200">
-              <Text className="text-red-600 text-sm" style={{ fontFamily: 'Manrope_400Regular' }}>{errorMsg}</Text>
-            </View>
-          )}
+          <AuthErrorBanner message={errorMsg} className="mb-4" />
 
           {/* Continue Button */}
-          <Pressable
-            onPress={handleSubmit}
-            disabled={loading}
-            className={`py-4 rounded-xl mb-6 ${loading ? "opacity-50" : ""}`}
-            style={{ backgroundColor: theme.colors.primary.main }}
-          >
-            {loading ? (
-              <View className="flex-row items-center justify-center">
-                <ActivityIndicator size="small" color="#fff" />
-                <Text className="text-white font-semibold text-center ml-2" style={{ fontFamily: 'Manrope_600SemiBold' }}>
-                  Wird geladen...
-                </Text>
-              </View>
-            ) : (
-              <Text className="text-white font-semibold text-center text-base" style={{ fontFamily: 'Manrope_600SemiBold' }}>
-                Weiter
-              </Text>
-            )}
-          </Pressable>
+          <AuthSubmitButton title="Anmelden" onPress={handleSubmit} disabled={loading} loading={loading} />
 
           {/* Or Continue With */}
           <View className="flex-row items-center mb-6">
             <View className="flex-1 h-px bg-gray-300" />
-            <Text className="mx-4 text-gray-500 text-sm" style={{ fontFamily: 'Manrope_400Regular' }}>Oder weiter mit</Text>
+            <Text className="mx-4 text-gray-500 text-sm">Oder weiter mit</Text>
             <View className="flex-1 h-px bg-gray-300" />
           </View>
 
@@ -427,29 +399,10 @@ export default function Login() {
             )}
           </View>
 
-          {/* Bottom Text */}
-          <View className="mt-auto">
-            <Text className="text-gray-500 text-sm leading-5" style={{}}>
-              
-            </Text>
-          </View>
+          {/* Bottom Spacer */}
+          <View className="mt-auto" />
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  oauthOverlay: {
-    flex: 1,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  oauthOverlayText: {
-    marginTop: 16,
-    color: theme.colors.neutral.gray[700],
-    fontSize: 16,
-    fontFamily: 'Manrope_400Regular',
-  },
-});
