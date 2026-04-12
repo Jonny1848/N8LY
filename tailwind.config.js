@@ -11,7 +11,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // N8LY Brand Blue (Chat-Bubbles, Buttons)
+        // N8LY Brand Blue (Chat-Bubbles, Buttons) — `brand` fuer z. B. AuthSubmitButton (bg-brand)
+        brand: '#0066FF',
         'N8LY-blue': '#0066FF',
         // Minimalistische Farbpalette
         primary: {
