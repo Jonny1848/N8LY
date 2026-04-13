@@ -11,7 +11,6 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen name="home" />
-      <Tabs.Screen name="events" />
       <Tabs.Screen name="social" />
       <Tabs.Screen name="discover" />
       <Tabs.Screen name="profile" />

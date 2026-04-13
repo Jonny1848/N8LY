@@ -11,21 +11,18 @@ import { theme } from '../constants/theme';
 
 // Solid Icons
 import { HomeIcon as HomeIconSolid } from 'react-native-heroicons/solid';
-import { CalendarIcon as CalendarIconSolid } from 'react-native-heroicons/solid';
 import { ChatBubbleLeftIcon as ChatBubbleLeftIconSolid } from 'react-native-heroicons/solid';
 import { GlobeAltIcon as GlobeAltIconSolid } from 'react-native-heroicons/solid';
 import { UserIcon as UserIconSolid } from 'react-native-heroicons/solid';
 
 // Outline Icons
 import { HomeIcon as HomeIconOutline } from 'react-native-heroicons/outline';
-import { CalendarIcon as CalendarIconOutline } from 'react-native-heroicons/outline';
 import { ChatBubbleLeftIcon as ChatBubbleLeftIconOutline } from 'react-native-heroicons/outline';
 import { GlobeAltIcon as GlobeAltIconOutline } from 'react-native-heroicons/outline';
 import { UserIcon as UserIconOutline } from 'react-native-heroicons/outline';
 
 const iconMap: Record<string, { solid: any; outline: any }> = {
   home: { solid: HomeIconSolid, outline: HomeIconOutline },
-  events: { solid: CalendarIconSolid, outline: CalendarIconOutline },
   social: { solid: ChatBubbleLeftIconSolid, outline: ChatBubbleLeftIconOutline },
   discover: { solid: GlobeAltIconSolid, outline: GlobeAltIconOutline },
   profile: { solid: UserIconSolid, outline: UserIconOutline },
