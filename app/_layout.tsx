@@ -135,7 +135,7 @@ export default function RootLayout() {
 
   /**
    * Nach erfolgreicher Authentifizierung: Profil laden und navigieren.
-   * Speichert das Profil im Zustand-Store, sodass alle Screens darauf zugreifen koennen.
+   * Speichert das Profil im Zustand-Store, sodass alle Screens darauf zugreifen können.
    */
   async function handleAuthenticated(session: any, event?: string) {
     if (handlingAuthRef.current) return;

@@ -1,8 +1,9 @@
 /**
  * Vertikale Werkzeugleiste rechts (Instagram-Stil): Text, Sticker, Musik, Effekte, Mehr.
- * „Mehr" klappt mit Reanimated auf — enthält Stift, Farbspektrum-Slider und Undo.
+ * „Mehr" klappt mit Reanimated auf — enthält Stift, Farbvorschau-Dot und Undo.
+ * Der Stift-Button öffnet einen erweiterten Farbwähler als Overlay (StoryColorPickerOverlay).
  */
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -12,7 +13,6 @@ import Animated, {
   interpolate,
   Extrapolation,
 } from 'react-native-reanimated';
-import ColorPicker, { HueSlider } from 'reanimated-color-picker';
 import {
   FaceSmileIcon,
   MusicalNoteIcon,
@@ -21,8 +21,10 @@ import {
   PencilIcon,
 } from 'react-native-heroicons/solid';
 import { theme } from '../../constants/theme';
+import StoryColorPickerOverlay from './StoryColorPickerOverlay';
 
-const MORE_PANEL_MAX_H = 300;
+/* Reduzierte Höhe: ohne inline HueSlider (Panel ist jetzt im Overlay) */
+const MORE_PANEL_MAX_H = 160;
 
 const SPRING_CFG = {
   damping: 18,
@@ -57,6 +59,8 @@ export default function StoryEditorSidebar({
   onDismissTextEditor,
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
+  /* Steuert die Sichtbarkeit des erweiterten Farbwähler-Overlays */
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -92,18 +96,13 @@ export default function StoryEditorSidebar({
 
   const penBtnStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolate(penActive.value, [0, 1], [0, 1]) > 0.5
-      ? 'rgba(255,255,255,0.2)' : 'transparent',
+      ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.3)',
     transform: [{ scale: interpolate(penActive.value, [0, 1], [1, 1.12], Extrapolation.CLAMP) }],
   }));
 
-  /** Color Picker: nimmt Farbwechsel entgegen */
-  const handleColorComplete = useCallback(({ hex }) => {
-    onColorChange(hex);
-  }, [onColorChange]);
-
   return (
     <View style={styles.column}>
-      {/* Aa */}
+      {/* Aa — dunkler Kreis-Backdrop garantiert Sichtbarkeit auf jedem Hintergrund */}
       <Pressable
         onPress={() => {
           if (mode === 'text') {
@@ -112,37 +111,36 @@ export default function StoryEditorSidebar({
             onOpenText();
           }
         }}
-        style={styles.hit}
+        style={[styles.iconBtn, mode === 'text' && styles.iconBtnActive]}
         hitSlop={8}
       >
-        <Text style={[styles.aa, mode === 'text' && styles.aaActive]}>Aa</Text>
+        <Text style={styles.aa}>Aa</Text>
       </Pressable>
 
       {/* Sticker */}
       <Pressable
         onPress={() => onModeChange(mode === 'sticker' ? 'none' : 'sticker')}
-        style={styles.hit}
+        style={styles.iconBtn}
         hitSlop={8}
       >
-        <FaceSmileIcon size={28} color="#fff" style={styles.iconShadow} />
+        <FaceSmileIcon size={26} color="#fff" />
       </Pressable>
 
       {/* Musik (Platzhalter) */}
-      <Pressable style={styles.hit} hitSlop={8} onPress={() => undefined} accessibilityLabel="Musik (bald)">
-        <MusicalNoteIcon size={28} color="#fff" style={styles.iconShadow} />
+      <Pressable style={styles.iconBtn} hitSlop={8} onPress={() => undefined} accessibilityLabel="Musik (bald)">
+        <MusicalNoteIcon size={26} color="#fff" />
       </Pressable>
 
       {/* Effekte */}
       <Pressable
-        style={styles.hit}
+        style={styles.iconBtn}
         hitSlop={8}
         onPress={() => onOpenEffects?.()}
         accessibilityLabel="Effekte und Filter"
       >
         <SparklesIcon
-          size={28}
+          size={26}
           color={effectsActive ? theme.colors.primary.main2 : '#fff'}
-          style={styles.iconShadow}
         />
       </Pressable>
 
@@ -152,40 +150,30 @@ export default function StoryEditorSidebar({
         pointerEvents={moreOpen ? 'auto' : 'none'}
       >
         <View style={styles.moreBlock}>
-          {/* Stift-Button mit Animierung */}
+          {/* Stift-Button: aktiviert Zeichenmodus + öffnet Farbwähler-Overlay */}
           <Pressable
-            onPress={() => onModeChange(mode === 'draw' ? 'none' : 'draw')}
+            onPress={() => {
+              if (mode === 'draw') {
+                onModeChange('none');
+              } else {
+                onModeChange('draw');
+                setColorPickerOpen(true);
+              }
+            }}
             hitSlop={8}
           >
             <Animated.View style={[styles.penBtn, penBtnStyle]}>
               <PencilIcon
-                size={24}
+                size={22}
                 color={mode === 'draw' ? theme.colors.primary.main2 : '#fff'}
-                style={styles.iconShadow}
               />
             </Animated.View>
           </Pressable>
 
-          {/* Aktive Farbvorschau */}
-          <View style={[styles.activeColorPreview, { backgroundColor: strokeColor }]} />
-
-          {/* Farbspektrum-Slider (Hue) statt 6 Farbpunkte */}
-          <View style={styles.hueSliderWrap}>
-            <ColorPicker
-              value={strokeColor}
-              onCompleteJS={handleColorComplete}
-              style={styles.colorPickerContainer}
-            >
-              <HueSlider
-                vertical
-                style={styles.hueSlider}
-                thumbShape="circle"
-                thumbSize={18}
-                thumbColor="#fff"
-                sliderThickness={14}
-              />
-            </ColorPicker>
-          </View>
+          {/* Farbvorschau-Dot: Tap öffnet den erweiterten Farbwähler */}
+          <Pressable onPress={() => setColorPickerOpen(true)} hitSlop={6}>
+            <View style={[styles.activeColorPreview, { backgroundColor: strokeColor }]} />
+          </Pressable>
 
           {/* Undo */}
           <Pressable onPress={onUndo} disabled={!canUndo} style={[styles.hit, !canUndo && styles.disabled]}>
@@ -197,14 +185,22 @@ export default function StoryEditorSidebar({
       {/* Chevron: Mehr auf/zu */}
       <Pressable
         onPress={() => setMoreOpen((v) => !v)}
-        style={styles.hit}
+        style={styles.iconBtn}
         hitSlop={8}
         accessibilityLabel="Mehr Werkzeuge"
       >
         <Animated.View style={chevronRotateStyle}>
-          <ChevronDownIcon size={28} color="#fff" style={styles.iconShadow} />
+          <ChevronDownIcon size={26} color="#fff" />
         </Animated.View>
       </Pressable>
+
+      {/* Erweiterter Farbwähler als Overlay (Panel1 + Hue + Opacity + Swatches) */}
+      <StoryColorPickerOverlay
+        visible={colorPickerOpen}
+        color={strokeColor}
+        onColorChange={onColorChange}
+        onClose={() => setColorPickerOpen(false)}
+      />
     </View>
   );
 }
@@ -212,20 +208,32 @@ export default function StoryEditorSidebar({
 const styles = StyleSheet.create({
   column: {
     alignItems: 'center',
-    gap: 22,
+    gap: 18,
+  },
+  /** Dunkler Kreis-Backdrop fuer jeden Icon-Button — garantiert Lesbarkeit auf jedem Hintergrund */
+  iconBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /** Leichtes Highlight wenn ein Modus aktiv ist (z. B. Text-Modus) */
+  iconBtnActive: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    transform: [{ scale: 1.06 }],
   },
   hit: { padding: 4 },
   disabled: { opacity: 0.35 },
   aa: {
     color: '#fff',
-    fontSize: 22,
+    fontSize: 20,
     fontFamily: 'Manrope_700Bold',
-    textShadowColor: 'rgba(0,0,0,0.85)',
+    textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    textShadowRadius: 2,
   },
-  aaActive: { opacity: 1, transform: [{ scale: 1.06 }] },
-  iconShadow: { opacity: 1 },
   moreOuter: {
     alignItems: 'center',
     width: '100%',
@@ -235,6 +243,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 6,
   },
+  /** Stift-Button: gleiche Groesse wie iconBtn, Hintergrund wird per Animation gesteuert */
   penBtn: {
     width: 40,
     height: 40,
@@ -242,29 +251,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  /** Kleine runde Vorschau der aktuellen Stiftfarbe */
+  /** Kleine runde Vorschau der aktuellen Stiftfarbe — Tap oeffnet das Picker-Overlay */
   activeColorPreview: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2.5,
     borderColor: '#fff',
-  },
-  /** Container fuer den vertikalen Hue-Slider */
-  hueSliderWrap: {
-    width: 36,
-    height: 120,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  colorPickerContainer: {
-    width: 36,
-    height: 120,
-  },
-  hueSlider: {
-    width: 14,
-    height: 120,
-    borderRadius: 7,
+    /* Subtiler Schatten damit der Dot auch auf weissem Hintergrund sichtbar bleibt */
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.5,
+    shadowRadius: 3,
+    elevation: 3,
   },
   undoTxt: {
     color: '#fff',

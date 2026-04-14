@@ -181,11 +181,11 @@ export default function ChatBubble({ item, index, messages, userId, conversation
                   isOwn={isOwn}
                 />
               ) : isFile && item.media_url ? (
-                /* Dateianhang: Tipp oeffnet die oeffentliche Storage-URL im System (Browser / Viewer) */
+                /* Dateianhang: Tipp öffnet die öffentliche Storage-URL im System (Browser / Viewer) */
                 <Pressable
                   onPress={() => Linking.openURL(item.media_url)}
                   accessibilityRole="button"
-                  accessibilityLabel="Datei oeffnen"
+                  accessibilityLabel="Datei öffnen"
                   className="flex-row items-center gap-2 active:opacity-80"
                 >
                   <PaperClipIcon
@@ -204,7 +204,7 @@ export default function ChatBubble({ item, index, messages, userId, conversation
               ) : isImage && item.media_url ? (
                 /* Bildnachricht: Foto mit optionalem Caption – Zeitstempel unter der Bubble */
                 <>
-                  {/* Tipp oeffnet Vollbild; Callback kommt vom Chat-Screen (imagePreviewUri) */}
+                  {/* Tipp öffnet Vollbild; Callback kommt vom Chat-Screen (imagePreviewUri) */}
                   <Pressable
                     onPress={() => onImagePress?.(item.media_url)}
                     disabled={!onImagePress}

@@ -74,7 +74,7 @@ function hasAvatar(url) {
   return typeof url === 'string' && url.trim().length > 0;
 }
 
-// ── Avatar-Komponente (benoetigt style wegen dynamischer size-Props) ──
+// ── Avatar-Komponente (benötigt style wegen dynamischer size-Props) ──
 
 function RoundAvatar({ url, name, size = 48 }) {
   if (hasAvatar(url)) {
@@ -208,7 +208,7 @@ export default function NewChatSelectScreen() {
 
   /**
    * Weiter-Aktion:
-   * - 1 Teilnehmer → Direktchat erstellen/oeffnen
+   * - 1 Teilnehmer → Direktchat erstellen/öffnen
    * - 2+ Teilnehmer → Chat-Details (Name/Bild) vor dem Erstellen
    */
   const handleNext = async () => {

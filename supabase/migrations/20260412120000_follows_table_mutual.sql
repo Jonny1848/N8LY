@@ -34,7 +34,7 @@ CREATE POLICY "follows_select_if_involved"
   TO authenticated
   USING (follower_id = auth.uid() OR following_id = auth.uid());
 
--- Einfuegen / Loeschen: nur als Follower (eigene Kante)
+-- Einfuegen / Löschen: nur als Follower (eigene Kante)
 DROP POLICY IF EXISTS "follows_insert_own" ON public.follows;
 CREATE POLICY "follows_insert_own"
   ON public.follows

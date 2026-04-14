@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     transform: [{ translateY: 12 }],
   },
-  /** Abstand Icon → Label: groesser = Text sitzt weiter unten in der Kachel */
+  /** Abstand Icon → Label: grösser = Text sitzt weiter unten in der Kachel */
   tileLabel: {
     marginTop: 16,
     textAlign: 'center',

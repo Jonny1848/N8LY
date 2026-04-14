@@ -1,7 +1,7 @@
 /**
  * Untere Leiste fuer Story-Editor:
- * - Text: Font-Pills + vertikaler Groessen-Regler + Farbpalette.
- * - Sticker: Groessen-Slider.
+ * - Text: Font-Pills + vertikaler Grössen-Regler + Farbpalette.
+ * - Sticker: Grössen-Slider.
  * - Effekte: huebsche animierte Kapseln mit Emoji + Label.
  */
 import { useEffect, useState, useCallback } from 'react';
@@ -198,7 +198,7 @@ export default function StoryEditorStyleBar({
             <Pressable
               onPress={() => setTextPanel('font')}
               style={[styles.iconCircle, textPanel === 'font' && styles.iconCircleActive]}
-              accessibilityLabel="Schrift und Groesse"
+              accessibilityLabel="Schrift und Grösse"
               accessibilityRole="button"
             >
               <Text style={styles.iconAa}>Aa</Text>
@@ -235,7 +235,7 @@ export default function StoryEditorStyleBar({
 
       {variant === 'sticker' ? (
         <>
-          <Text style={styles.sectionLabel}>Emoji-Groesse</Text>
+          <Text style={styles.sectionLabel}>Emoji-Größe</Text>
           <View style={styles.sliderRow}>
             <Text style={styles.sliderHint}>Klein</Text>
             <Slider

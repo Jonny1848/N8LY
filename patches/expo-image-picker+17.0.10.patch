@@ -44,7 +44,7 @@ index 6e4fbe1..f68afad 100644
          let mimeType = getMimeType(from: destinationUrl.pathExtension)
 @@ -389,7 +397,8 @@ internal struct MediaHandler {
  
-           // Stream the resource into our cache directory. This API is asynchronous but doesn't require
+           // Stream the resource into our cache directory. This API is asynchronous but dösn't require
            // a temporary file like `loadFileRepresentation`.
 -          try await PHAssetResourceManager.default().writeData(for: resource, toFile: destinationUrl, options: nil)
 +          try await PHAssetResourceManager.default().writeData(

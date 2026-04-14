@@ -81,7 +81,7 @@ export default function ChatHeader({ conversation, onBack, onOptions, onPressPro
         <View style={styles.headerProfile}>{profileBlock}</View>
       )}
 
-      {/* Video-Anruf + Telefon Icons – groesser fuer bessere Erreichbarkeit */}
+      {/* Video-Anruf + Telefon Icons – grösser fuer bessere Erreichbarkeit */}
       <View className="flex-row items-center gap-2">
         <Pressable className="w-12 h-12 items-center justify-center">
           <VideoCameraIcon size={28} strokeWidth={2} color={"black"} />

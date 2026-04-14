@@ -62,7 +62,7 @@ export default function ChatDetailScreen() {
   const insets = useSafeAreaInsets();
 
   /**
-   * iOS: Tastatur-Hoehe als animierter Shared Value — folgt der nativen Keyboard-Kurve
+   * iOS: Tastatur-Höhe als animierter Shared Value — folgt der nativen Keyboard-Kurve
    * (weicher als KeyboardAvoidingView/padding allein). Android bleibt bei resize/KAV.
    */
   const keyboard = useAnimatedKeyboard();
@@ -109,7 +109,7 @@ export default function ChatDetailScreen() {
 
   // ============================
   // Callbacks fuer Kinder-Komponenten (stabil via useCallback)
-  // Store-Actions ueber getState() – keine Store-Subscription noetig.
+  // Store-Actions über getState() – keine Store-Subscription nötig.
   // ============================
 
   /** Text-Nachricht senden (wird an MessageInput weitergegeben) */
@@ -192,7 +192,7 @@ export default function ChatDetailScreen() {
     } else if (key === 'contact') {
       setTimeout(() => messageInputRef.current?.openContactsPicker?.(), 300);
     } else if (key === 'poll') {
-      // TODO: Umfrage-Erstellung oeffnen
+      // TODO: Umfrage-Erstellung öffnen
       console.log('[SHARE] Umfrage noch nicht implementiert');
     } else {
       console.log('[SHARE] Option gewaehlt:', key);
@@ -200,14 +200,14 @@ export default function ChatDetailScreen() {
   }, []);
 
   /**
-   * Callback fuer ChatBubble: Bild antippen oeffnet die Vorschau.
+   * Callback fuer ChatBubble: Bild antippen öffnet die Vorschau.
    * HIER wird das Callback gesetzt und an jede Bubble durchgereicht (renderItem).
    */
   const handleImagePress = useCallback((uri) => {
     if (uri) setImagePreviewUri(uri);
   }, []);
 
-  /** Gruppeninfo oeffnen — gleiche Ziel-Route wie Tipp auf Header (Avatar/Name) */
+  /** Gruppeninfo öffnen — gleiche Ziel-Route wie Tipp auf Header (Avatar/Name) */
   const openGroupInfo = useCallback(() => {
     if (conversation?.type === 'group' && conversationId) {
       router.push(`/chat/group-info/${conversationId}`);
@@ -215,7 +215,7 @@ export default function ChatDetailScreen() {
   }, [conversation?.type, conversationId, router]);
 
   /**
-   * Rechter Rand: Wisch von rechts nach links oeffnet die Gruppeninfo (nur Gruppenchats).
+   * Rechter Rand: Wisch von rechts nach links öffnet die Gruppeninfo (nur Gruppenchats).
    * Schmales Overlay, damit die Nachrichtenliste weiterhin normal scrollt.
    */
   const edgeOpenGroupGesture = useMemo(
@@ -337,7 +337,7 @@ export default function ChatDetailScreen() {
           ) : (
             <KeyboardAvoidingView
               style={{ flex: 1 }}
-              // Android: Fenster-resize (adjustResize) — kein zusaetzliches behavior noetig
+              // Android: Fenster-resize (adjustResize) — kein zusätzliches behavior nötig
               behavior={undefined}
               keyboardVerticalOffset={0}
             >

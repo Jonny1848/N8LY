@@ -8,7 +8,7 @@
  * - Story-Bilder und -Videos → Bucket 'stories'
  *
  * Dateien werden in Unterordnern nach User-ID organisiert,
- * damit die RLS-Policies (Loeschrechte) korrekt greifen.
+ * damit die RLS-Policies (Löschrechte) korrekt greifen.
  *
  * WICHTIG (React Native): Blob-Uploads zu Supabase liefern oft 0 Bytes,
  * da Blob/FormData in RN nicht korrekt serialisiert werden.
@@ -102,7 +102,7 @@ export async function uploadVoiceMessage(conversationId, uri, mimeType = 'audio/
     throw error;
   }
 
-  // Oeffentliche URL Zurückgeben
+  // Öffentliche URL Zurückgeben
   const { data: urlData } = supabase.storage
     .from(CHAT_MEDIA_BUCKET)
     .getPublicUrl(filePath);
@@ -202,7 +202,7 @@ export async function uploadStoryMedia(userId, uri, mimeType = 'image/jpeg') {
 }
 
 /**
- * Loescht eine Datei aus einem Storage Bucket.
+ * Löscht eine Datei aus einem Storage Bucket.
  *
  * @param {string} bucket – Der Bucket-Name ('chat-media' oder 'stories')
  * @param {string} filePath – Der Dateipfad innerhalb des Buckets
@@ -213,7 +213,7 @@ export async function deleteFile(bucket, filePath) {
     .remove([filePath]);
 
   if (error) {
-    console.error('Fehler beim Loeschen der Datei:', error);
+    console.error('Fehler beim Löschen der Datei:', error);
     throw error;
   }
 }

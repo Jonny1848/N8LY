@@ -36,7 +36,7 @@ import { publishStoryDrafts } from '../../../../services/publishStoryDrafts';
 
 const THUMB = 56;
 const SLIDE_CORNER_RADIUS = 18;
-/** Mindest-Swipe-Distanz (px) bevor ein Slide-Wechsel ausgeloest wird */
+/** Mindest-Swipe-Distanz (px) bevor ein Slide-Wechsel ausgelöst wird */
 const SWIPE_THRESHOLD = 50;
 
 /**
@@ -111,7 +111,7 @@ export default function StoryReviewScreen() {
     [cardW, cardH]
   );
 
-  /** Nach Loeschen: Index begrenzen */
+  /** Nach Löschen: Index begrenzen */
   useEffect(() => {
     if (clips.length === 0) {
       setActiveIndex(0);

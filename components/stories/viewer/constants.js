@@ -36,7 +36,7 @@ export const STORY_REACTION_PRESS_IN_SCALE = 0.86;
 export const STORY_REACTION_PRESS_IN_MS = 80;
 export const STORY_REACTION_PRESS_POP_SPRING = { damping: 10, stiffness: 440, mass: 0.38 };
 export const STORY_REACTION_PRESS_SETTLE_SPRING = { damping: 17, stiffness: 260, mass: 0.45 };
-/** Leichte Vergroesserung wenn Nutzer diese Reaktion gewaehlt hat */
+/** Leichte Vergrösserung wenn Nutzer diese Reaktion gewaehlt hat */
 export const STORY_REACTION_SELECTED_SCALE = 1.07;
 export const STORY_REACTION_SELECTED_SPRING = { damping: 14, stiffness: 240, mass: 0.5 };
 

@@ -9,7 +9,7 @@ index d84e52b..6f7a0bf 100644
 -      // Use this plugin in reanimated 4 and later
 -      "react-native-worklets/plugin",
 +      // Hinweis N8LY: Reanimated 3.x nutzt react-native-reanimated/plugin (letztes Plugin in babel.config),
-+      // nicht react-native-worklets (Reanimated 4+). Sonst schlaegt das Aufloesen von worklets fehl.
++      // nicht react-native-worklets (Reanimated 4+). Sonst schlaegt das Auflösen von worklets fehl.
      ],
    };
  };
