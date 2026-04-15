@@ -27,7 +27,7 @@ export default function GroupInfoStatsRow({ mediaCount, onPress }) {
           <View style={styles.rightCluster}>
             <Text style={styles.value}>{mediaCount}</Text>
             <View style={styles.chevronWrap}>
-              <ChevronRightIcon size={18} color="black" />
+              <ChevronRightIcon size={22} color= {theme.colors.neutral.gray[400]} />
             </View>
           </View>
         </View>

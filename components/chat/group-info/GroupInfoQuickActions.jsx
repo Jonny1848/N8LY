@@ -30,7 +30,7 @@ function ActionTile({ icon: Icon, label, onPress, emphasized = false }) {
     return (
       <View style={[styles.tileShell, styles.tileShellEmph]}>
         <LinearGradient
-          colors={[theme.colors.accent.main, theme.colors.primary.main3]}
+          colors={[theme.colors.primary.main2, theme.colors.primary.main3]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}

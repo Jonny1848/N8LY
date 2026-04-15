@@ -9,7 +9,6 @@ import {
   Modal,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -17,6 +16,15 @@ import {
 import { Image } from 'expo-image';
 import { XMarkIcon, PhotoIcon } from 'react-native-heroicons/solid';
 import { theme } from '../../../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolateColor,
+} from 'react-native-reanimated';
+
+import { useEffect, useMemo } from 'react';
 
 export default function GroupInfoEditModal({
   visible,
@@ -31,6 +39,49 @@ export default function GroupInfoEditModal({
   name,
 }) {
   const showAvatar = localPreviewUri || (initialAvatarUrl && String(initialAvatarUrl).trim());
+
+  // Vergleich mit Server-Stand: Name geaendert und/oder neues lokales Bild gewaehlt
+  const initialNorm = useMemo(
+    () => String(initialName ?? '').trim(),
+    [initialName],
+  );
+  const draftNorm = String(name ?? '').trim();
+  const hasChanges =
+    draftNorm !== initialNorm || Boolean(localPreviewUri);
+  /** Gradient bleibt „aktiv“ auch waehrend Speichern, damit kein Farbsprung entsteht */
+  const confirmLooksActive = hasChanges || saving;
+
+  const confirmActive = useSharedValue(0);
+  useEffect(() => {
+    confirmActive.value = withTiming(confirmLooksActive ? 1 : 0, { duration: 260 });
+  }, [confirmLooksActive, confirmActive]);
+
+  const confirmBtnScaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: confirmActive.value * 0.06 + 0.94 }],
+  }));
+
+  const confirmInactiveGradOpacity = useAnimatedStyle(() => ({
+    opacity: 1 - confirmActive.value,
+  }));
+
+  const confirmActiveGradOpacity = useAnimatedStyle(() => ({
+    opacity: confirmActive.value,
+  }));
+
+  const confirmLabelStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(
+      confirmActive.value,
+      [0, 1],
+      [theme.colors.neutral.gray[500], '#ffffff'],
+    ),
+  }));
+
+  // Parent erwartet kein Argument (siehe handleSaveEdit in group-info/[id])
+  const handleConfirm = () => {
+    if (!hasChanges || saving || !draftNorm) return;
+    onSave();
+  };
+
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -79,20 +130,46 @@ export default function GroupInfoEditModal({
             )}
           </Pressable>
 
+          {/* Speichern: wie GroupInfoDescriptionModal — zwei LinearGradients (inaktiv/aktiv) */}
           <Pressable
-            onPress={onSave}
-            disabled={saving || !String(name || '').trim()}
+            onPress={handleConfirm}
+            disabled={!draftNorm || !hasChanges || saving}
             style={({ pressed }) => [
-              styles.saveBtn,
-              (!String(name || '').trim() || saving) && styles.saveBtnDisabled,
-              pressed && String(name || '').trim() && !saving && { opacity: 0.92 },
+              styles.confirmPressWrap,
+              pressed && draftNorm && hasChanges && !saving && { opacity: 0.92 },
             ]}
           >
-            {saving ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.saveLabel}>Speichern</Text>
-            )}
+            <Animated.View style={[styles.confirmBtnOuter, confirmBtnScaleStyle]}>
+              <Animated.View
+                pointerEvents="none"
+                style={[StyleSheet.absoluteFillObject, confirmInactiveGradOpacity]}
+              >
+                <LinearGradient
+                  colors={[theme.colors.neutral.gray[300], theme.colors.neutral.gray[200]]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+              </Animated.View>
+              <Animated.View
+                pointerEvents="none"
+                style={[StyleSheet.absoluteFillObject, confirmActiveGradOpacity]}
+              >
+                <LinearGradient
+                  colors={[theme.colors.primary.main, theme.colors.primary.main2]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+              </Animated.View>
+              {saving ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Animated.Text style={[styles.confirmLabel, confirmLabelStyle]}>
+                  Speichern
+                </Animated.Text>
+              )}
+            </Animated.View>
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -171,19 +248,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.colors.neutral.gray[500],
   },
-  saveBtn: {
+  confirmPressWrap: {
     marginTop: 32,
-    backgroundColor: theme.colors.primary.main,
-    borderRadius: theme.borderRadius.lg,
-    paddingVertical: 14,
     alignItems: 'center',
   },
-  saveBtnDisabled: {
-    opacity: 0.45,
+  confirmBtnOuter: {
+    borderRadius: 9999,
+    overflow: 'hidden',
+    paddingHorizontal: 40,
+    paddingVertical: 14,
+    minWidth: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  saveLabel: {
+  confirmLabel: {
     fontFamily: theme.typography.fontFamily.bold,
     fontSize: 16,
-    color: '#FFFFFF',
   },
 });

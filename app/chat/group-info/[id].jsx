@@ -256,16 +256,6 @@ export default function GroupInfoScreen() {
             <Text style={styles.memberHeaderText}>
               {membersSorted.length} Mitglieder
             </Text>
-            <Pressable
-              onPress={() =>
-                Alert.alert('Suche', 'Mitglieder-Suche folgt in einer späteren Version.')
-              }
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel="Mitglieder durchsuchen"
-            >
-              <MagnifyingGlassIcon size={22} color={theme.colors.primary.main} />
-            </Pressable>
           </View>
           <View style={styles.memberCard}>
             {membersSorted.map((p, idx) => {
