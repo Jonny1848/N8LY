@@ -140,7 +140,7 @@ export default function StoryEditorSidebar({
       >
         <SparklesIcon
           size={26}
-          color={effectsActive ? theme.colors.primary.main2 : '#fff'}
+          color={effectsActive ? theme.colors.primary.main : '#fff'}
         />
       </Pressable>
 
@@ -165,7 +165,7 @@ export default function StoryEditorSidebar({
             <Animated.View style={[styles.penBtn, penBtnStyle]}>
               <PencilIcon
                 size={22}
-                color={mode === 'draw' ? theme.colors.primary.main2 : '#fff'}
+                color={mode === 'draw' ? theme.colors.primary.main : '#fff'}
               />
             </Animated.View>
           </Pressable>

@@ -25,6 +25,7 @@ import {
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { ChevronLeftIcon } from 'react-native-heroicons/outline';
+import { VideoCameraIcon } from 'react-native-heroicons/solid';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -287,7 +288,7 @@ export default function StoryReviewScreen() {
             >
               {c.kind === 'video' ? (
                 <View style={[styles.thumb, styles.thumbVideo]}>
-                  <Text style={styles.videoLbl}>Video</Text>
+                  <VideoCameraIcon size={24} color="#fff" />
                 </View>
               ) : (
                 <Image source={{ uri: c.exportUri || c.localUri }} style={styles.thumb} />
@@ -378,7 +379,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#333',
   },
-  thumbVideo: { alignItems: 'center', justifyContent: 'center' },
+  thumbVideo: { alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.accent.main},
   videoLbl: { color: '#fff', fontFamily: 'Manrope_600SemiBold', fontSize: 10 },
   addMore: {
     borderWidth: 2,

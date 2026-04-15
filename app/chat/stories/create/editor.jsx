@@ -353,21 +353,7 @@ export default function StoryEditorScreen() {
           </View>
         </View>
 
-        <View style={[styles.pad, { paddingBottom: insets.bottom + 8 }]}>
-          <Text style={styles.label}>Caption (optional)</Text>
-          <TextInput
-            value={clip.caption || ''}
-            onChangeText={(t) => updateClip(clip.id, { caption: t || null })}
-            placeholder="Text zur Story…"
-            placeholderTextColor="#888"
-            style={styles.input}
-            multiline
-          />
-          <Text style={styles.hintPhaseC}>
-            Hinweis Phase C: Zeichnung/Sticker auf Video sind hier noch nicht ins Material
-            eingebrannt; dafuer wäre FFmpeg oder ein Overlay-JSON im Viewer nötig.
-          </Text>
-        </View>
+       
 
         <View
           style={[
