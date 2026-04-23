@@ -237,7 +237,7 @@ export async function updateGroupConversation(conversationId, updates = {}) {
 }
 
 /**
- * Zaehlt Medien-/Datei-Nachrichten in der Gruppe (WhatsApp: „Medien, Links, Doks“ — hier Medien + Dateien).
+ * Zaehlt Medien-/Datei-Nachrichten in der Gruppe (WhatsApp: „Medien“ — hier Medien + Dateien).
  *
  * @param {string} conversationId
  * @returns {Promise<number>}
@@ -832,4 +832,60 @@ export async function getKnownContacts(currentUserId) {
   const merged = [...byId.values()];
   merged.sort((a, b) => (a.username || '').localeCompare(b.username || ''));
   return merged;
+}
+
+
+/// ========== GRUPPENCHATS ==========
+
+export async function makeAdmin(conversationId, userId) {
+  console.log('[makeAdmin] conversationId:', conversationId, 'userId:', userId);
+
+  /*
+   * .select() ist wichtig: Supabase (PostgREST) gibt bei RLS-Blockierung
+   * standardmässig keinen Fehler zurück, sondern leere Daten.
+   * Nur durch .select() können wir prüfen, ob wirklich eine Zeile geändert wurde.
+   */
+  const { data, error } = await supabase
+    .from('conversation_participants')
+    .update({ role: 'admin' })
+    .eq('conversation_id', conversationId)
+    .eq('user_id', userId)
+    .select();
+
+  console.log('[makeAdmin] result — data:', data, 'error:', error);
+
+  if (error) {
+    console.error('[makeAdmin] Supabase error:', error);
+    throw error;
+  }
+
+  if (!data || data.length === 0) {
+    const msg = 'Rolle konnte nicht gesetzt werden — möglicherweise fehlende Berechtigung (RLS).';
+    console.error('[makeAdmin]', msg);
+    throw new Error(msg);
+  }
+}
+
+export async function removeAdmin(conversationId, userId) {
+  console.log('[removeAdmin] conversationId:', conversationId, 'userId:', userId);
+
+  const { data, error } = await supabase
+    .from('conversation_participants')
+    .update({ role: 'member' })
+    .eq('conversation_id', conversationId)
+    .eq('user_id', userId)
+    .select();
+
+  console.log('[removeAdmin] result — data:', data, 'error:', error);
+
+  if (error) {
+    console.error('[removeAdmin] Supabase error:', error);
+    throw error;
+  }
+
+  if (!data || data.length === 0) {
+    const msg = 'Adminrechte konnten nicht entzogen werden — möglicherweise fehlende Berechtigung (RLS).';
+    console.error('[removeAdmin]', msg);
+    throw new Error(msg);
+  }
 }

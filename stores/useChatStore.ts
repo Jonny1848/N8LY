@@ -36,6 +36,9 @@ import {
   createDirectConversation,
   createGroupConversation,
   updateGroupConversation as apiUpdateGroupConversation,
+  makeAdmin as apiMakeAdmin,
+  removeAdmin as apiRemoveAdmin,
+  removeParticipant as apiRemoveParticipant,
 } from '../services/chatService';
 import { supabase } from '../lib/supabase';
 
@@ -164,6 +167,16 @@ interface ChatState {
 
   /** Setzt den aktiven Chat Zurück (beim Verlassen des Chat-Screens) */
   clearActiveConversation: () => void;
+
+
+  /** Macht einen User zu einem Admin in einer Gruppenkonversation */
+  makeAdmin: (conversationId: string, currentUserId: string) => Promise<void>;
+
+  /** Entfernt einen Admin aus einer Gruppenkonversation */
+  removeAdmin: (conversationId: string, userId: string) => Promise<void>;
+
+  /** Entfernt einen Teilnehmer aus einer Gruppenkonversation */
+  removeParticipant: (conversationId: string, userId: string) => Promise<void>;
 }
 
 // ============================
@@ -403,6 +416,16 @@ const useChatStore = create<ChatState>((set, get) => ({
 
   clearActiveConversation: () => {
     set({ activeConversation: null });
+  },
+  makeAdmin: async (conversationId, currentUserId) => {
+    await apiMakeAdmin(conversationId, currentUserId);
+  },
+  removeAdmin: async (conversationId, userId) => {
+    await apiRemoveAdmin(conversationId, userId);
+  },
+
+  removeParticipant: async (conversationId, userId) => {
+    await apiRemoveParticipant(conversationId, userId);
   },
 }));
 

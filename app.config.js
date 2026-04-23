@@ -31,6 +31,7 @@ export default {
         NSLocationWhenInUseUsageDescription:
           "Diese App benötigt deinen Standort, um Events in deiner Nähe anzuzeigen.",
         ITSAppUsesNonExemptEncryption: false,
+        NSCameraUsageDescription: "Diese App benötigt deine Kamera, um Fotos und Videos aufzunehmen.",
       },
       usesAppleSignIn: true,
       supportsTablet: true,
@@ -102,9 +103,9 @@ export default {
         "expo-camera",
         {
           cameraPermission:
-            "N8LY benötigt die Kamera, um Fotos und Videos fuer deine Story aufzunehmen.",
+            "N8LY benötigt die Kamera, um Fotos und Videos für deine Story aufzunehmen.",
           microphonePermission:
-            "N8LY benötigt das Mikrofon fuer Video-Stories.",
+            "N8LY benötigt das Mikrofon für Video-Stories.",
           recordAudioAndroid: true,
         },
       ],
