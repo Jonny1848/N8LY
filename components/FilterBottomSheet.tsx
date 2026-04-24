@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Modal, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
+  Easing,
   useAnimatedStyle,
-  withSpring,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
@@ -61,9 +61,9 @@ export function FilterBottomSheet({ visible, onClose, onApply, onReset }: Filter
 
   React.useEffect(() => {
     if (visible && !isFilterClosing) {
-      translateY.value = withSpring(0, {
-        damping: 20,
-        stiffness: 90,
+      translateY.value = withTiming(0, {
+        duration: 300,
+        easing: Easing.out(Easing.cubic),
       });
     }
   }, [visible, isFilterClosing]);

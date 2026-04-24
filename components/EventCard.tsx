@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
 import { AvatarStack } from './AvatarStack';
@@ -58,61 +58,64 @@ export default function EventCard({ event, onPress }: EventCardProps) {
       onPress={() => onPress?.(event)}
       style={({ pressed }) => [styles.container, pressed && styles.pressed]}
     >
-      <View style={styles.imageWrapper}>
-        <Image
-          source={
-            event.image_urls && event.image_urls.length > 0
-              ? { uri: event.image_urls[0] }
-              : require('../assets/pexels-apasaric-2078071.jpg')
-          }
-          style={styles.image}
-        />
-        {event.is_boosted && (
-          <View style={styles.boostBadge}>
-            <Ionicons name="flash" size={10} color="white" />
-          </View>
-        )}
-      </View>
-
-      <View style={styles.content}>
-        <View style={styles.topRow}>
-          <Text style={styles.dateText}>{`${formattedDate} • ${formattedTime}`}</Text>
-
-          <Pressable
-            onPress={() => setIsSaved(!isSaved)}
-            style={styles.bookmarkButton}
-          >
-            <Ionicons
-              name={isSaved ? "bookmark" : "bookmark-outline"}
-              size={22}
-              color={isSaved ? theme.colors.primary.main : theme.colors.neutral.gray[300]}
-            />
-          </Pressable>
-        </View>
-
-        <Text style={styles.title} numberOfLines={1}>{event.title}</Text>
-        <View style={styles.locationRow}>
-          <Text style={styles.locationText} numberOfLines={1}>
-            {event.venue_name} • {event.city}
-          </Text>
-        </View>
-
-        <View style={styles.footer}>
-          <AvatarStack
-            avatars={avatars}
-            totalCount={event.interested_count}
-            maxVisible={3}
-            size={24}
-            spacing={-6}
+      <View style={styles.mainRow}>
+        <View style={styles.imageWrapper}>
+          <Image
+            source={
+              event.image_urls && event.image_urls.length > 0
+                ? { uri: event.image_urls[0] }
+                : require('../assets/pexels-apasaric-2078071.jpg')
+            }
+            style={styles.image}
+            resizeMode="cover"
           />
-          <View style={styles.interestedBox}>
-            <Ionicons name="flame" size={14} color={theme.colors.accent.main} />
-            <Text style={styles.interestedText}>{event.interested_count} Buzz</Text>
-          </View>
-          
-          {!!(event.ticket_available < 20 && event.ticket_available > 0) && (
-            <Text style={styles.limitedText}>Fast ausverkauft!</Text>
+          {event.is_boosted && (
+            <View style={styles.boostBadge}>
+              <Ionicons name="flash" size={10} color="white" />
+            </View>
           )}
+        </View>
+
+        <View style={styles.content}>
+          <View style={styles.topRow}>
+            <Text style={styles.dateText} numberOfLines={1}>{`${formattedDate} • ${formattedTime}`}</Text>
+
+            <Pressable
+              onPress={() => setIsSaved(!isSaved)}
+              style={styles.bookmarkButton}
+            >
+              <Ionicons
+                name={isSaved ? "bookmark" : "bookmark-outline"}
+                size={22}
+                color={isSaved ? theme.colors.primary.main : theme.colors.neutral.gray[300]}
+              />
+            </Pressable>
+          </View>
+
+          <Text style={styles.title} numberOfLines={1}>{event.title}</Text>
+          <View style={styles.locationRow}>
+            <Text style={styles.locationText} numberOfLines={1}>
+              {event.venue_name} • {event.city}
+            </Text>
+          </View>
+
+          <View style={styles.footer}>
+            <AvatarStack
+              avatars={avatars}
+              totalCount={event.interested_count}
+              maxVisible={3}
+              size={24}
+              spacing={-6}
+            />
+            <View style={styles.interestedBox}>
+              <Ionicons name="flame" size={14} color={theme.colors.accent.main} />
+              <Text style={styles.interestedText}>{event.interested_count} Buzz</Text>
+            </View>
+            
+            {!!(event.ticket_available < 20 && event.ticket_available > 0) && (
+              <Text style={styles.limitedText}>Fast ausverkauft!</Text>
+            )}
+          </View>
         </View>
       </View>
 
@@ -140,8 +143,15 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     transform: [{ scale: 0.99 }],
   },
+  mainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
+  },
   imageWrapper: {
     position: 'relative',
+    flexShrink: 0,
   },
   image: {
     width: 85,
@@ -166,13 +176,15 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     marginLeft: 14,
-    height: 85,
+    minHeight: 85,
     justifyContent: 'space-between',
+    minWidth: 0,
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
   },
   dateText: {
     fontSize: 12,
@@ -204,6 +216,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
   },
   interestedBox: {
     flexDirection: 'row',

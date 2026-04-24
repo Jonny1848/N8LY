@@ -1,8 +1,6 @@
 import { View, Pressable, Image, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useRef, useEffect } from 'react';
-import { MapPinIcon} from 'react-native-heroicons/solid';
-import { theme } from '../../constants/theme';
+import { useState, useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 import MapboxGL from "@rnmapbox/maps";
 import * as Location from 'expo-location';
 import { supabase } from '../../lib/supabase';
@@ -18,15 +16,23 @@ const MAP_STYLE_LIGHT = "mapbox://styles/mapbox/light-v11";
 const getMapStyleForHour = (hour: number) =>
   hour >= 6 && hour < 18 ? MAP_STYLE_LIGHT : MAP_STYLE_DARK;
 
-export default function Map() {
+export type MapHandle = {
+  centerOnUser: () => void;
+};
+
+const Map = forwardRef<MapHandle, object>(function Map(_props, ref) {
   // Zustand Stores
-  const { userLocation, setUserLocation, searchQuery } = useGeneralStore();
+  const { userLocation, setUserLocation, searchQuery, setMapIsLight } = useGeneralStore();
   const { setEvents, setLoadingEvents, selectedEvent, setSelectedEvent } = useEventStore();
   const filteredEvents = useFilteredEvents();
 
   const [mapStyleUrl, setMapStyleUrl] = useState(() =>
     getMapStyleForHour(new Date().getHours())
   );
+
+  useEffect(() => {
+    setMapIsLight(mapStyleUrl === MAP_STYLE_LIGHT);
+  }, [mapStyleUrl, setMapIsLight]);
 
   const mapboxToken = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
   if (mapboxToken) {
@@ -168,19 +174,22 @@ export default function Map() {
     }
   }, [selectedEvent]);
 
-  const handleLocatePress = () => {
+  const handleLocatePress = useCallback(() => {
     if (!userLocation) return;
-    try {
-      flightPlayer.volume = 0.2;
-      flightPlayer.seekTo(0);
-      flightPlayer.play();
-    } catch {}
     cameraRef.current?.setCamera({
       centerCoordinate: [userLocation.longitude, userLocation.latitude],
       zoomLevel: 15,
       animationDuration: 1000,
     });
-  };
+  }, [userLocation]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      centerOnUser: handleLocatePress,
+    }),
+    [handleLocatePress]
+  );
 
   // ============================
   // 🔎 Suche über Mapbox Geocoding
@@ -197,11 +206,6 @@ export default function Map() {
 
     const [lng, lat] = data.features[0].center;
 
-    try {
-      flightPlayer.volume = 0.2;
-      flightPlayer.seekTo(0);
-      flightPlayer.play();
-    } catch {}
     cameraRef.current?.setCamera({
       centerCoordinate: [lng, lat],
       zoomLevel: 12,
@@ -299,17 +303,8 @@ export default function Map() {
       </SafeAreaView>
 
       {selectedEvent && <MapEventCard selectedEvent={selectedEvent} />}
-
-      {/* Locate Button */}
-      <View className="absolute bottom-32 left-5" style={{ zIndex: 10 }}>
-        <Pressable
-          className="w-14 h-14 rounded-full justify-center items-center shadow-xl"
-          style={{ backgroundColor: theme.colors.primary.main2 }}
-          onPress={handleLocatePress}
-        >
-          <MapPinIcon size={24} color="#fff" />
-        </Pressable>
-      </View>
     </View>
   );
-}
+});
+
+export default Map;

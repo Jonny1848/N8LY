@@ -12,18 +12,27 @@ const LIST_BOTTOM_INSET = 120;
 type HomeEventsListProps = {
   /** Im `ListeBottomSheet`: kein großer Titel (steht im Sheet-Header), nur Untertitel. */
   embedded?: boolean;
+  onEventPress?: (event: Event) => void;
 };
 
 /**
  * Listenansicht auf Home: gleiche Event-Menge wie die Karten-Pins (`useFilteredEvents`).
  * Layout über NativeWind/Tailwind (`className`), Schrift wie im restlichen Screen über Manrope.
  */
-export default function HomeEventsList({ embedded = false }: HomeEventsListProps) {
+export default function HomeEventsList({
+  embedded = false,
+  onEventPress,
+}: HomeEventsListProps) {
   const filteredEvents = useFilteredEvents();
   const { loadingEvents } = useEventStore();
   const router = useRouter();
 
   const handleEventPress = (event: Event) => {
+    if (onEventPress) {
+      onEventPress(event);
+      return;
+    }
+
     router.push({
       pathname: '/event/[id]',
       params: { id: event.id },
@@ -52,6 +61,9 @@ export default function HomeEventsList({ embedded = false }: HomeEventsListProps
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => (
         <EventCard event={item} onPress={handleEventPress} />
+      )}
+      ItemSeparatorComponent={() => (
+        <View className="mx-6 h-px bg-gray-200/70" />
       )}
       contentContainerStyle={{ paddingBottom: LIST_BOTTOM_INSET }}
       showsVerticalScrollIndicator={false}

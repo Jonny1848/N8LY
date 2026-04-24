@@ -11,7 +11,16 @@ type GeneralStore = {
     
     userLocation: { latitude: number; longitude: number } | null;
     setUserLocation: (location: { latitude: number; longitude: number } | null) => void;
+
+    /** Tages-/Nacht-Map-Style: für Such-/Locate-Glas (Chrome-Farben). */
+    mapIsLight: boolean;
+    setMapIsLight: (v: boolean) => void;
 }
+
+const initialMapIsLight = (() => {
+    const h = new Date().getHours();
+    return h >= 6 && h < 18;
+})();
 
 export const useGeneralStore = create<GeneralStore>((set) => ({
     introCompleted: false,
@@ -25,4 +34,7 @@ export const useGeneralStore = create<GeneralStore>((set) => ({
     
     userLocation: null,
     setUserLocation: (location) => set({ userLocation: location }),
+
+    mapIsLight: initialMapIsLight,
+    setMapIsLight: (v) => set({ mapIsLight: v }),
 }));

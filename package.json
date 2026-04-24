@@ -90,7 +90,8 @@
     "react-native-svg": "15.12.1",
     "react-native-url-polyfill": "^3.0.0",
     "react-native-web": "~0.19.13",
-    "rive-react-native": "^9.6.1"
+    "rive-react-native": "^9.6.1",
+    "zustand": "^5.0.12"
   },
   "private": true,
   "devDependencies": {

@@ -17,41 +17,58 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
+import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
+import { MapPinIcon } from 'react-native-heroicons/solid';
 import { MagnifyingGlassIcon } from 'react-native-heroicons/solid';
 import { XMarkIcon as XMarkIconOutline } from 'react-native-heroicons/outline';
-import { theme } from '../../constants/theme';
+import { theme, getMapChromeIconColor } from '../../constants/theme';
 import { useGeneralStore } from '@/app/store/generalStore';
+
+/**
+ * Abstand bis unter die Such-UI (schwebende Tab-Pille + Labels + Safe Area).
+ * Zu klein → UI verschwindet unter der nativen Tab-Bar.
+ */
+const FLOATING_TAB_CLEARANCE_PT = 118;
 
 const ICON_W = 22;
 const SEARCH_HORIZONTAL_PAD = 20;
+const LOCATE_BTN_SIZE = 56;
+const GAP_LOCATE_SEARCH = 14;
 const SEARCH_MORPH_EXPANDED_H = 52;
 const SEARCH_ICON_TO_INPUT_GAP = 20;
-const CLOSED_SIZE = 56;
 const SEARCH_SPRING = { damping: 20, stiffness: 260, mass: 0.9 } as const;
 
-let GlassViewComponent: any = null;
-let isNativeGlassAvailable = false;
-if (Platform.OS === 'ios') {
-  try {
-    const glassModule = require('expo-glass-effect');
-    GlassViewComponent = glassModule.GlassView;
-    isNativeGlassAvailable = Boolean(glassModule.isGlassEffectAPIAvailable?.());
-  } catch {}
-}
+type SearchBarProps = {
+  onLocatePress: () => void;
+};
 
-export default function SearchBar() {
+export default function SearchBar({ onLocatePress }: SearchBarProps) {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
+  const mapIsLight = useGeneralStore((s) => s.mapIsLight);
   const { setSearchQuery, searchEdit, setSearchEdit } = useGeneralStore();
   const [searchExpanded, setSearchExpanded] = useState(false);
   const searchInputRef = useRef<TextInput>(null);
-
-  const canLiquidGlass = Platform.OS === 'ios' && isNativeGlassAvailable && !!GlassViewComponent;
-  const leftPad = insets.left + 12;
-  const rightPad = SEARCH_HORIZONTAL_PAD;
-  const expandedWidth = Math.max(0, windowWidth - leftPad - rightPad);
-  const searchMorphMaxWidth = Math.max(CLOSED_SIZE, expandedWidth);
   const searchMorph = useSharedValue(0);
+
+  const canLiquidGlass = Platform.OS === 'ios' && isGlassEffectAPIAvailable();
+
+  const mapChromePadLeft = insets.left + 12;
+  const mapChromePadRight = SEARCH_HORIZONTAL_PAD;
+  const searchExpandedWidth = Math.max(
+    0,
+    windowWidth - mapChromePadLeft - mapChromePadRight
+  );
+  const searchMorphMaxWidth = Math.max(LOCATE_BTN_SIZE, searchExpandedWidth);
+  const bottomInsetAboveTabBar = insets.bottom + FLOATING_TAB_CLEARANCE_PT;
+
+  const glassChromeIconColor = getMapChromeIconColor(mapIsLight);
+  const glassChromeInputTextColor = mapIsLight
+    ? theme.colors.neutral.gray[900]
+    : '#FFFFFF';
+  const glassChromePlaceholderColor = mapIsLight
+    ? theme.colors.neutral.gray[500]
+    : theme.colors.neutral.gray[400];
 
   useEffect(() => {
     if (!searchExpanded) {
@@ -74,27 +91,27 @@ export default function SearchBar() {
   };
 
   const morphContainerStyle = useAnimatedStyle(() => {
-    const width = interpolate(
+    const w = interpolate(
       searchMorph.value,
       [0, 1],
-      [CLOSED_SIZE, searchMorphMaxWidth],
+      [LOCATE_BTN_SIZE, searchMorphMaxWidth],
       Extrapolation.CLAMP
     );
-    const height = interpolate(
+    const h = interpolate(
       searchMorph.value,
       [0, 1],
-      [CLOSED_SIZE, SEARCH_MORPH_EXPANDED_H],
+      [LOCATE_BTN_SIZE, SEARCH_MORPH_EXPANDED_H],
       Extrapolation.CLAMP
     );
-    const borderRadius = Math.min(width, height) / 2;
-    return { width, height, borderRadius };
+    const r = Math.min(w, h) / 2;
+    return { width: w, height: h, borderRadius: r };
   }, [searchMorphMaxWidth]);
 
   const iconLeadStyle = useAnimatedStyle(() => ({
     marginLeft: interpolate(
       searchMorph.value,
       [0, 1],
-      [(CLOSED_SIZE - ICON_W) / 2, 12],
+      [(LOCATE_BTN_SIZE - ICON_W) / 2, 12],
       Extrapolation.CLAMP
     ),
   }));
@@ -122,7 +139,7 @@ export default function SearchBar() {
     ],
   }));
 
-  const content = (
+  const mapSearchMorphInner = (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={searchExpanded ? undefined : 'Suche öffnen'}
@@ -136,14 +153,14 @@ export default function SearchBar() {
     >
       <View className="flex-1 flex-row items-center">
         <Animated.View style={iconLeadStyle}>
-          <MagnifyingGlassIcon size={ICON_W} color={theme.colors.neutral.gray[700]} />
+          <MagnifyingGlassIcon size={ICON_W} color={glassChromeIconColor} />
         </Animated.View>
         <Animated.View style={inputSlotStyle}>
           <TextInput
             ref={searchInputRef}
             className="text-base"
             placeholder="Wohin möchtest du?"
-            placeholderTextColor={theme.colors.neutral.gray[500]}
+            placeholderTextColor={glassChromePlaceholderColor}
             value={searchEdit}
             onChangeText={setSearchEdit}
             returnKeyType="search"
@@ -162,7 +179,7 @@ export default function SearchBar() {
               paddingVertical: 6,
               marginRight: 4,
               minWidth: 0,
-              color: theme.colors.neutral.gray[900],
+              color: glassChromeInputTextColor,
             }}
           />
         </Animated.View>
@@ -185,38 +202,124 @@ export default function SearchBar() {
     <View
       pointerEvents="box-none"
       style={{
-        paddingLeft: leftPad,
-        paddingRight: rightPad,
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: bottomInsetAboveTabBar,
+        zIndex: 15,
+        paddingLeft: mapChromePadLeft,
+        paddingRight: mapChromePadRight,
         paddingBottom: 8,
+        alignItems: 'flex-start',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.18,
+        shadowRadius: 10,
+        elevation: 8,
       }}
     >
-      <Animated.View style={[morphContainerStyle, { overflow: 'hidden' }]}>
-        {canLiquidGlass ? (
-          <GlassViewComponent
+      {canLiquidGlass ? (
+        <View style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+          <GlassView
             glassEffectStyle="regular"
             isInteractive={false}
-            colorScheme="light"
-            style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden' }}
+            colorScheme={mapIsLight ? 'light' : 'dark'}
+            style={{
+              width: LOCATE_BTN_SIZE,
+              height: LOCATE_BTN_SIZE,
+              borderRadius: LOCATE_BTN_SIZE / 2,
+              overflow: 'hidden',
+            }}
           >
-            {content}
-          </GlassViewComponent>
-        ) : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Karte auf Standort zentrieren"
+              className="h-full w-full items-center justify-center"
+              onPress={onLocatePress}
+            >
+              <MapPinIcon size={24} color={glassChromeIconColor} />
+            </Pressable>
+          </GlassView>
+
+          <Animated.View
+            style={[
+              morphContainerStyle,
+              { overflow: 'hidden', marginTop: GAP_LOCATE_SEARCH },
+            ]}
+          >
+            <GlassView
+              glassEffectStyle="regular"
+              isInteractive={false}
+              colorScheme={mapIsLight ? 'light' : 'dark'}
+              style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden' }}
+            >
+              {mapSearchMorphInner}
+            </GlassView>
+          </Animated.View>
+        </View>
+      ) : (
+        <View
+          style={{
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            width: '100%',
+          }}
+        >
           <BlurView
             intensity={Platform.OS === 'ios' ? 42 : 58}
-            tint="light"
-            style={{ width: '100%', height: '100%', overflow: 'hidden' }}
+            tint={mapIsLight ? 'light' : 'dark'}
+            style={{
+              width: LOCATE_BTN_SIZE,
+              height: LOCATE_BTN_SIZE,
+              borderRadius: LOCATE_BTN_SIZE / 2,
+              overflow: 'hidden',
+            }}
           >
             <View
               pointerEvents="none"
               style={[
                 StyleSheet.absoluteFillObject,
-                { backgroundColor: 'rgba(255,255,255,0.28)' },
+                {
+                  backgroundColor: mapIsLight
+                    ? 'rgba(255,255,255,0.28)'
+                    : 'rgba(28,28,34,0.4)',
+                },
               ]}
             />
-            {content}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Karte auf Standort zentrieren"
+              className="h-full w-full items-center justify-center"
+              onPress={onLocatePress}
+            >
+              <MapPinIcon size={24} color={glassChromeIconColor} />
+            </Pressable>
           </BlurView>
-        )}
-      </Animated.View>
+
+          <View style={{ height: GAP_LOCATE_SEARCH }} />
+
+          <Animated.View style={[morphContainerStyle, { overflow: 'hidden' }]}>
+            <BlurView
+              intensity={Platform.OS === 'ios' ? 42 : 58}
+              tint={mapIsLight ? 'light' : 'dark'}
+              style={{ width: '100%', height: '100%', overflow: 'hidden' }}
+            >
+              <View
+                pointerEvents="none"
+                style={[
+                  StyleSheet.absoluteFillObject,
+                  {
+                    backgroundColor: mapIsLight
+                      ? 'rgba(255,255,255,0.28)'
+                      : 'rgba(28,28,34,0.4)',
+                  },
+                ]}
+              />
+              {mapSearchMorphInner}
+            </BlurView>
+          </Animated.View>
+        </View>
+      )}
     </View>
   );
 }

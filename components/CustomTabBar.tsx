@@ -26,6 +26,7 @@ import { UserIcon as UserIconOutline } from 'react-native-heroicons/outline';
 
 const iconMap: Record<string, { solid: any; outline: any }> = {
   home: { solid: HomeIconSolid, outline: HomeIconOutline },
+  events: { solid: CalendarIconSolid, outline: CalendarIconOutline },
   social: { solid: ChatBubbleLeftIconSolid, outline: ChatBubbleLeftIconOutline },
   discover: { solid: GlobeAltIconSolid, outline: GlobeAltIconOutline },
   profile: { solid: UserIconSolid, outline: UserIconOutline },

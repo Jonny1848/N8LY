@@ -27,6 +27,8 @@ const MapEventCard = ({ selectedEvent }: any) => {
     }).format(d) + ' Uhr';
   };
 
+  console.log(selectedEvent);
+
   return (
     <Animated.View style={[styles.cardContainer, { transform: [{ translateY }] }]}>
     <Pressable

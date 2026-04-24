@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { FilterBottomSheet } from '../../components/FilterBottomSheet';
 import {
   ListeBottomSheet,
   type ListeBottomSheetRef,
 } from '@/components/ListeBottomSheet';
 import { useFilterStore } from '../store/filterStore';
-import Map from '@/components/home/Map';
+import Map, { type MapHandle } from '@/components/home/Map';
 import SearchBar from '@/components/home/SearchBar';
 import MapListFloatingBar, {
   HomeViewMode,
@@ -17,6 +16,7 @@ import { useEventStore } from '@/app/store/eventStore';
 export default function HomeScreen() {
   const { filterVisible, setFilterVisible } = useFilterStore();
   const { setSelectedEvent } = useEventStore();
+  const mapRef = useRef<MapHandle>(null);
 
   const [listeSheetVisible, setListeSheetVisible] = useState(false);
   const listeSheetRef = useRef<ListeBottomSheetRef>(null);
@@ -40,15 +40,10 @@ export default function HomeScreen() {
 
   return (
     <View className="flex-1 bg-white">
-      <Map />
+      <Map ref={mapRef} />
 
       {!listeSheetVisible && (
-        <SafeAreaView
-          edges={['bottom']}
-          className="absolute bottom-0 left-0 right-0 z-[15]"
-        >
-          <SearchBar />
-        </SafeAreaView>
+        <SearchBar onLocatePress={() => mapRef.current?.centerOnUser()} />
       )}
 
       <MapListFloatingBar

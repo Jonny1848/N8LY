@@ -6,14 +6,16 @@ import React, {
   useState,
 } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal, Dimensions } from 'react-native';
+import { useRouter } from 'expo-router';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
+  Easing,
   withTiming,
 } from 'react-native-reanimated';
 import { theme } from '@/constants/theme';
 import HomeEventsList from '@/components/home/HomeEventsList';
+import type { Event } from '@/components/EventCard';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -33,15 +35,16 @@ type ListeBottomSheetProps = {
  */
 export const ListeBottomSheet = forwardRef<ListeBottomSheetRef, ListeBottomSheetProps>(
   function ListeBottomSheet({ visible, onClose }, ref) {
+    const router = useRouter();
     const [isListClosing, setIsListClosing] = useState(false);
 
     const translateY = useSharedValue(SCREEN_HEIGHT);
 
     useEffect(() => {
       if (visible && !isListClosing) {
-        translateY.value = withSpring(0, {
-          damping: 20,
-          stiffness: 90,
+        translateY.value = withTiming(0, {
+          duration: 300,
+          easing: Easing.out(Easing.cubic),
         });
       }
     }, [visible, isListClosing, translateY]);
@@ -57,6 +60,17 @@ export const ListeBottomSheet = forwardRef<ListeBottomSheetRef, ListeBottomSheet
         onClose();
       }, 320);
     }, [onClose, translateY]);
+
+    const handleEventPress = useCallback((event: Event) => {
+      handleClose();
+
+      setTimeout(() => {
+        router.push({
+          pathname: '/event/[id]',
+          params: { id: event.id },
+        });
+      }, 320);
+    }, [handleClose, router]);
 
     useImperativeHandle(
       ref,
@@ -97,7 +111,7 @@ export const ListeBottomSheet = forwardRef<ListeBottomSheetRef, ListeBottomSheet
 
           {/* Listeninhalt — nimmt restliche Sheet-Höhe (FlatList scrollt) */}
           <View style={styles.listBody}>
-            <HomeEventsList embedded />
+            <HomeEventsList embedded onEventPress={handleEventPress} />
           </View>
         </Animated.View>
       </Modal>

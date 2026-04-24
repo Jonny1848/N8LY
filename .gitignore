@@ -26,6 +26,10 @@ npm-debug.*
 yarn-debug.*
 yarn-error.*
 .cursor/
+.cursor/*.log
+.cursor/settings.json
+*.patch
+patches/
 yarn.lock
 
 # macOS
