@@ -11,7 +11,6 @@ type GeneralStore = {
     
     userLocation: { latitude: number; longitude: number } | null;
     setUserLocation: (location: { latitude: number; longitude: number } | null) => void;
-
 }
 
 export const useGeneralStore = create<GeneralStore>((set) => ({

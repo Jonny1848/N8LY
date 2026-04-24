@@ -12,9 +12,6 @@
       },
       "android": {
         "buildType": "apk"
-      },
-      "env": {
-        "RNMAPBOX_MAPS_DOWNLOAD_TOKEN": "sk.eyJ1Ijoiam9ubnkyMDA1IiwiYSI6ImNtZ3R0MDVwODA3MTMyanI3eTRiM2k0bHEifQ.JDKw4aOqKw_UNLKok4gvOQ"
       }
     },
     "preview": {
@@ -24,9 +21,6 @@
       },
       "android": {
         "buildType": "apk"
-      },
-      "env": {
-        "RNMAPBOX_MAPS_DOWNLOAD_TOKEN": "sk.eyJ1Ijoiam9ubnkyMDA1IiwiYSI6ImNtZ3R0MDVwODA3MTMyanI3eTRiM2k0bHEifQ.JDKw4aOqKw_UNLKok4gvOQ"
       }
     },
     "production": {
@@ -35,9 +29,6 @@
       },
       "android": {
         "buildType": "app-bundle"
-      },
-      "env": {
-        "RNMAPBOX_MAPS_DOWNLOAD_TOKEN": "sk.eyJ1Ijoiam9ubnkyMDA1IiwiYSI6ImNtZ3R0MDVwODA3MTMyanI3eTRiM2k0bHEifQ.JDKw4aOqKw_UNLKok4gvOQ"
       }
     }
   },

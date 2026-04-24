@@ -4,21 +4,25 @@ type EventStore = {
     events: any[]; // TODO: Create file for event type
     selectedEvent: any;
     loadingEvents: boolean;
+    filterVisible: boolean;
 
     setEvents: (events: any[]) => Promise<void>;
 
     setSelectedEvent: (event: any) => Promise<void>;
 
     setLoadingEvents: (loading: boolean) => void;
+
+    setFilterVisible: (visible: boolean) => void;
 }
 
 export const useEventStore = create<EventStore>((set) => ({
     events: [],
-    selectedEvent: null,
+    selectedEvent: null, 
     loadingEvents: false,
-
+    filterVisible: false,
 
     setEvents: async (events) => set({ events: events }),
     setSelectedEvent: async (event) => set({ selectedEvent: event }),
     setLoadingEvents: (loading) => set({ loadingEvents: loading }),
+    setFilterVisible: (visible) => set({ filterVisible: visible }),
 }));

@@ -44,7 +44,6 @@ export default function EventCard({ event, onPress }: EventCardProps) {
   const formattedDate = eventDate.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
   const formattedTime = eventDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
-  // Dummy Data
   const avatars = ['https://i.pravatar.cc/150?u=a',
     'https://i.pravatar.cc/150?u=b',
     'https://i.pravatar.cc/150?u=c',
@@ -59,10 +58,13 @@ export default function EventCard({ event, onPress }: EventCardProps) {
       onPress={() => onPress?.(event)}
       style={({ pressed }) => [styles.container, pressed && styles.pressed]}
     >
-      {/* IMAGE SECTION */}
       <View style={styles.imageWrapper}>
         <Image
-          source={event.image_urls?.[0] ? { uri: event.image_urls[0] } : require('../assets/pexels-apasaric-2078071.jpg')}
+          source={
+            event.image_urls && event.image_urls.length > 0
+              ? { uri: event.image_urls[0] }
+              : require('../assets/pexels-apasaric-2078071.jpg')
+          }
           style={styles.image}
         />
         {event.is_boosted && (
@@ -72,12 +74,10 @@ export default function EventCard({ event, onPress }: EventCardProps) {
         )}
       </View>
 
-      {/* CONTENT SECTION */}
       <View style={styles.content}>
         <View style={styles.topRow}>
           <Text style={styles.dateText}>{`${formattedDate} • ${formattedTime}`}</Text>
 
-          {/* BOOKMARK TOP RIGHT */}
           <Pressable
             onPress={() => setIsSaved(!isSaved)}
             style={styles.bookmarkButton}
@@ -91,7 +91,6 @@ export default function EventCard({ event, onPress }: EventCardProps) {
         </View>
 
         <Text style={styles.title} numberOfLines={1}>{event.title}</Text>
-
         <View style={styles.locationRow}>
           <Text style={styles.locationText} numberOfLines={1}>
             {event.venue_name} • {event.city}
@@ -106,11 +105,19 @@ export default function EventCard({ event, onPress }: EventCardProps) {
             size={24}
             spacing={-6}
           />
-
+          <View style={styles.interestedBox}>
+            <Ionicons name="flame" size={14} color={theme.colors.accent.main} />
+            <Text style={styles.interestedText}>{event.interested_count} Buzz</Text>
+          </View>
+          
           {!!(event.ticket_available < 20 && event.ticket_available > 0) && (
-            <Text style={styles.limitedText}>Fast weg!</Text>
+            <Text style={styles.limitedText}>Fast ausverkauft!</Text>
           )}
         </View>
+      </View>
+
+      <View style={styles.chevron}>
+        <Ionicons name="chevron-forward" size={18} color={theme.colors.neutral.gray[300]} />
       </View>
     </Pressable>
   );
@@ -130,7 +137,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pressed: {
-    opacity: 0.8,
+    opacity: 0.7,
     transform: [{ scale: 0.99 }],
   },
   imageWrapper: {
@@ -169,22 +176,25 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: theme.colors.primary.main,
-    textTransform: 'uppercase',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   bookmarkButton: {
     padding: 2,
     marginRight: -2,
   },
   title: {
-    fontSize: 17,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '700',
     color: theme.colors.neutral.gray[900],
+    fontFamily: theme.typography.fontFamily.bold,
+    marginBottom: 2,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 6,
   },
   locationText: {
     fontSize: 13,
@@ -195,10 +205,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  interestedBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.accent.bg,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  interestedText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: theme.colors.accent.main,
+    marginLeft: 4,
+  },
   limitedText: {
     fontSize: 10,
     color: theme.colors.error,
-    fontWeight: '800',
-    textTransform: 'uppercase',
+    fontWeight: '600',
   },
+  chevron: {
+    marginLeft: 8,
+  }
 });

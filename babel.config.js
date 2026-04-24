@@ -1,13 +1,11 @@
-// babel.config.js
+// Babel: jsxImportSource "nativewind" leitet JSX auf react-native-css-interop um; Reanimated-Plugin muss zuletzt stehen
 module.exports = function (api) {
   api.cache(true);
   return {
-    presets: [["babel-preset-expo"]], // no jsxImportSource needed on v2
-    plugins: [
+    presets: [
+      ["babel-preset-expo", { jsxImportSource: "nativewind" }],
       "nativewind/babel",
-      "react-native-reanimated/plugin", // MUST be last
     ],
+    plugins: ["react-native-reanimated/plugin"],
   };
 };
-
-

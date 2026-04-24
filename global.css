@@ -1,0 +1,4 @@
+/* Tailwind-Imports fuer NativeWind v4 (Metro verarbeitet diese Datei via global.css input) */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

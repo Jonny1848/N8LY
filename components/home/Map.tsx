@@ -10,6 +10,7 @@ import { useGeneralStore } from '@/app/store/generalStore';
 import { useEventStore } from '@/app/store/eventStore';
 import MapEventCard from '@/components/home/MapEventCard';
 import { useFilteredEvents } from '../../hooks/useFilteredEvents';
+import { useAudioPlayer } from 'expo-audio';
 
 const MAP_STYLE_DARK = "mapbox://styles/jonny2005/cmiag4rgh00eb01s90y2r7qw0";
 const MAP_STYLE_LIGHT = "mapbox://styles/mapbox/light-v11";
@@ -27,10 +28,16 @@ export default function Map() {
     getMapStyleForHour(new Date().getHours())
   );
 
-  MapboxGL.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN as string);
+  const mapboxToken = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
+  if (mapboxToken) {
+    MapboxGL.setAccessToken(mapboxToken);
+  }
 
   const cameraRef = useRef<MapboxGL.Camera>(null);
   const mapRef = useRef<MapboxGL.MapView>(null);
+  const flightPlayer = useAudioPlayer(require('../../assets/flight.mp3'), {
+    updateInterval: 16,
+  });
 
   const BERLIN_COORDS = { latitude: 52.520008, longitude: 13.404954 };
 
@@ -163,6 +170,11 @@ export default function Map() {
 
   const handleLocatePress = () => {
     if (!userLocation) return;
+    try {
+      flightPlayer.volume = 0.2;
+      flightPlayer.seekTo(0);
+      flightPlayer.play();
+    } catch {}
     cameraRef.current?.setCamera({
       centerCoordinate: [userLocation.longitude, userLocation.latitude],
       zoomLevel: 15,
@@ -185,6 +197,11 @@ export default function Map() {
 
     const [lng, lat] = data.features[0].center;
 
+    try {
+      flightPlayer.volume = 0.2;
+      flightPlayer.seekTo(0);
+      flightPlayer.play();
+    } catch {}
     cameraRef.current?.setCamera({
       centerCoordinate: [lng, lat],
       zoomLevel: 12,

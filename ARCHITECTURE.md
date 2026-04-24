@@ -1,4 +1,4 @@
-# N8TLY App - Architektur-Dokumentation
+# N8LY App - Architektur-Dokumentation
 
 ## 🎯 Kritische Analyse & Verbesserungsvorschläge
 
@@ -457,7 +457,7 @@ CREATE INDEX idx_interactions_type ON event_interactions(interaction_type);
 ## 🗂️ Projekt-Ordnerstruktur
 
 ```
-/Users/jean-philippenjikenana/Documents/GitHub/N8TLY/
+/Users/jean-philippenjikenana/Documents/GitHub/N8LY/
 ├── app/
 │   ├── _layout.tsx
 │   ├── index.tsx                # Root redirect

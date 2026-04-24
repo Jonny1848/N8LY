@@ -1,4 +1,4 @@
-// N8TLY App Theme
+// N8LY App Theme
 // Minimalistisches, erwachsenes Design mit dezenten Akzenten
 
 export const theme = {
@@ -11,7 +11,8 @@ export const theme = {
       lighter: '#6B7280',   // Helles Grau
       dark: '#111827',      // Sehr dunkles Grau
       bg: '#F9FAFB',        // Sehr heller Hintergrund
-      main2: '#191970'       // Midnight Blue
+      main2: '#191970' ,     // Midnight Blue
+      main3: "#1E90FF"      // Dodger Blue
     },
     // Sekundäre Farben: Hellere Grautöne
     secondary: {
@@ -36,6 +37,7 @@ export const theme = {
       offWhite: '#FAFAFA',
       offBlack: '#0F172A',
       gray: {
+        0: '#000000',
         50: '#F9FAFB',
         100: '#F3F4F6',
         200: '#E5E7EB',
@@ -192,3 +194,13 @@ export const getColor = (path) => {
 export const getGradient = (type = 'primary') => {
   return theme.gradients[type] || theme.gradients.primary;
 };
+
+/**
+ * Icons auf der Karte (Lupe, Standort): neutrales „System-Chrome“ statt `primary.main`.
+ * Wenn Logo, Tab-Aktivzustand und Map-Buttons alle dasselbe Blau nutzen, wirkt die Oberfläche
+ * schnell laut; hier bleibt das Blau für Identität (Logo) und Navigation (Tabs).
+ *
+ * @param {boolean} isLightMap – z. B. `mapStyleUrl === MAP_STYLE_LIGHT`
+ */
+export const getMapChromeIconColor = (isLightMap) =>
+  isLightMap ? theme.colors.neutral.gray[800] : '#FFFFFF';
