@@ -3,23 +3,36 @@ import {
   FlatList,
   ListRenderItem,
   RefreshControl,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import type { Event } from '@/components/EventCard';
-import EventRail from '@/components/discover/EventRail';
+import ShowcaseSection from '@/components/discover/ShowcaseSection';
 import { theme } from '@/constants/theme';
-import { useDiscoverRails } from '@/hooks/useDiscoverRails';
-import type { DiscoverRail } from '@/lib/discoverData';
+import { useDiscoverShowcase } from '@/hooks/useDiscoverRails';
+import type { DiscoverShowcaseSection } from '@/lib/discoverData';
 
 const SCROLL_BOTTOM_PADDING = 100;
+const font = {
+  regular: { fontFamily: 'Arial' },
+  semibold: { fontFamily: 'Arial', fontWeight: '600' as const },
+  bold: { fontFamily: 'Arial', fontWeight: '700' as const },
+};
 
 export default function EventsScreen() {
   const router = useRouter();
-  const { rails, loading, refreshing, error, refresh } = useDiscoverRails();
+  const {
+    sections,
+    loading,
+    refreshing,
+    error,
+    activeQuickFilter,
+    setActiveQuickFilter,
+    refresh,
+  } = useDiscoverShowcase();
+  const hasEventSections = sections.some((section) => section.events.length > 0);
 
   const onEventPress = (event: Event) => {
     router.push({
@@ -28,44 +41,55 @@ export default function EventsScreen() {
     });
   };
 
-  const renderRail: ListRenderItem<DiscoverRail> = ({ item }) => (
-    <EventRail
-      railKey={item.key}
-      title={item.title}
-      events={item.events}
+  const renderSection: ListRenderItem<DiscoverShowcaseSection> = ({ item }) => (
+    <ShowcaseSection
+      section={item}
+      activeQuickFilter={activeQuickFilter}
+      onQuickFilterPress={setActiveQuickFilter}
       onEventPress={onEventPress}
     />
   );
 
   const listHeader = (
     <>
-      <View style={styles.hero}>
-        <Text style={styles.heroTitle}>Events</Text>
+      <View className="flex-row items-center px-5 pb-4 pt-3">
+        <View className="h-11 w-11" />
+        <View className="flex-1 items-center justify-center">
+          <Text className="text-[28px] text-primary-dark" style={font.bold}>
+            Events
+          </Text>
+        </View>
+        <View className="h-11 w-11" />
       </View>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      {loading && rails.length === 0 ? (
+      {loading && !hasEventSections ? (
         <View style={styles.loaderWrap}>
           <ActivityIndicator size="large" color={theme.colors.primary.main} />
-        </View>
-      ) : null}
-      {!loading && rails.length === 0 && !error ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>Noch keine Events</Text>
-          <Text style={styles.emptyBody}>
-            Sobald Events in der Datenbank liegen, erscheinen sie hier.
-          </Text>
         </View>
       ) : null}
     </>
   );
 
+  const listFooter =
+    !loading && !hasEventSections && !error ? (
+      <View className="mx-5 mt-1 rounded-[28px] border border-secondary-lighter bg-white px-6 py-10">
+        <Text className="text-center text-[18px] text-primary-dark" style={font.bold}>
+          Keine Events gefunden
+        </Text>
+        <Text className="mt-2 text-center text-[14px] leading-5 text-secondary" style={font.regular}>
+          Wähle oben einen anderen Filter.
+        </Text>
+      </View>
+    ) : null;
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView className="flex-1 bg-neutral-white" edges={['top']}>
       <FlatList
-        data={rails}
+        data={sections}
         keyExtractor={(item) => item.key}
-        renderItem={renderRail}
+        renderItem={renderSection}
         ListHeaderComponent={listHeader}
+        ListFooterComponent={listFooter}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
@@ -80,23 +104,9 @@ export default function EventsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: theme.colors.neutral.white,
-  },
+const styles = {
   scrollContent: {
     paddingBottom: SCROLL_BOTTOM_PADDING,
-  },
-  hero: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 24,
-  },
-  heroTitle: {
-    fontFamily: theme.typography.fontFamily.bold,
-    fontSize: 32,
-    color: theme.colors.neutral.gray[900],
   },
   loaderWrap: {
     paddingVertical: 48,
@@ -105,25 +115,9 @@ const styles = StyleSheet.create({
   errorText: {
     marginHorizontal: 20,
     marginBottom: 12,
-    fontFamily: theme.typography.fontFamily.medium,
+    fontFamily: 'Arial',
+    fontWeight: '500',
     fontSize: 14,
     color: theme.colors.error,
   },
-  empty: {
-    paddingHorizontal: 24,
-    paddingVertical: 40,
-    alignItems: 'center',
-  },
-  emptyTitle: {
-    fontFamily: theme.typography.fontFamily.semibold,
-    fontSize: 17,
-    color: theme.colors.neutral.gray[700],
-  },
-  emptyBody: {
-    marginTop: 8,
-    textAlign: 'center',
-    fontFamily: theme.typography.fontFamily.regular,
-    fontSize: 14,
-    color: theme.colors.neutral.gray[500],
-  },
-});
+} as const;

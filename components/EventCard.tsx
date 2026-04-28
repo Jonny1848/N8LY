@@ -109,7 +109,7 @@ export default function EventCard({ event, onPress }: EventCardProps) {
             />
             <View style={styles.interestedBox}>
               <Ionicons name="flame" size={14} color={theme.colors.accent.main} />
-              <Text style={styles.interestedText}>{event.interested_count} Buzz</Text>
+              <Text style={styles.interestedText}>{event.interested_count} interessiert</Text>
             </View>
             
             {!!(event.ticket_available < 20 && event.ticket_available > 0) && (
