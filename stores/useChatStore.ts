@@ -40,6 +40,7 @@ import {
   removeAdmin as apiRemoveAdmin,
   removeParticipant as apiRemoveParticipant,
 } from '../services/chatService';
+import { sendPoll as apiSendPoll } from '../services/pollService';
 import { supabase } from '../lib/supabase';
 
 // ============================
@@ -114,6 +115,21 @@ interface ChatState {
 
   /** Sendet eine Textnachricht und fuegt sie optimistisch hinzu */
   sendTextMessage: (conversationId: string, userId: string, content: string) => Promise<void>;
+
+  /**
+   * Sendet eine Umfrage und fuegt sie optimistisch zum Nachrichten-Cache hinzu.
+   * pollData: { question, options: [{id, text}], allow_multiple, is_anonymous }
+   */
+  sendPollMessage: (
+    conversationId: string,
+    userId: string,
+    pollData: {
+      question: string;
+      options: Array<{ id: string; text: string }>;
+      allow_multiple: boolean;
+      is_anonymous: boolean;
+    },
+  ) => Promise<void>;
 
   /**
    * Sendet eine Medien-Nachricht (Bild, Sprache, Datei) und fuegt sie optimistisch hinzu.
@@ -282,6 +298,17 @@ const useChatStore = create<ChatState>((set, get) => ({
       set({ activeConversation: conv as Conversation });
     } catch (err) {
       console.error('[CHAT STORE] Fehler beim Laden der Konversation:', err);
+    }
+  },
+
+  sendPollMessage: async (conversationId, userId, pollData) => {
+    try {
+      const msg: any = await apiSendPoll(conversationId, userId, pollData);
+      // Umfrage optimistisch zum Cache hinzufuegen (Abstimmungen werden lazy in PollBubble geladen)
+      get().addMessage(conversationId, { ...msg, profiles: { id: userId } });
+    } catch (err) {
+      console.error('[CHAT STORE] Fehler beim Senden der Umfrage:', err);
+      throw err;
     }
   },
 

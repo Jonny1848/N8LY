@@ -33,6 +33,7 @@ import ChatBubble from '../../components/chat/ChatBubble';
 import MessageInput from '../../components/chat/MessageInput';
 import ShareSheet from '../../components/chat/ShareSheet';
 import ImagePreviewModal from '../../components/chat/ImagePreviewModal';
+import PollCreationModal from '../../components/chat/PollCreationModal';
 import { theme } from '../../constants/theme';
 
 // Stabiler Fallback – verhindert Update-Loop bei leerem messagesByConversation
@@ -57,6 +58,9 @@ export default function ChatDetailScreen() {
   // ============================
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
   const [imagePreviewUri, setImagePreviewUri] = useState(null);
+  // Poll-Erstellungs-Modal: sichtbar + Ladeindikator waehrend des Sendens
+  const [pollModalVisible, setPollModalVisible] = useState(false);
+  const [pollSending, setPollSending] = useState(false);
   const flatListRef = useRef(null);
   const messageInputRef = useRef(null);
   const insets = useSafeAreaInsets();
@@ -192,8 +196,8 @@ export default function ChatDetailScreen() {
     } else if (key === 'contact') {
       setTimeout(() => messageInputRef.current?.openContactsPicker?.(), 300);
     } else if (key === 'poll') {
-      // TODO: Umfrage-Erstellung öffnen
-      console.log('[SHARE] Umfrage noch nicht implementiert');
+      // Poll-Erstellungs-Modal oeffnen (kurze Verzoegerung nach Sheet-Close fuer smoother UX)
+      setTimeout(() => setPollModalVisible(true), 300);
     } else {
       console.log('[SHARE] Option gewaehlt:', key);
     }
@@ -206,6 +210,23 @@ export default function ChatDetailScreen() {
   const handleImagePress = useCallback((uri) => {
     if (uri) setImagePreviewUri(uri);
   }, []);
+
+  /**
+   * Umfrage senden: Nachrichten-Store aufrufen, Modal schliessen.
+   * pollData: { question, options, allow_multiple, is_anonymous }
+   */
+  const handleSendPoll = useCallback(async (pollData) => {
+    if (!userId) return;
+    setPollSending(true);
+    try {
+      await useChatStore.getState().sendPollMessage(conversationId, userId, pollData);
+      setPollModalVisible(false);
+    } catch (err) {
+      console.error('[CHAT] Fehler beim Senden der Umfrage:', err);
+    } finally {
+      setPollSending(false);
+    }
+  }, [conversationId, userId]);
 
   /** Gruppeninfo öffnen — gleiche Ziel-Route wie Tipp auf Header (Avatar/Name) */
   const openGroupInfo = useCallback(() => {
@@ -371,6 +392,14 @@ export default function ChatDetailScreen() {
         visible={!!imagePreviewUri}
         imageUri={imagePreviewUri}
         onClose={() => setImagePreviewUri(null)}
+      />
+
+      {/* Umfrage-Erstellungs-Modal (pageSheet, schiebt sich von unten) */}
+      <PollCreationModal
+        visible={pollModalVisible}
+        onClose={() => setPollModalVisible(false)}
+        onSend={handleSendPoll}
+        loading={pollSending}
       />
       </View>
     </GestureHandlerRootView>

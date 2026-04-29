@@ -1,5 +1,5 @@
 /**
- * Story Capture – Einstieg: Vollbild-Kamera + Galerie (Mehrfachauswahl moeglich).
+ * Story Capture – Einstieg: Vollbild-Kamera + Galerie (Mehrfachauswahl möglich).
  * Neue Medien landen im Draft-Store; Navigation zum Editor bzw. Review bei Bulk.
  */
 import { View, Alert } from 'react-native';
@@ -64,7 +64,7 @@ export default function StoryCaptureScreen() {
         'Galerie',
         isIcloudOrNetwork
           ? 'Fuer Videos aus der iCloud braucht iOS Internet. Bitte Verbindung pruefen und erneut versuchen.'
-          : 'Auswahl nicht moeglich.',
+          : 'Auswahl nicht möglich.',
         [{ text: 'OK' }],
       );
     }

@@ -19,6 +19,7 @@ import { theme } from '../../constants/theme';
 import { UserIcon } from 'react-native-heroicons/solid';
 import { PaperClipIcon } from 'react-native-heroicons/outline';
 import VoiceMessageBubble from './VoiceMessageBubble';
+import PollBubble from './PollBubble';
 
 /**
  * Formatiert den Zeitstempel einer Nachricht (z.B. "14:30").
@@ -83,6 +84,7 @@ export default function ChatBubble({ item, index, messages, userId, conversation
   const isImage = item.message_type === 'image';
   const isVoice = item.message_type === 'voice';
   const isFile = item.message_type === 'file';
+  const isPoll = item.message_type === 'poll';
 
   // Bildbreite: max. 65% Bildschirmbreite, maximal 260px (wie vorher mit StyleSheet)
   const imageWidth = Math.min(screenWidth * 0.65, 260);
@@ -96,6 +98,72 @@ export default function ChatBubble({ item, index, messages, userId, conversation
   const showTime = shouldShowTimestamp(item, msgBelow);
   // Engerer Abstand wenn die naechste Bubble zur selben Gruppe gehoert
   const isGrouped = msgBelow && msgBelow.sender_id === item.sender_id && sameMinute(item, msgBelow);
+
+  // ── Poll-Nachrichten: eigenes Layout (breite Karte, weisser Hintergrund) ──
+  if (isPoll) {
+    return (
+      <View>
+        {/* Datumsseparator */}
+        {shouldShowDateSeparator(item, messages[index + 1]) && (
+          <View className="items-center py-4">
+            <View className="px-4 py-1.5 rounded-full bg-gray-100">
+              <Text className="text-xs text-gray-500" style={{ fontFamily: 'Manrope_500Medium' }}>
+                {formatDateSeparator(item.created_at)}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Poll-Karte: linksseitig bei fremden Nachrichten, rechtsseitig bei eigenen */}
+        <View
+          className={`px-4 ${isOwn ? 'items-end' : 'items-start'} ${
+            shouldShowTimestamp(item, messages[index - 1]) ? 'mb-5' : 'mb-1.5'
+          }`}
+        >
+          {/* Gruppenavatar des Absenders (nur bei Gruppen-Chats + fremde Nachricht) */}
+          {!isOwn && conversation?.type === 'group' && (
+            <View className="flex-row items-end mb-1 gap-2.5">
+              <View className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center overflow-hidden">
+                {item.profiles?.avatar_url ? (
+                  <Image
+                    source={{ uri: item.profiles.avatar_url }}
+                    style={{ width: 32, height: 32 }}
+                    cachePolicy="disk"
+                    contentFit="cover"
+                  />
+                ) : (
+                  <UserIcon size={16} color={theme.colors.neutral.gray[400]} />
+                )}
+              </View>
+              {item.profiles?.username && (
+                <Text
+                  className="text-xs text-N8LY-blue mb-1"
+                  style={{ fontFamily: 'Manrope_600SemiBold' }}
+                >
+                  {item.profiles.username}
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* Polls belegen 90% der Chatbreite fuer gute Lesbarkeit */}
+          <View style={{ width: '90%' }}>
+            <PollBubble message={item} userId={userId} isOwn={isOwn} />
+          </View>
+
+          {/* Zeitstempel unter der Karte */}
+          {shouldShowTimestamp(item, messages[index - 1]) && (
+            <Text
+              className={`text-xs text-gray-500 mt-1.5 ${isOwn ? 'text-right' : 'text-left'}`}
+              style={{ fontFamily: 'Manrope_400Regular' }}
+            >
+              {formatMessageTime(item.created_at)}
+            </Text>
+          )}
+        </View>
+      </View>
+    );
+  }
 
   // Tailwind-Klassen fuer die Bubble – dynamisch je nach Nachrichtentyp
   const bubbleBaseClasses =
