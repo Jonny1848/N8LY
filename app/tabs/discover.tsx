@@ -1,15 +1,38 @@
-import { View, Text } from 'react-native';
-import { theme } from '../../constants/theme';
-
+import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { theme } from '@/constants/theme';
 export default function DiscoverScreen() {
   return (
-    <View className="flex-1 bg-white justify-center items-center">
-      <Text 
-        style={{ color: theme.colors.neutral.gray[900], fontFamily: 'Manrope_700Bold' }} 
-        className="text-4xl font-bold"
-      >
-        Entdecken
-      </Text>
-    </View>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Discover</Text>
+        <Text style={styles.subtitle}>Diese Seite ist fuer zukuenftige Features reserviert.</Text>
+      </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: theme.colors.neutral.white,
+  },
+  container: {
+    flex: 1,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontFamily: theme.typography.fontFamily.bold,
+    fontSize: 30,
+    color: theme.colors.neutral.gray[900],
+  },
+  subtitle: {
+    marginTop: 10,
+    textAlign: 'center',
+    fontFamily: theme.typography.fontFamily.regular,
+    fontSize: 14,
+    color: theme.colors.neutral.gray[500],
+  },
+});

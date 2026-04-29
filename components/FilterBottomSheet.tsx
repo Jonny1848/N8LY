@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Modal, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
+  Easing,
   useAnimatedStyle,
-  withSpring,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
 import { Slider } from '@miblanchard/react-native-slider';
 import { theme } from '../constants/theme';
+import { useFilterStore } from '@/app/store/filterStore';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -24,7 +25,7 @@ const EVENT_TYPES = [
   { id: 'house_party', name: 'House Party' },
   { id: 'boat_party', name: 'Boat Party' },
   { id: 'warehouse', name: 'Warehouse' },
-];
+]; //TODO: structure types for Events
 
 // Music Genres aus Onboarding
 const MUSIC_GENRES = [
@@ -44,7 +45,7 @@ const MUSIC_GENRES = [
   { id: 'schlager', name: 'Schlager' },
   { id: 'latin', name: 'Latin' },
   { id: 'jazz', name: 'Jazz' },
-];
+]; //TODO: Uniform structure for Events
 
 interface FilterBottomSheetProps {
   visible: boolean;
@@ -54,31 +55,28 @@ interface FilterBottomSheetProps {
 }
 
 export function FilterBottomSheet({ visible, onClose, onApply, onReset }: FilterBottomSheetProps) {
-  const [radius, setRadius] = useState(10);
-  const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([]);
-  const [selectedMusicGenres, setSelectedMusicGenres] = useState<string[]>([]);
-  const [isClosing, setIsClosing] = useState(false);
+  const { selectedEventTypes, setSelectedEventTypes, selectedMusicGenres, setSelectedMusicGenres, isFilterClosing, setIsFilterClosing, selectedRadius, setSelectedRadius } = useFilterStore();
 
   const translateY = useSharedValue(SCREEN_HEIGHT);
 
   React.useEffect(() => {
-    if (visible && !isClosing) {
-      translateY.value = withSpring(0, {
-        damping: 20,
-        stiffness: 90,
+    if (visible && !isFilterClosing) {
+      translateY.value = withTiming(0, {
+        duration: 300,
+        easing: Easing.out(Easing.cubic),
       });
     }
-  }, [visible, isClosing]);
+  }, [visible, isFilterClosing]);
 
   const handleClose = () => {
-    setIsClosing(true);
+    setIsFilterClosing(true);
     translateY.value = withTiming(SCREEN_HEIGHT, {
       duration: 300,
     });
-    
+
     // Warte bis Animation fertig ist
     setTimeout(() => {
-      setIsClosing(false);
+      setIsFilterClosing(false);
       onClose();
     }, 320);
   };
@@ -87,20 +85,16 @@ export function FilterBottomSheet({ visible, onClose, onApply, onReset }: Filter
     transform: [{ translateY: translateY.value }],
   }));
 
-  const toggleEventType = (typeId: string) => {
-    setSelectedEventTypes(prev =>
-      prev.includes(typeId) ? prev.filter(id => id !== typeId) : [...prev, typeId]
-    );
+  const toggleMusicGenre = (genre: string) => {
+    selectedMusicGenres.includes(genre) ? setSelectedMusicGenres(selectedMusicGenres.filter(selectedGenre => selectedGenre !== genre)) : setSelectedMusicGenres([...selectedMusicGenres, genre]);
   };
 
-  const toggleMusicGenre = (genreId: string) => {
-    setSelectedMusicGenres(prev =>
-      prev.includes(genreId) ? prev.filter(id => id !== genreId) : [...prev, genreId]
-    );
+  const toggleEventType = (type: string) => {
+    selectedEventTypes.includes(type) ? setSelectedEventTypes(selectedEventTypes.filter(selectedType => selectedType !== type)) : setSelectedEventTypes([...selectedEventTypes, type]);
   };
 
   const handleReset = () => {
-    setRadius(10);
+    setSelectedRadius(10);
     setSelectedEventTypes([]);
     setSelectedMusicGenres([]);
     onReset?.();
@@ -108,7 +102,7 @@ export function FilterBottomSheet({ visible, onClose, onApply, onReset }: Filter
 
   const handleApply = () => {
     console.log('Filter angewendet:', {
-      radius,
+      selectedRadius,
       eventTypes: selectedEventTypes,
       musicGenres: selectedMusicGenres,
     });
@@ -143,88 +137,64 @@ export function FilterBottomSheet({ visible, onClose, onApply, onReset }: Filter
 
         {/* Content */}
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            {/* Radius Slider */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Radius</Text>
-              <View style={styles.sliderContainer}>
-                <View style={styles.sliderWrapper}>
-                  <Slider
-                    minimumValue={5}
-                    maximumValue={50}
-                    step={5}
-                    value={[radius]}
-                    onValueChange={(values: number[]) => setRadius(values[0])}
-                    minimumTrackTintColor={theme.colors.primary.main}
-                    maximumTrackTintColor={theme.colors.neutral.gray[300]}
-                    thumbTintColor={theme.colors.primary.main}
-                    containerStyle={styles.slider}
-                  />
-                </View>
-                <View style={styles.radiusLabels}>
-                  <Text style={styles.radiusLabelLeft}>5 km</Text>
-                  <Text style={styles.radiusValue}>{radius} km</Text>
-                  <Text style={styles.radiusLabelRight}>50 km</Text>
-                </View>
-              </View>
-            </View>
 
-            {/* Event Types */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Event Type</Text>
-              <View style={styles.gridContainer}>
-                {EVENT_TYPES.map((type) => {
-                  const isSelected = selectedEventTypes.includes(type.id);
-                  return (
-                    <Pressable
-                      key={type.id}
-                      onPress={() => toggleEventType(type.id)}
+          {/* Event Types */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Event Type</Text>
+            <View style={styles.gridContainer}>
+              {EVENT_TYPES.map((type) => {
+                const isSelected = selectedEventTypes.includes(type.id);
+                return (
+                  <Pressable
+                    key={type.id}
+                    onPress={() => toggleEventType(type.id)}
+                    style={[
+                      styles.card,
+                      isSelected && styles.cardSelected,
+                    ]}
+                  >
+                    <Text
                       style={[
-                        styles.card,
-                        isSelected && styles.cardSelected,
+                        styles.cardText,
+                        isSelected && styles.cardTextSelected,
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.cardText,
-                          isSelected && styles.cardTextSelected,
-                        ]}
-                      >
-                        {type.name}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+                      {type.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
+          </View>
 
-            {/* Music Genres */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Music Type</Text>
-              <View style={styles.gridContainer}>
-                {MUSIC_GENRES.map((genre) => {
-                  const isSelected = selectedMusicGenres.includes(genre.id);
-                  return (
-                    <Pressable
-                      key={genre.id}
-                      onPress={() => toggleMusicGenre(genre.id)}
+          {/* Music Genres */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Music Type</Text>
+            <View style={styles.gridContainer}>
+              {MUSIC_GENRES.map((genre) => {
+                const isSelected = selectedMusicGenres.includes(genre.id);
+                return (
+                  <Pressable
+                    key={genre.id}
+                    onPress={() => toggleMusicGenre(genre.id)}
+                    style={[
+                      styles.card,
+                      isSelected && styles.cardSelected,
+                    ]}
+                  >
+                    <Text
                       style={[
-                        styles.card,
-                        isSelected && styles.cardSelected,
+                        styles.cardText,
+                        isSelected && styles.cardTextSelected,
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.cardText,
-                          isSelected && styles.cardTextSelected,
-                        ]}
-                      >
-                        {genre.name}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+                      {genre.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
+          </View>
 
           {/* Bottom spacing */}
           <View style={{ height: 20 }} />

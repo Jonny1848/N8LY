@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { theme } from '../../constants/theme';
 import { Event } from '../../components/EventCard';
+import { Share } from 'react-native';
+import { Avatar } from '@/components/Avatar';
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams();

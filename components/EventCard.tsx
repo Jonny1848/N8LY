@@ -1,7 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, Pressable, Dimensions } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Image, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
+import { AvatarStack } from './AvatarStack';
 
 // Typescript Interface for events
 export interface Event {
@@ -9,11 +10,11 @@ export interface Event {
   host_id: string;
   title: string;
   description: string | null;
-  event_type: string | null;
+  event_type: string;
   music_genres: string[] | null;
   date: string; // ISO Timestamp
   end_date: string | null;
-  image_urls: string[] | null;
+  image_urls: string[] | [];
   ticket_price: number;
   ticket_available: number;
   ticket_sold: number;
@@ -23,7 +24,7 @@ export interface Event {
   status: string | null;
   min_age: number | null;
   max_capacity: number | null;
-  venue_name: string;
+  venue_name: string | null;
   city: string;
   address: string;
   lineup: string[] | null;
@@ -38,53 +39,83 @@ interface EventCardProps {
 }
 
 export default function EventCard({ event, onPress }: EventCardProps) {
+  const [isSaved, setIsSaved] = useState(false);
   const eventDate = new Date(event.date);
   const formattedDate = eventDate.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
   const formattedTime = eventDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
+  const avatars = ['https://i.pravatar.cc/150?u=a',
+    'https://i.pravatar.cc/150?u=b',
+    'https://i.pravatar.cc/150?u=c',
+    'https://i.pravatar.cc/150?u=d',
+    'https://i.pravatar.cc/150?u=e',
+    'https://i.pravatar.cc/150?u=f',
+    'https://i.pravatar.cc/150?u=g'
+  ];
+
   return (
-    <Pressable 
-      onPress={() => onPress?.(event)} 
+    <Pressable
+      onPress={() => onPress?.(event)}
       style={({ pressed }) => [styles.container, pressed && styles.pressed]}
     >
-      <View style={styles.imageWrapper}>
-        <Image
-          source={
-            event.image_urls && event.image_urls.length > 0
-              ? { uri: event.image_urls[0] }
-              : require('../assets/pexels-apasaric-2078071.jpg') 
-          }
-          style={styles.image}
-        />
-        {event.is_boosted && (
-          <View style={styles.boostBadge}>
-            <Ionicons name="flash" size={10} color="white" />
-          </View>
-        )}
-      </View>
-
-      <View style={styles.content}>
-        <View style={styles.topRow}>
-          <Text style={styles.dateText}>{`${formattedDate}, ${formattedTime}`}</Text>
-        </View>
-
-        <Text style={styles.title} numberOfLines={1}>{event.title}</Text>
-        
-        <View style={styles.locationRow}>
-          <Text style={styles.locationText} numberOfLines={1}>
-            {event.venue_name} • {event.city}
-          </Text>
-        </View>
-
-        <View style={styles.footer}>
-          <View style={styles.interestedBox}>
-            <Ionicons name="flame" size={14} color={theme.colors.accent.main} />
-            <Text style={styles.interestedText}>{event.interested_count} Buzz</Text>
-          </View>
-          
-          {!!(event.ticket_available < 20 && event.ticket_available > 0) && (
-            <Text style={styles.limitedText}>Fast ausverkauft!</Text>
+      <View style={styles.mainRow}>
+        <View style={styles.imageWrapper}>
+          <Image
+            source={
+              event.image_urls && event.image_urls.length > 0
+                ? { uri: event.image_urls[0] }
+                : require('../assets/pexels-apasaric-2078071.jpg')
+            }
+            style={styles.image}
+            resizeMode="cover"
+          />
+          {event.is_boosted && (
+            <View style={styles.boostBadge}>
+              <Ionicons name="flash" size={10} color="white" />
+            </View>
           )}
+        </View>
+
+        <View style={styles.content}>
+          <View style={styles.topRow}>
+            <Text style={styles.dateText} numberOfLines={1}>{`${formattedDate} • ${formattedTime}`}</Text>
+
+            <Pressable
+              onPress={() => setIsSaved(!isSaved)}
+              style={styles.bookmarkButton}
+            >
+              <Ionicons
+                name={isSaved ? "bookmark" : "bookmark-outline"}
+                size={22}
+                color={isSaved ? theme.colors.primary.main : theme.colors.neutral.gray[300]}
+              />
+            </Pressable>
+          </View>
+
+          <Text style={styles.title} numberOfLines={1}>{event.title}</Text>
+          <View style={styles.locationRow}>
+            <Text style={styles.locationText} numberOfLines={1}>
+              {event.venue_name} • {event.city}
+            </Text>
+          </View>
+
+          <View style={styles.footer}>
+            <AvatarStack
+              avatars={avatars}
+              totalCount={event.interested_count}
+              maxVisible={3}
+              size={24}
+              spacing={-6}
+            />
+            <View style={styles.interestedBox}>
+              <Ionicons name="flame" size={14} color={theme.colors.accent.main} />
+              <Text style={styles.interestedText}>{event.interested_count} interessiert</Text>
+            </View>
+            
+            {!!(event.ticket_available < 20 && event.ticket_available > 0) && (
+              <Text style={styles.limitedText}>Fast ausverkauft!</Text>
+            )}
+          </View>
         </View>
       </View>
 
@@ -99,7 +130,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: theme.colors.neutral.white,
-    borderRadius: theme.borderRadius.lg,
+    borderRadius: 20,
     marginHorizontal: 16,
     marginBottom: 12,
     padding: 10,
@@ -112,13 +143,20 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     transform: [{ scale: 0.99 }],
   },
+  mainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
+  },
   imageWrapper: {
     position: 'relative',
+    flexShrink: 0,
   },
   image: {
-    width: 80,
-    height: 80,
-    borderRadius: theme.borderRadius.md,
+    width: 85,
+    height: 85,
+    borderRadius: 16,
     backgroundColor: theme.colors.neutral.gray[200],
   },
   boostBadge: {
@@ -133,16 +171,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'white',
+    zIndex: 11,
   },
   content: {
     flex: 1,
     marginLeft: 14,
-    justifyContent: 'center',
+    minHeight: 85,
+    justifyContent: 'space-between',
+    minWidth: 0,
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 2,
+    alignItems: 'center',
+    gap: 8,
   },
   dateText: {
     fontSize: 12,
@@ -150,10 +192,9 @@ const styles = StyleSheet.create({
     color: theme.colors.primary.main,
     fontFamily: theme.typography.fontFamily.semibold,
   },
-  priceText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: theme.colors.neutral.gray[900],
+  bookmarkButton: {
+    padding: 2,
+    marginRight: -2,
   },
   title: {
     fontSize: 16,
@@ -175,6 +216,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
   },
   interestedBox: {
     flexDirection: 'row',
