@@ -27,7 +27,7 @@ export function StoryViewerSlide({
       {!story.media_url ? (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-white/60 text-center" style={storyViewerFontArial}>
-            Kein Medium fuer diese Story.
+            Kein Medium für diese Story.
           </Text>
         </View>
       ) : String(story.media_type || '').toLowerCase() === 'video' ? (

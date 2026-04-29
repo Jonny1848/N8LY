@@ -21,7 +21,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import { supabase, fetchProfileWithToken } from '../../lib/supabase';
 
-// WICHTIG: Ermoeglicht dem Browser, die Auth-Session abzuschliessen
+// WICHTIG: Ermöglicht dem Browser, die Auth-Session abzuschliessen
 WebBrowser.maybeCompleteAuthSession();
 
 export function useOAuthHandlers({ setErrorMsg, mode, router }) {

@@ -1,53 +1,72 @@
 /**
- * Zeile „Medien, Links, Doks“: links Icon + Titel, rechts Anzahl + Chevron in einer Zeile.
+ * Zeile „Medien“: links Icon + Titel, rechts Anzahl + Chevron in einer Zeile.
  * Layout wie GroupInfoDescriptionCard: innere View fuer Flex-Row (Pressable allein misst sich oft schmal).
  */
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { PhotoIcon, ChevronRightIcon } from 'react-native-heroicons/solid';
 import { theme } from '../../../constants/theme';
 
-const PRIMARY = theme.colors.primary.main;
-
 export default function GroupInfoStatsRow({ mediaCount, onPress }) {
   return (
-    <View style={styles.section}>
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [styles.pressableFill, pressed && { backgroundColor: theme.colors.neutral.gray[50] }]}
-        accessibilityRole="button"
-      >
-        {/* Explizite Row-View: verhindert, dass Pressable die Kinder vertikal stapelt */}
-        <View style={styles.row}>
-          <View style={styles.leftCluster}>
-            <PhotoIcon size={22} color="black" />
-            <Text style={styles.label} numberOfLines={1}>
-              Medien, Links, Doks
-            </Text>
-          </View>
-          <View style={styles.rightCluster}>
-            <Text style={styles.value}>{mediaCount}</Text>
-            <View style={styles.chevronWrap}>
-              <ChevronRightIcon size={18} color="black" />
+    <View style={styles.outer}>
+      {/*
+        Gleiche Hülle wie GroupInfoDescriptionCard: outer = seitlicher Einzug, section = weisse Kachel
+        mit exakt demselben borderRadius.md (Kanten wirken identisch zu „Gruppenbeschreibung“).
+      */}
+      <View style={styles.section}>
+        <Pressable
+          onPress={onPress}
+          style={({ pressed }) => [styles.pressableFill, pressed && { backgroundColor: theme.colors.neutral.gray[50] }]}
+          accessibilityRole="button"
+        >
+          {/* Explizite Row-View: verhindert, dass Pressable die Kinder vertikal stapelt */}
+          <View style={styles.row}>
+            <View style={styles.leftCluster}>
+              <PhotoIcon size={22} color="black" />
+              <Text style={styles.label} numberOfLines={1}>
+                Medien
+              </Text>
+            </View>
+            <View style={styles.rightCluster}>
+              <Text style={styles.value}>{mediaCount}</Text>
+              <View style={styles.chevronWrap}>
+                <ChevronRightIcon size={22} color={theme.colors.neutral.gray[400]} />
+              </View>
             </View>
           </View>
-        </View>
-      </Pressable>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  /**
+   * Wie GroupInfoDescriptionCard `outer`: gray[50] hinter Seiten und Ecken der weissen Kachel.
+   * Fehlt das, ist der Screen-Bereich weiss = weiss auf weiss: Ecken wirken weder abgerundet
+   * noch sichtbar „eingerückt“.
+   */
+  outer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+    backgroundColor: theme.colors.neutral.gray[50],
+  },
+  /** 1:1 mit GroupInfoDescriptionCard `section` (borderRadius, Schatten, overflow). */
   section: {
     alignSelf: 'stretch',
-    marginHorizontal: 16,
     borderRadius: theme.borderRadius.md,
     backgroundColor: theme.colors.neutral.white,
     overflow: 'hidden',
     ...theme.shadows.sm,
   },
-  /** Volle Kachelbreite — sonst schrumpft Pressable und die Row bricht um */
+  /**
+   * borderRadius + overflow wie die Kachel, damit der Press-Overlay (gray[50]) an den Ecken clippt.
+   */
   pressableFill: {
     width: '100%',
+    borderRadius: theme.borderRadius.md,
+    overflow: 'hidden',
   },
   row: {
     flexDirection: 'row',

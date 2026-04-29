@@ -77,7 +77,7 @@ export function StoryHeaderOverlay({
 
         <View className="flex-1 ml-2.5 justify-center min-h-[46px]">
           <View className="flex-row items-center flex-wrap">
-            <Text className="text-white text-[15px] font-bold" style={storyViewerFontArial} numberOfLines={1}>
+            <Text className="text-white text-[16px] font-bold" style={storyViewerFontArial} numberOfLines={1}>
               {displayName}
             </Text>
             <View className="ml-1">

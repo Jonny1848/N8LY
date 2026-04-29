@@ -24,7 +24,7 @@ import {
  * Emoji-Kapsel: iOS Liquid Glass wenn verfuegbar, sonst Blur + mattes Overlay.
  * isSelected: Ring + leichte Skalierung (eigene Reaktion bzw. Smiley wenn schon gewaehlt).
  * Press: tieferes Eindruecken, kurzer Pop beim Loslassen.
- * disabled: z. B. eigene Story — Anzeige bleibt, keine Reaktion moeglich.
+ * disabled: z. B. eigene Story — Anzeige bleibt, keine Reaktion möglich.
  */
 export function StoryReactionGlassChip({
   useGlass,

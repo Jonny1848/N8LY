@@ -1,52 +1,32 @@
 /**
  * Vier Quick-Actions: Audio, Video, N8-Pics, Suche.
- * Icon + Text als Spalte, horizontal zentriert; vertikal mit paddingTop nach unten versetzt.
- * N8-Pics: LinearGradient accent.main → primary.main3.
+ * Alle Kacheln einheitlich: weiss mit Schatten, Primary-Farbe für Icons (wie WhatsApp/Streifen).
+ *
+ * Hinweis: N8-Pics ist nicht mehr visuell hervorgehoben — eigene USP-Seite kommt beim Antippen
+ * (/chat/group-n8-pics/[id]), die Mediengalerie bleibt über die Medien-Zeile verlinkt.
  */
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { PhoneIcon, VideoCameraIcon, MagnifyingGlassIcon, PhotoIcon } from 'react-native-heroicons/solid';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { theme } from '../../../constants/theme';
 
 const PRIMARY = theme.colors.primary.main;
 
 /** Icon + Beschriftung als eine zentrierte Gruppe (Icon in fester Box, optisch mittig) */
-function TileContent({ icon: Icon, label, emph = false }) {
+function TileContent({ icon: Icon, label }) {
   return (
     <View style={styles.innerGroup}>
       <View style={styles.iconWrap}>
-        <Icon size={26} color={emph ? '#FFFFFF' : PRIMARY} />
+        <Icon size={26} color={PRIMARY} />
       </View>
-      <Text style={emph ? styles.tileEmphLabel : styles.tileLabel} numberOfLines={2}>
+      <Text style={styles.tileLabel} numberOfLines={2}>
         {label}
       </Text>
     </View>
   );
 }
 
-function ActionTile({ icon: Icon, label, onPress, emphasized = false }) {
-  if (emphasized) {
-    return (
-      <View style={[styles.tileShell, styles.tileShellEmph]}>
-        <LinearGradient
-          colors={[theme.colors.accent.main, theme.colors.primary.main3]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-        <Pressable
-          onPress={onPress}
-          style={({ pressed }) => [styles.tilePressFill, pressed && { opacity: 0.92 }]}
-          accessibilityRole="button"
-          accessibilityLabel={label}
-        >
-          <TileContent icon={Icon} label={label} emph />
-        </Pressable>
-      </View>
-    );
-  }
-
+function ActionTile({ icon: Icon, label, onPress }) {
   return (
     <View style={styles.tileShell}>
       <Pressable
@@ -55,7 +35,7 @@ function ActionTile({ icon: Icon, label, onPress, emphasized = false }) {
         accessibilityRole="button"
         accessibilityLabel={label}
       >
-        <TileContent icon={Icon} label={label} emph={false} />
+        <TileContent icon={Icon} label={label} />
       </Pressable>
     </View>
   );
@@ -71,7 +51,7 @@ export default function GroupInfoQuickActions({
     <Animated.View entering={FadeIn.duration(420)} style={styles.row}>
       <ActionTile icon={PhoneIcon} label="Audio" onPress={onAudio} />
       <ActionTile icon={VideoCameraIcon} label="Video" onPress={onVideo} />
-      <ActionTile icon={PhotoIcon} label="N8-Pics" onPress={onN8Pics} emphasized />
+      <ActionTile icon={PhotoIcon} label="N8-Pics" onPress={onN8Pics} />
       <ActionTile icon={MagnifyingGlassIcon} label="Suche" onPress={onSearch} />
     </Animated.View>
   );
@@ -94,9 +74,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...theme.shadows.sm,
   },
-  tileShellEmph: {
-    backgroundColor: 'transparent',
-  },
   /**
    * flex-start + grosses paddingTop: Icon+Text weiter unten in der Kachel (alle 4 gleich).
    */
@@ -111,19 +88,12 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     paddingHorizontal: 4,
   },
-  /**
-   * Nur so breit wie Inhalt (max. Kachelbreite), horizontal zentriert.
-   */
   innerGroup: {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     maxWidth: '100%',
   },
-  /**
-   * Gleiche Box fuer alle Icons.
-   * translateY: nur die Glyphe nach unten; Layout (Textposition, marginTop am Label) bleibt.
-   */
   iconWrap: {
     width: 32,
     height: 32,
@@ -131,19 +101,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     transform: [{ translateY: 12 }],
   },
-  /** Abstand Icon → Label: groesser = Text sitzt weiter unten in der Kachel */
   tileLabel: {
     marginTop: 16,
     textAlign: 'center',
     fontFamily: theme.typography.fontFamily.medium,
     fontSize: 11,
     color: theme.colors.neutral.gray[700],
-  },
-  tileEmphLabel: {
-    marginTop: 16,
-    textAlign: 'center',
-    fontFamily: theme.typography.fontFamily.bold,
-    fontSize: 11,
-    color: '#FFFFFF',
   },
 });

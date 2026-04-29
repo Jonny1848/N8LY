@@ -2,7 +2,7 @@ import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { theme } from '../../constants/theme';
 
 /**
- * Primaer-CTA; Hintergrund per theme als Fallback, falls NativeWind `bg-brand` nicht aufloest.
+ * Primaer-CTA; Hintergrund per theme als Fallback, falls NativeWind `bg-brand` nicht auflöst.
  */
 export default function AuthSubmitButton({ title, onPress, disabled, loading }) {
     return (

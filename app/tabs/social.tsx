@@ -39,6 +39,13 @@ import ChatsEmptyStateIllustration from '../../components/chat/ChatsEmptyStateIl
 const SEARCH_BAR_HEIGHT = 56;
 
 
+const AVATAR_RING_GRADIENT_COLORS = [
+  theme.colors.primary.main2,
+  theme.colors.primary.main,
+  theme.colors.accent.main,
+  theme.colors.accent.dark,
+] as const;
+
 
 
 /** Plus im leeren Story-Ring: Goldtoenung wie im Referenz-UI */
@@ -48,7 +55,14 @@ const STORY_ADD_PLUS_GOLD = '#F4D03F';
 const STORY_LABEL_ON_BLUE = 'rgba(255,255,255,0.88)';
 
 /** Ringe auf blauem Header: inaktiv leicht transparent, neu weiss */
-const STORY_RING_IDLE_ON_BLUE = 'rgba(255,255,255,0.42)';
+const STORY_RING_IDLE_ON_BLUE = 'rgba(255,255,255,0.5)';
+
+/**
+ * Story-Zeile: äußerer Kreis (vorher w-16 = 64px) — leicht größer, damit Avatare nicht wie die Header-Icons wirken.
+ * Inner-Idle: proportional zu altem 52/64, damit der weisse Ring gleich aussieht.
+ */
+const STORY_AVATAR_OUTER_PX = 72;
+const STORY_AVATAR_INNER_IDLE_PX = 59;
 
 /**
  * Untere Rundung der blauen Kopf-Karte zum weissen Chat-Bereich darunter.
@@ -182,7 +196,18 @@ export default function SocialScreen() {
         if (!label) return '📎 Datei';
         return msg.content.length > 36 ? `📎 ${msg.content.substring(0, 36)}…` : `📎 ${msg.content}`;
       }
-       case 'system':
+      case 'poll': {
+        // Poll-Frage aus dem JSON-Content extrahieren
+        try {
+          const poll = JSON.parse(msg.content ?? '{}');
+          const question = poll?.question?.trim();
+          if (!question) return '📊 Umfrage';
+          return question.length > 36 ? `📊 ${question.substring(0, 36)}…` : `📊 ${question}`;
+        } catch {
+          return '📊 Umfrage';
+        }
+      }
+      case 'system':
         return msg.content || 'Systemnachricht';
       default:
         return msg.content?.length > 40
@@ -333,14 +358,17 @@ export default function SocialScreen() {
                     onPress={() => router.push('/chat/stories/create')}
                   >
                     <View
-                      className="w-16 h-16 rounded-full items-center justify-center"
+                      className="rounded-full items-center justify-center"
                       style={{
+                        width: STORY_AVATAR_OUTER_PX,
+                        height: STORY_AVATAR_OUTER_PX,
                         borderWidth: 2,
                         borderStyle: 'dashed',
                         borderColor: theme.colors.neutral.white,
                       }}
                     >
-                      <PlusIcon size={24} color={STORY_ADD_PLUS_GOLD} />
+                      {/* Plus leicht hoch skaliert mit dem grösseren Ring */}
+                      <PlusIcon size={28} color={STORY_ADD_PLUS_GOLD} />
                     </View>
                     <Text
                       className="text-xs mt-1.5"
@@ -360,29 +388,28 @@ export default function SocialScreen() {
                   className="items-center mr-6"
                   onPress={() => userId && router.push(`/chat/stories/${userId}`)}
                 >
-                  <View
-                    className="w-16 h-16 rounded-full items-center justify-center"
-                    style={{
-                      borderWidth: 2.5,
-                      borderColor: ringActive
-                        ? theme.colors.neutral.white
-                        : STORY_RING_IDLE_ON_BLUE,
-                    }}
-                  >
-                    {u?.avatar_url ? (
-                      <Image
-                        source={{ uri: u.avatar_url }}
-                        className="w-[52px] h-[52px] rounded-full"
-                        style={{ backgroundColor: theme.colors.neutral.gray[100] }}
-                      />
-                    ) : (
+                  {/* Gradient-Ring wie in StoryHeaderOverlay: padding erzeugt den Ring */}
+                  <View style={{ width: STORY_AVATAR_OUTER_PX, height: STORY_AVATAR_OUTER_PX }}>
+                    <LinearGradient
+                      colors={AVATAR_RING_GRADIENT_COLORS}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={{ flex: 1, borderRadius: 9999, padding: 2.5 }}
+                    >
                       <View
-                        className="w-[52px] h-[52px] rounded-full items-center justify-center"
+                        className="w-full h-full rounded-full overflow-hidden items-center justify-center"
                         style={{ backgroundColor: theme.colors.neutral.gray[100] }}
                       >
-                        <UserIcon size={24} color={theme.colors.neutral.gray[400]} />
+                        {u?.avatar_url ? (
+                          <Image
+                            source={{ uri: u.avatar_url }}
+                            style={{ width: '100%', height: '100%' }}
+                          />
+                        ) : (
+                          <UserIcon size={28} color={theme.colors.neutral.gray[400]} />
+                        )}
                       </View>
-                    )}
+                    </LinearGradient>
                   </View>
                   <Text
                     className="text-xs mt-1.5"
@@ -405,33 +432,68 @@ export default function SocialScreen() {
                 className="items-center mr-6"
                 onPress={() => u?.id && router.push(`/chat/stories/${u.id}`)}
               >
-                <View
-                  className="w-16 h-16 rounded-full items-center justify-center"
-                  style={{
-                    borderWidth: 2.5,
-                    borderColor: g?.hasUnviewed
-                      ? theme.colors.neutral.white
-                      : STORY_RING_IDLE_ON_BLUE,
-                  }}
-                >
-                  {u?.avatar_url ? (
-                    <Image
-                      source={{ uri: u.avatar_url }}
-                      className="w-[52px] h-[52px] rounded-full"
-                      style={{ backgroundColor: theme.colors.neutral.gray[100] }}
-                    />
-                  ) : (
-                    <View
-                      className="w-[52px] h-[52px] rounded-full items-center justify-center"
-                      style={{ backgroundColor: theme.colors.neutral.gray[100] }}
+                {/* Ungesehen → Gradient-Ring, gesehen → schlichter Idle-Ring */}
+                {g?.hasUnviewed ? (
+                  <View style={{ width: STORY_AVATAR_OUTER_PX, height: STORY_AVATAR_OUTER_PX }}>
+                    <LinearGradient
+                      colors={AVATAR_RING_GRADIENT_COLORS}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={{ flex: 1, borderRadius: 9999, padding: 2.5 }}
                     >
-                      <UserIcon size={24} color={theme.colors.neutral.gray[400]} />
-                    </View>
-                  )}
-                </View>
+                      <View
+                        className="w-full h-full rounded-full overflow-hidden items-center justify-center"
+                        style={{ backgroundColor: theme.colors.neutral.gray[100] }}
+                      >
+                        {u?.avatar_url ? (
+                          <Image
+                            source={{ uri: u.avatar_url }}
+                            style={{ width: '100%', height: '100%' }}
+                          />
+                        ) : (
+                          <UserIcon size={28} color={theme.colors.neutral.gray[400]} />
+                        )}
+                      </View>
+                    </LinearGradient>
+                  </View>
+                ) : (
+                  <View
+                    className="rounded-full items-center justify-center"
+                    style={{
+                      width: STORY_AVATAR_OUTER_PX,
+                      height: STORY_AVATAR_OUTER_PX,
+                      borderWidth: 2.5,
+                      borderColor: STORY_RING_IDLE_ON_BLUE,
+                    }}
+                  >
+                    {u?.avatar_url ? (
+                      <Image
+                        source={{ uri: u.avatar_url }}
+                        className="rounded-full"
+                        style={{
+                          width: STORY_AVATAR_INNER_IDLE_PX,
+                          height: STORY_AVATAR_INNER_IDLE_PX,
+                          backgroundColor: theme.colors.neutral.gray[100],
+                        }}
+                      />
+                    ) : (
+                      <View
+                        className="rounded-full items-center justify-center"
+                        style={{
+                          width: STORY_AVATAR_INNER_IDLE_PX,
+                          height: STORY_AVATAR_INNER_IDLE_PX,
+                          backgroundColor: theme.colors.neutral.gray[100],
+                        }}
+                      >
+                        <UserIcon size={28} color={theme.colors.neutral.gray[400]} />
+                      </View>
+                    )}
+                  </View>
+                )}
                 <Text
-                  className="text-xs mt-1.5 max-w-[64px]"
+                  className="text-xs mt-1.5"
                   style={{
+                    maxWidth: STORY_AVATAR_OUTER_PX,
                     fontFamily: 'Manrope_500Medium',
                     color: STORY_LABEL_ON_BLUE,
                   }}

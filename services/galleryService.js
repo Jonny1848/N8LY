@@ -10,7 +10,7 @@
  * Funktionen:
  * - Galerie-Eintraege laden (pro Chat)
  * - Automatisch Eintraege erstellen wenn Bilder gesendet werden
- * - Eintraege loeschen
+ * - Eintraege löschen
  * =============================================================
  */
 
@@ -113,7 +113,7 @@ export async function addToGallery(conversationId, messageId, mediaUrl, uploaded
 /**
  * Entfernt ein Medium aus der Chat-Galerie.
  *
- * Loescht nur den Galerie-Eintrag, nicht die Original-Nachricht
+ * Löscht nur den Galerie-Eintrag, nicht die Original-Nachricht
  * oder die Datei in Supabase Storage.
  *
  * @param {string} galleryItemId – Die UUID des Galerie-Eintrags

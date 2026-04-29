@@ -27,7 +27,7 @@ import { XMarkIcon } from 'react-native-heroicons/solid';
 import { theme } from '../../../constants/theme';
 
 /** Sinnvolle Obergrenze fuer die Beschreibung */
-const MAX_LEN = 500;
+const MAX_LEN = 250;
 
 export default function GroupInfoDescriptionModal({
   visible,
@@ -38,7 +38,7 @@ export default function GroupInfoDescriptionModal({
 }) {
   const [draft, setDraft] = useState('');
 
-  // Beim Oeffnen: Entwurf aus DB/Props uebernehmen
+  // Beim Öffnen: Entwurf aus DB/Props uebernehmen
   useEffect(() => {
     if (visible) {
       setDraft(initialDescription != null ? String(initialDescription) : '');

@@ -31,6 +31,7 @@ export default {
         NSLocationWhenInUseUsageDescription:
           "Diese App benötigt deinen Standort, um Events in deiner Nähe anzuzeigen.",
         ITSAppUsesNonExemptEncryption: false,
+        NSCameraUsageDescription: "Diese App benötigt deine Kamera, um Fotos und Videos aufzunehmen.",
       },
       usesAppleSignIn: true,
       supportsTablet: true,
@@ -40,7 +41,7 @@ export default {
 
     // Android-spezifische Einstellungen
     android: {
-      // Fenster verkleinert sich bei geoeffneter Tastatur (adjustResize) — wichtig damit die Chat-Eingabe
+      // Fenster verkleinert sich bei geöffneter Tastatur (adjustResize) — wichtig damit die Chat-Eingabe
       // nicht unter der Tastatur liegt; passt zu KeyboardAvoidingView nur auf iOS im Chat-Screen.
       softwareKeyboardLayoutMode: "resize",
       permissions: [
@@ -88,23 +89,23 @@ export default {
         {
           // iOS Mikrofon-Permission fuer Sprachnachrichten
           microphonePermission:
-            "N8LY benoetigt Zugriff auf dein Mikrofon fuer Sprachnachrichten.",
+            "N8LY benötigt Zugriff auf dein Mikrofon fuer Sprachnachrichten.",
         },
       ],
       [
         "expo-contacts",
         {
           contactsPermission:
-            "N8LY benoetigt Zugriff auf deine Kontakte fuer den Kontakt-Teilen-Dialog.",
+            "N8LY benötigt Zugriff auf deine Kontakte fuer den Kontakt-Teilen-Dialog.",
         },
       ],
       [
         "expo-camera",
         {
           cameraPermission:
-            "N8LY benoetigt die Kamera, um Fotos und Videos fuer deine Story aufzunehmen.",
+            "N8LY benötigt die Kamera, um Fotos und Videos für deine Story aufzunehmen.",
           microphonePermission:
-            "N8LY benoetigt das Mikrofon fuer Video-Stories.",
+            "N8LY benötigt das Mikrofon für Video-Stories.",
           recordAudioAndroid: true,
         },
       ],

@@ -19,7 +19,7 @@ export default function ImagePreviewModal({ visible, imageUri, onClose }) {
   // Ratio Zurücksetzen bei neuem Bild (verhindert Flicker vom vorherigen Wert)
   useEffect(() => { setRatio(4 / 3); }, [imageUri]);
 
-  // Rahmen: so gross wie moeglich, mit minimalem Rand fuer den Dismiss-Tap drumherum
+  // Rahmen: so gross wie möglich, mit minimalem Rand fuer den Dismiss-Tap drumherum
   const maxW = screenW - 24;
   const maxH = screenH * 0.78;
   let w = maxW;

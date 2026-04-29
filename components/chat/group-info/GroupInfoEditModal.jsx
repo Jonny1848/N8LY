@@ -9,14 +9,33 @@ import {
   Modal,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { XMarkIcon, PhotoIcon } from 'react-native-heroicons/solid';
 import { theme } from '../../../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolateColor,
+} from 'react-native-reanimated';
+
+import { useEffect, useMemo } from 'react';
+
+/**
+ * Runder Gruppenavatar: relativ zur Bildschirmbreite, deutlich groesser als kleine Vorschau —
+ * mittig wirkt nur sauber wenn der Kreis zur Zeilenbreite passt (~72 % minus Rand).
+ *
+ * @param {number} screenWidth
+ */
+function getAvatarDiameter(screenWidth) {
+  return Math.round(Math.min(292, Math.max(220, screenWidth * 0.72)));
+}
 
 export default function GroupInfoEditModal({
   visible,
@@ -30,7 +49,57 @@ export default function GroupInfoEditModal({
   saving,
   name,
 }) {
+  const { width: screenW } = useWindowDimensions();
+  const avatarDiameter = useMemo(() => getAvatarDiameter(screenW), [screenW]);
+  const avatarRadius = avatarDiameter / 2;
+
+  /** Icon fuer leeren Platz skaliert mit Kreisgroesse */
+  const photoIconSize = Math.round(Math.min(64, avatarDiameter * 0.26));
+
   const showAvatar = localPreviewUri || (initialAvatarUrl && String(initialAvatarUrl).trim());
+
+  // Vergleich mit Server-Stand: Name geaendert und/oder neues lokales Bild gewaehlt
+  const initialNorm = useMemo(
+    () => String(initialName ?? '').trim(),
+    [initialName],
+  );
+  const draftNorm = String(name ?? '').trim();
+  const hasChanges =
+    draftNorm !== initialNorm || Boolean(localPreviewUri);
+  /** Gradient bleibt „aktiv“ auch waehrend Speichern, damit kein Farbsprung entsteht */
+  const confirmLooksActive = hasChanges || saving;
+
+  const confirmActive = useSharedValue(0);
+  useEffect(() => {
+    confirmActive.value = withTiming(confirmLooksActive ? 1 : 0, { duration: 260 });
+  }, [confirmLooksActive, confirmActive]);
+
+  const confirmBtnScaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: confirmActive.value * 0.06 + 0.94 }],
+  }));
+
+  const confirmInactiveGradOpacity = useAnimatedStyle(() => ({
+    opacity: 1 - confirmActive.value,
+  }));
+
+  const confirmActiveGradOpacity = useAnimatedStyle(() => ({
+    opacity: confirmActive.value,
+  }));
+
+  const confirmLabelStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(
+      confirmActive.value,
+      [0, 1],
+      [theme.colors.neutral.gray[500], '#ffffff'],
+    ),
+  }));
+
+  // Parent erwartet kein Argument (siehe handleSaveEdit in group-info/[id])
+  const handleConfirm = () => {
+    if (!hasChanges || saving || !draftNorm) return;
+    onSave();
+  };
+
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -60,39 +129,102 @@ export default function GroupInfoEditModal({
             maxLength={80}
           />
 
-          <Text style={[styles.label, { marginTop: 24 }]}>Gruppenbild</Text>
-          <Pressable
-            onPress={onPickImage}
-            style={({ pressed }) => [styles.imageCard, pressed && { opacity: 0.9 }]}
-          >
-            {showAvatar ? (
-              <Image
-                source={{ uri: localPreviewUri || initialAvatarUrl }}
-                style={styles.preview}
-                contentFit="cover"
-              />
-            ) : (
-              <View style={styles.previewPh}>
-                <PhotoIcon size={40} color={theme.colors.neutral.gray[400]} />
-                <Text style={styles.previewHint}>Tippen zum Auswählen</Text>
-              </View>
-            )}
-          </Pressable>
+          {/* Sektion zentriert: Label und Kreis mittig ueber die volle Breite */}
+          <View style={styles.avatarSection}>
+            <Text style={[styles.label, styles.labelAboveAvatar]}>Gruppenbild</Text>
+            {/*
+              Kreis: Kanten auf Container UND expo-image — sonst rechteckiger Clip nur auf manchen Builds.
+              alignSelf:center + wrapper alignItems garantiert echte Bildschirmmitte (nicht nur alignSelf ohne Block).
+            */}
+            <Pressable
+              onPress={onPickImage}
+              style={({ pressed }) => [
+                {
+                  width: avatarDiameter,
+                  height: avatarDiameter,
+                  borderRadius: avatarRadius,
+                  overflow: 'hidden',
+                  backgroundColor: theme.colors.neutral.gray[100],
+                },
+                pressed && { opacity: 0.92 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Gruppenbild auswählen"
+            >
+              {showAvatar ? (
+                <Image
+                  source={{ uri: localPreviewUri || initialAvatarUrl }}
+                  style={{
+                    width: avatarDiameter,
+                    height: avatarDiameter,
+                    borderRadius: avatarRadius,
+                  }}
+                  contentFit="cover"
+                />
+              ) : (
+                <View
+                  style={{
+                    width: avatarDiameter,
+                    height: avatarDiameter,
+                    borderRadius: avatarRadius,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <PhotoIcon size={photoIconSize} color={theme.colors.neutral.gray[400]} />
+                  <Text style={styles.previewHint}>Tippen zum Auswählen</Text>
+                </View>
+              )}
+            </Pressable>
+          </View>
 
+          {/*
+            Expliziter Spacer: marginTop/marginBottom zw. ScrollView-Kindern war auf iOS/Simulator
+            optisch oft unveraendert — feste Hoehe erzwingt den Abstand zuverlaessig.
+          */}
+          <View style={styles.avatarToSaveSpacer} />
+
+          {/* Speichern: wie GroupInfoDescriptionModal — zwei LinearGradients (inaktiv/aktiv) */}
           <Pressable
-            onPress={onSave}
-            disabled={saving || !String(name || '').trim()}
+            onPress={handleConfirm}
+            disabled={!draftNorm || !hasChanges || saving}
             style={({ pressed }) => [
-              styles.saveBtn,
-              (!String(name || '').trim() || saving) && styles.saveBtnDisabled,
-              pressed && String(name || '').trim() && !saving && { opacity: 0.92 },
+              styles.confirmPressWrap,
+              pressed && draftNorm && hasChanges && !saving && { opacity: 0.92 },
             ]}
           >
-            {saving ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.saveLabel}>Speichern</Text>
-            )}
+            <Animated.View style={[styles.confirmBtnOuter, confirmBtnScaleStyle]}>
+              <Animated.View
+                pointerEvents="none"
+                style={[StyleSheet.absoluteFillObject, confirmInactiveGradOpacity]}
+              >
+                <LinearGradient
+                  colors={[theme.colors.neutral.gray[300], theme.colors.neutral.gray[200]]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+              </Animated.View>
+              <Animated.View
+                pointerEvents="none"
+                style={[StyleSheet.absoluteFillObject, confirmActiveGradOpacity]}
+              >
+                <LinearGradient
+                  colors={[theme.colors.primary.main, theme.colors.primary.main2]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+              </Animated.View>
+              {saving ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Animated.Text style={[styles.confirmLabel, confirmLabelStyle]}>
+                  Speichern
+                </Animated.Text>
+              )}
+            </Animated.View>
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -148,42 +280,45 @@ const styles = StyleSheet.create({
     color: theme.colors.neutral.gray[900],
     backgroundColor: theme.colors.neutral.gray[50],
   },
-  imageCard: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    overflow: 'hidden',
-    alignSelf: 'center',
-    backgroundColor: theme.colors.neutral.gray[100],
-  },
-  preview: {
+  avatarSection: {
     width: '100%',
-    height: '100%',
-  },
-  previewPh: {
-    flex: 1,
+    marginTop: 28,
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+  },
+  labelAboveAvatar: {
+    width: '100%',
+    textAlign: 'center',
+    marginBottom: 20,
+    marginTop: 0,
   },
   previewHint: {
     fontFamily: theme.typography.fontFamily.medium,
     fontSize: 12,
     color: theme.colors.neutral.gray[500],
   },
-  saveBtn: {
-    marginTop: 32,
-    backgroundColor: theme.colors.primary.main,
-    borderRadius: theme.borderRadius.lg,
-    paddingVertical: 14,
+  confirmPressWrap: {
+    marginTop: 0,
     alignItems: 'center',
+    alignSelf: 'center',
+    width: '100%',
   },
-  saveBtnDisabled: {
-    opacity: 0.45,
+  /** Abstand Avatar-Block → Speichern (Hauptabstand; siehe Spacer im JSX) */
+  avatarToSaveSpacer: {
+    width: '100%',
+    height: 112,
+    minHeight: 112,
   },
-  saveLabel: {
+  confirmBtnOuter: {
+    borderRadius: 9999,
+    overflow: 'hidden',
+    paddingHorizontal: 40,
+    paddingVertical: 14,
+    minWidth: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmLabel: {
     fontFamily: theme.typography.fontFamily.bold,
     fontSize: 16,
-    color: '#FFFFFF',
   },
 });

@@ -1,5 +1,5 @@
 /**
- * Gruppenbeschreibung in einer Kachel wie „Medien, Links, Doks“:
+ * Gruppenbeschreibung in einer Kachel wie „Medien“:
  * Text links (mehrzeilig), Stift rechts — nur der Stift oeffnet die Bearbeitung.
  */
 import { View, Text, Pressable, StyleSheet } from 'react-native';

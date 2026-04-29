@@ -28,9 +28,10 @@ yarn-error.*
 .cursor/
 .cursor/*.log
 .cursor/settings.json
-*.patch
-patches/
 yarn.lock
+
+# Patches unter `patches/` werden NICHT hier ignoriert — `patch-package` braucht sie im Repo
+# (Konflikt merge: Incoming hatte patches/ ignorieren; wir behalten versionierte Hotfixes.)
 
 # macOS
 .DS_Store

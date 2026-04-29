@@ -1,5 +1,5 @@
 /**
- * Sticker: Emoji-Schicht (Zeichen aus Emoji-Picker), verschiebbar; optional Skalierung (Groesse).
+ * Sticker: Emoji-Schicht (Zeichen aus Emoji-Picker), verschiebbar; optional Skalierung (Grösse).
  * Gestrichelter Rahmen nur, solange die Sticker-Style-Leiste aktiv ist (Bearbeitung),
  * nicht bei reiner Auswahl ohne Leiste oder nach Export.
  */
@@ -16,7 +16,7 @@ const BASE_EMOJI_PX = 42;
  *   onSelect: (id: string) => void,
  *   canvasW: number,
  *   canvasH: number,
- *   /** true, wenn Sticker-Leiste sichtbar (Groesse) — dann gestrichelter Rahmen am gewaehlten Sticker
+ *   /** true, wenn Sticker-Leiste sichtbar (Grösse) — dann gestrichelter Rahmen am gewaehlten Sticker
  *   showEditChrome?: boolean,
  * }} props
  */

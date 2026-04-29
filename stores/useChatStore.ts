@@ -36,7 +36,12 @@ import {
   createDirectConversation,
   createGroupConversation,
   updateGroupConversation as apiUpdateGroupConversation,
+  makeAdmin as apiMakeAdmin,
+  removeAdmin as apiRemoveAdmin,
+  removeParticipant as apiRemoveParticipant,
+  addParticipant as apiAddParticipant,
 } from '../services/chatService';
+import { sendPoll as apiSendPoll } from '../services/pollService';
 import { supabase } from '../lib/supabase';
 
 // ============================
@@ -113,6 +118,21 @@ interface ChatState {
   sendTextMessage: (conversationId: string, userId: string, content: string) => Promise<void>;
 
   /**
+   * Sendet eine Umfrage und fuegt sie optimistisch zum Nachrichten-Cache hinzu.
+   * pollData: { question, options: [{id, text}], allow_multiple, is_anonymous }
+   */
+  sendPollMessage: (
+    conversationId: string,
+    userId: string,
+    pollData: {
+      question: string;
+      options: Array<{ id: string; text: string }>;
+      allow_multiple: boolean;
+      is_anonymous: boolean;
+    },
+  ) => Promise<void>;
+
+  /**
    * Sendet eine Medien-Nachricht (Bild, Sprache, Datei) und fuegt sie optimistisch hinzu.
    * optional: caption (z. B. Dateiname bei message_type file), waveformData nur bei voice.
    */
@@ -164,6 +184,22 @@ interface ChatState {
 
   /** Setzt den aktiven Chat Zurück (beim Verlassen des Chat-Screens) */
   clearActiveConversation: () => void;
+
+
+  /** Macht einen User zu einem Admin in einer Gruppenkonversation */
+  makeAdmin: (conversationId: string, currentUserId: string) => Promise<void>;
+
+  /** Entfernt einen Admin aus einer Gruppenkonversation */
+  removeAdmin: (conversationId: string, userId: string) => Promise<void>;
+
+  /** Entfernt einen Teilnehmer aus einer Gruppenkonversation */
+  removeParticipant: (conversationId: string, userId: string) => Promise<void>;
+
+  /**
+   * Fuegt mehrere neue Teilnehmer zu einer Gruppenkonversation hinzu.
+   * @param memberIds – UUIDs der neuen Mitglieder
+   */
+  addParticipants: (conversationId: string, memberIds: string[]) => Promise<void>;
 }
 
 // ============================
@@ -269,6 +305,17 @@ const useChatStore = create<ChatState>((set, get) => ({
       set({ activeConversation: conv as Conversation });
     } catch (err) {
       console.error('[CHAT STORE] Fehler beim Laden der Konversation:', err);
+    }
+  },
+
+  sendPollMessage: async (conversationId, userId, pollData) => {
+    try {
+      const msg: any = await apiSendPoll(conversationId, userId, pollData);
+      // Umfrage optimistisch zum Cache hinzufuegen (Abstimmungen werden lazy in PollBubble geladen)
+      get().addMessage(conversationId, { ...msg, profiles: { id: userId } });
+    } catch (err) {
+      console.error('[CHAT STORE] Fehler beim Senden der Umfrage:', err);
+      throw err;
     }
   },
 
@@ -403,6 +450,23 @@ const useChatStore = create<ChatState>((set, get) => ({
 
   clearActiveConversation: () => {
     set({ activeConversation: null });
+  },
+  makeAdmin: async (conversationId, currentUserId) => {
+    await apiMakeAdmin(conversationId, currentUserId);
+  },
+  removeAdmin: async (conversationId, userId) => {
+    await apiRemoveAdmin(conversationId, userId);
+  },
+
+  removeParticipant: async (conversationId, userId) => {
+    await apiRemoveParticipant(conversationId, userId);
+  },
+
+  addParticipants: async (conversationId, memberIds) => {
+    // Alle neuen Teilnehmer parallel hinzufuegen
+    await Promise.all(
+      memberIds.map((id) => apiAddParticipant(conversationId, id, 'member')),
+    );
   },
 }));
 

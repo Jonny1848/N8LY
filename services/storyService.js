@@ -5,7 +5,7 @@
  *
  * Verwaltet:
  * - Stories laden (aktive, nicht abgelaufene)
- * - Stories erstellen und loeschen
+ * - Stories erstellen und löschen
  * - Story-Views tracken (wer hat was gesehen)
  * - Stories nach User gruppieren (fuer den Story-Ring)
  * =============================================================
@@ -158,7 +158,7 @@ export async function createStory(userId, mediaUrl, mediaType, caption = null) {
 }
 
 /**
- * Loescht eine eigene Story.
+ * Löscht eine eigene Story.
  *
  * @param {string} storyId – Die UUID der Story
  */
@@ -169,7 +169,7 @@ export async function deleteStory(storyId) {
     .eq('id', storyId);
 
   if (error) {
-    console.error('Fehler beim Loeschen der Story:', error);
+    console.error('Fehler beim Löschen der Story:', error);
     throw error;
   }
 }

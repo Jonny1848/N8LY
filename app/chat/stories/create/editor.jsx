@@ -42,7 +42,7 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const STORY_CARD_RADIUS = 18;
 /** Seitenabstand der Preview */
 const PREVIEW_SIDE_MARGIN = 8;
-/** Platz fuer unteren „Weiter“-Bereich (kleiner als zuvor = hoehere Karte) */
+/** Platz für unteren „Weiter“-Bereich (kleiner als zuvor = höhere Karte) */
 const BOTTOM_ACTION_RESERVE = 76;
 
 function cloneState(s) {
@@ -54,7 +54,7 @@ function cloneState(s) {
   };
 }
 
-/** Eigenes Modul noetig: useVideoPlayer muss unbedingt bedingungslos pro Mount aufgerufen werden. */
+/** Eigenes Modul nötig: useVideoPlayer muss unbedingt bedingungslos pro Mount aufgerufen werden. */
 function StoryVideoPreview({ uri, width, height }) {
   const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
@@ -93,13 +93,13 @@ export default function StoryEditorScreen() {
   const [selectedStickerId, setSelectedStickerId] = useState(null);
   const [effectsTrayOpen, setEffectsTrayOpen] = useState(false);
   const [textModal, setTextModal] = useState(false);
-  /** null = neuer Text; sonst ID des bearbeiteten Blocks (Instagram: Tap oeffnet direkt Eingabe) */
+  /** null = neuer Text; sonst ID des bearbeiteten Blocks (Instagram: Tap öffnet direkt Eingabe) */
   const [editingTextId, setEditingTextId] = useState(null);
   const [draftText, setDraftText] = useState('');
   const [saving, setSaving] = useState(false);
 
   const previewW = SCREEN_W - PREVIEW_SIDE_MARGIN * 2;
-  // Maximale Hoehe: 9:16; wenig Reserve oben (X liegt wie bei IG ueber der Ecke) → wirkt weiter oben
+  // Maximale Höhe: 9:16; wenig Reserve oben (X liegt wie bei IG über der Ecke) → wirkt weiter oben
   const previewH = Math.min(
     previewW * (16 / 9),
     SCREEN_H - insets.top - insets.bottom - BOTTOM_ACTION_RESERVE - 4
@@ -222,7 +222,7 @@ export default function StoryEditorScreen() {
     setEffectsTrayOpen(false);
   };
 
-  /** Leerer Bildbereich: Auswahl schliessen (nicht beim Zeichnen stoeren) */
+  /** Leerer Bildbereich: Auswahl schliessen (nicht beim Zeichnen stören) */
   const onCanvasBackdropPress = () => {
     if (mode === 'draw') return;
     clearOverlaySelection();
@@ -353,21 +353,7 @@ export default function StoryEditorScreen() {
           </View>
         </View>
 
-        <View style={[styles.pad, { paddingBottom: insets.bottom + 8 }]}>
-          <Text style={styles.label}>Caption (optional)</Text>
-          <TextInput
-            value={clip.caption || ''}
-            onChangeText={(t) => updateClip(clip.id, { caption: t || null })}
-            placeholder="Text zur Story…"
-            placeholderTextColor="#888"
-            style={styles.input}
-            multiline
-          />
-          <Text style={styles.hintPhaseC}>
-            Hinweis Phase C: Zeichnung/Sticker auf Video sind hier noch nicht ins Material
-            eingebrannt; dafuer waere FFmpeg oder ein Overlay-JSON im Viewer noetig.
-          </Text>
-        </View>
+       
 
         <View
           style={[
