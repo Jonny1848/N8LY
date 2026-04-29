@@ -93,6 +93,26 @@ export async function getPollVotes(messageId) {
 // ========================
 
 /**
+ * Zieht die Stimme eines Users fuer eine Umfrage vollstaendig zurueck.
+ * Wird aufgerufen wenn der User seine letzte/einzige Auswahl wieder abwaehlt.
+ *
+ * @param {string} messageId – UUID der Poll-Nachricht
+ * @param {string} userId    – UUID des Users
+ */
+export async function deleteVote(messageId, userId) {
+  const { error } = await supabase
+    .from('poll_votes')
+    .delete()
+    .eq('message_id', messageId)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('[pollService] deleteVote:', error);
+    throw error;
+  }
+}
+
+/**
  * Gibt eine Stimme ab oder aktualisiert sie (Upsert).
  * Bei Single-Choice: optionIds hat genau ein Element.
  * Bei Multiple-Choice: optionIds kann mehrere Elemente enthalten.

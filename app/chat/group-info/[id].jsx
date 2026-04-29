@@ -36,9 +36,11 @@ import GroupInfoStatsRow from '../../../components/chat/group-info/GroupInfoStat
 import GroupInfoMemberRow, {
   GROUP_MEMBER_ROW_TEXT_INSET,
 } from '../../../components/chat/group-info/GroupInfoMemberRow';
-import { MagnifyingGlassIcon } from 'react-native-heroicons/solid';
+import { UserPlusIcon } from 'react-native-heroicons/solid';
+import { LinearGradient } from 'expo-linear-gradient';
 import GroupInfoEditModal from '../../../components/chat/group-info/GroupInfoEditModal';
 import MemberActionSheet from '../../../components/chat/group-info/MemberActionSheet';
+import AddMembersModal from '../../../components/chat/group-info/AddMembersModal';
 
 export default function GroupInfoScreen() {
   const router = useRouter();
@@ -49,6 +51,7 @@ export default function GroupInfoScreen() {
   const makeAdmin = useChatStore((s) => s.makeAdmin);
   const removeAdmin = useChatStore((s) => s.removeAdmin);
   const removeParticipant = useChatStore((s) => s.removeParticipant);
+  const addParticipants = useChatStore((s) => s.addParticipants);
   /** Einzelchat finden/anlegen — liefert conversation_id fuer Route /chat/[id] (nicht user_id). */
   const createDirectChat = useChatStore((s) => s.createDirectChat);
 
@@ -66,6 +69,10 @@ export default function GroupInfoScreen() {
 
   const [descModalOpen, setDescModalOpen] = useState(false);
   const [savingDescription, setSavingDescription] = useState(false);
+
+  // Teilnehmer hinzufügen
+  const [addMembersOpen, setAddMembersOpen] = useState(false);
+  const [addingMembers, setAddingMembers] = useState(false);
 
   /** Ausgewähltes Mitglied (bleibt gesetzt bis nach der Schliess-Animation, damit kein Flicker) */
   const [selectedMember, setSelectedMember] = useState(null);
@@ -322,6 +329,25 @@ export default function GroupInfoScreen() {
    * Schnellaktion „Nachricht“: 1:1-Chat oeffnen.
    * Wichtig: /chat/[id] ist conversations.id — niemals user_id navigieren (sonst PGRST116 in getConversationById).
    */
+  /** Neue Mitglieder zur Gruppe hinzufuegen */
+  const handleAddMembers = useCallback(
+    async (memberIds) => {
+      if (!conversationId || memberIds.length === 0) return;
+      setAddingMembers(true);
+      try {
+        await addParticipants(conversationId, memberIds);
+        setAddMembersOpen(false);
+        await reload();
+      } catch (e) {
+        console.error("[GroupInfo] addMembers:", e);
+        Alert.alert("Fehler", e?.message || "Mitglieder konnten nicht hinzugefuegt werden.");
+      } finally {
+        setAddingMembers(false);
+      }
+    },
+    [conversationId, addParticipants, reload],
+  );
+
   const openSelectedMemberChat = useCallback(async () => {
     if (!selectedMember || !userId) return;
     const otherId = selectedMember.user_id;
@@ -379,13 +405,12 @@ export default function GroupInfoScreen() {
           avatarUrl={conversation.displayAvatar || conversation.avatar_url}
         />
 
+        {/* N8-Pics öffnet USP-Seite /chat/group-n8-pics; gemeinsame Medien weiter über „Medien“. */}
         <GroupInfoQuickActions
-          onAudio={() => Alert.alert('Audio', 'Gruppenanruf folgt in einer späteren Version.')}
-          onVideo={() => Alert.alert('Video', 'Gruppen-Videoanruf folgt in einer späteren Version.')}
-          onN8Pics={() =>
-            Alert.alert('N8-Pics', 'Hier kommt euer USP — Inhalt folgt.')
-          }
-          onSearch={() => Alert.alert('Suche', 'Chat-Suche folgt in einer späteren Version.')}
+          onAudio={() => Alert.alert('Gruppenanruf', 'Gruppenanrufe werden bald unterstützt.')}
+          onVideo={() => Alert.alert('Video-Gruppenanruf', 'Video-Gruppenanrufe werden bald unterstützt.')}
+          onN8Pics={() => router.push(`/chat/group-n8-pics/${conversationId}`)}
+          onSearch={() => router.push(`/chat/${conversationId}`)}
         />
 
         <GroupInfoDescriptionCard
@@ -393,11 +418,10 @@ export default function GroupInfoScreen() {
           onPressEdit={() => setDescModalOpen(true)}
         />
 
+        {/* Medien-Zeile: öffnet die Galerie-Seite */}
         <GroupInfoStatsRow
           mediaCount={mediaCount}
-          onPress={() =>
-            Alert.alert('Medien', 'Gemeinsame Medien — Detailansicht folgt.')
-          }
+          onPress={() => router.push(`/chat/group-media/${conversationId}`)}
         />
 
         {/*
@@ -419,6 +443,32 @@ export default function GroupInfoScreen() {
               <Text style={styles.memberHeaderText}>
                 {membersSorted.length} Mitglieder
               </Text>
+              {/* Admins dürfen neue Mitglieder einladen */}
+              {isCurrentUserAdmin && (
+                <Pressable
+                  onPress={() => setAddMembersOpen(true)}
+                  style={({ pressed }) => ({
+                    opacity: pressed ? 0.88 : 1,
+                  })}
+                  accessibilityRole="button"
+                  accessibilityLabel="Teilnehmer hinzufügen"
+                  hitSlop={8}
+                >
+                  {/*
+                    Klar gegenüber „Bearbeiten“ oben rechts abgehoben: gefüllter Gradient-Pill
+                    mit Icon — wirkt aktiv / primär, nicht wie reiner Link-Text.
+                  */}
+                  <LinearGradient
+                    colors={[theme.colors.primary.main, theme.colors.primary.main2]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.addMemberPillGradient}
+                  >
+                    <UserPlusIcon size={17} color={theme.colors.neutral.white} strokeWidth={2.2} />
+                    <Text style={styles.addMemberPillLabel}>Hinzufügen</Text>
+                  </LinearGradient>
+                </Pressable>
+              )}
             </View>
             {membersSorted.map((p, idx) => {
               const prof = p.profiles;
@@ -465,6 +515,15 @@ export default function GroupInfoScreen() {
         initialDescription={conversation.description}
         onSave={handleSaveDescription}
         saving={savingDescription}
+      />
+
+      {/* Teilnehmer hinzufügen (nur für Admins sichtbar) */}
+      <AddMembersModal
+        visible={addMembersOpen}
+        onClose={() => setAddMembersOpen(false)}
+        onAdd={handleAddMembers}
+        loading={addingMembers}
+        existingIds={membersSorted.map((p) => p.user_id)}
       />
 
     </SafeAreaView>
@@ -561,6 +620,24 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: 14,
     color: theme.colors.neutral.gray[600],
+  },
+  addMemberPillGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 999,
+    ...theme.shadows.sm,
+    shadowColor: theme.colors.primary.main,
+    shadowOpacity: 0.22,
+    elevation: 3,
+  },
+  addMemberPillLabel: {
+    fontFamily: theme.typography.fontFamily.bold,
+    fontSize: 13,
+    color: theme.colors.neutral.white,
+    letterSpacing: 0.2,
   },
   /** Volle Breite pro Zeile — verhindert Schrumpfen der Row auf die Avatarbreite */
   memberRowWrap: {

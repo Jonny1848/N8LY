@@ -39,6 +39,7 @@ import {
   makeAdmin as apiMakeAdmin,
   removeAdmin as apiRemoveAdmin,
   removeParticipant as apiRemoveParticipant,
+  addParticipant as apiAddParticipant,
 } from '../services/chatService';
 import { sendPoll as apiSendPoll } from '../services/pollService';
 import { supabase } from '../lib/supabase';
@@ -193,6 +194,12 @@ interface ChatState {
 
   /** Entfernt einen Teilnehmer aus einer Gruppenkonversation */
   removeParticipant: (conversationId: string, userId: string) => Promise<void>;
+
+  /**
+   * Fuegt mehrere neue Teilnehmer zu einer Gruppenkonversation hinzu.
+   * @param memberIds – UUIDs der neuen Mitglieder
+   */
+  addParticipants: (conversationId: string, memberIds: string[]) => Promise<void>;
 }
 
 // ============================
@@ -453,6 +460,13 @@ const useChatStore = create<ChatState>((set, get) => ({
 
   removeParticipant: async (conversationId, userId) => {
     await apiRemoveParticipant(conversationId, userId);
+  },
+
+  addParticipants: async (conversationId, memberIds) => {
+    // Alle neuen Teilnehmer parallel hinzufuegen
+    await Promise.all(
+      memberIds.map((id) => apiAddParticipant(conversationId, id, 'member')),
+    );
   },
 }));
 

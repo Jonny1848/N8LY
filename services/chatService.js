@@ -835,6 +835,42 @@ export async function getKnownContacts(currentUserId) {
 }
 
 
+// ========================
+// MEDIEN-GALERIE
+// ========================
+
+/**
+ * Laedt alle Bildnachrichten einer Konversation fuer die Medien-Galerie.
+ * Sortiert absteigend (neueste zuerst) — gleiche Reihenfolge wie die Nachrichtenliste.
+ *
+ * @param {string} conversationId
+ * @returns {Array<{ id, media_url, created_at, sender_id, profiles: { username, avatar_url } }>}
+ */
+export async function getConversationImages(conversationId) {
+  const { data, error } = await supabase
+    .from('messages')
+    .select(`
+      id,
+      media_url,
+      created_at,
+      sender_id,
+      profiles:sender_id (
+        username,
+        avatar_url
+      )
+    `)
+    .eq('conversation_id', conversationId)
+    .eq('message_type', 'image')
+    .not('media_url', 'is', null)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[chatService] getConversationImages:', error);
+    return [];
+  }
+  return data || [];
+}
+
 /// ========== GRUPPENCHATS ==========
 
 export async function makeAdmin(conversationId, userId) {

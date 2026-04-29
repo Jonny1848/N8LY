@@ -126,7 +126,7 @@ export default function ChatBubble({ item, index, messages, userId, conversation
               <View className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center overflow-hidden">
                 {item.profiles?.avatar_url ? (
                   <Image
-                    source={{ uri: item.profiles.avatar_url }}
+                    source={{ uri: String(item.profiles.avatar_url) }}
                     style={{ width: 32, height: 32 }}
                     cachePolicy="disk"
                     contentFit="cover"

@@ -27,12 +27,20 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  StyleSheet,
 } from 'react-native';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { XMarkIcon, PlusIcon, Bars3Icon } from 'react-native-heroicons/outline';
 import { XCircleIcon } from 'react-native-heroicons/solid';
 import { theme } from '../../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolateColor,
+} from 'react-native-reanimated';
 
 // Hilfs-ID fuer neue Optionen (lokal, keine UUID noetig)
 let _optionCounter = 0;
@@ -96,6 +104,42 @@ export default function PollCreationModal({ visible, onClose, onSend, loading = 
   const isValid =
     question.trim().length > 0 &&
     options.filter((o) => o.text.trim().length > 0).length >= 2;
+
+  // ============================
+  // Button-Animation (Reanimated + LinearGradient-Crossfade)
+  // Gleiches Muster wie new-chat-details.jsx und GroupInfoEditModal:
+  // Shared Value 0 (inaktiv/grau) → 1 (aktiv/blau), Dauer 260ms
+  // ============================
+  const sendActive = useSharedValue(0);
+  const sendLooksActive = isValid && !loading;
+
+  useEffect(() => {
+    sendActive.value = withTiming(sendLooksActive ? 1 : 0, { duration: 260 });
+  }, [sendLooksActive]);
+
+  /** Leichtes Einfedern: scale 0.94 (inaktiv) → 1.0 (aktiv) */
+  const sendBtnScaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: sendActive.value * 0.06 + 0.94 }],
+  }));
+
+  /** Inaktiver Gradient (grau) blendet aus */
+  const sendInactiveGradOpacity = useAnimatedStyle(() => ({
+    opacity: 1 - sendActive.value,
+  }));
+
+  /** Aktiver Gradient (blau) blendet ein */
+  const sendActiveGradOpacity = useAnimatedStyle(() => ({
+    opacity: sendActive.value,
+  }));
+
+  /** Label-Farbe: grau → weiss */
+  const sendLabelStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(
+      sendActive.value,
+      [0, 1],
+      [theme.colors.neutral.gray[500], '#ffffff'],
+    ),
+  }));
 
   const handleSend = useCallback(() => {
     if (!isValid || loading) return;
@@ -184,7 +228,7 @@ export default function PollCreationModal({ visible, onClose, onSend, loading = 
             <TextInput
               value={question}
               onChangeText={setQuestion}
-              placeholder="z. B. Wo essen wir morgen zu Mittag?"
+              placeholder=""
               placeholderTextColor={theme.colors.neutral.gray[400]}
               maxLength={MAX_QUESTION_LENGTH}
               multiline
@@ -314,34 +358,56 @@ export default function PollCreationModal({ visible, onClose, onSend, loading = 
             />
           </ScrollView>
 
-          {/* ── Senden-Button ── */}
+          {/* ── Senden-Button (Reanimated + LinearGradient-Crossfade wie new-chat-details) ── */}
           <View
-            className="px-5 pb-6 pt-3 border-t border-gray-100"
+            className="px-5 pt-3 border-t border-gray-100"
             style={{ paddingBottom: Math.max(insets.bottom, 24) }}
           >
-            <Pressable
-              onPress={handleSend}
-              disabled={!isValid || loading}
-              className="rounded-2xl py-4 items-center justify-center active:opacity-80"
-              style={{
-                backgroundColor: isValid && !loading
-                  ? theme.colors.primary.main
-                  : theme.colors.neutral.gray[200],
-              }}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text
-                  className="text-base"
-                  style={{
-                    fontFamily: 'Manrope_700Bold',
-                    color: isValid ? '#FFFFFF' : theme.colors.neutral.gray[400],
-                  }}
+            <Pressable onPress={handleSend} disabled={!isValid || loading}>
+              <Animated.View
+                className="rounded-2xl overflow-hidden py-4 items-center justify-center"
+                style={[{ minHeight: 54 }, sendBtnScaleStyle]}
+              >
+                {/* Inaktiver Hintergrund: grauer Gradient */}
+                <Animated.View
+                  pointerEvents="none"
+                  style={[StyleSheet.absoluteFillObject, sendInactiveGradOpacity]}
                 >
-                  Umfrage senden
-                </Text>
-              )}
+                  <LinearGradient
+                    colors={[theme.colors.neutral.gray[300], theme.colors.neutral.gray[200]]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                </Animated.View>
+
+                {/* Aktiver Hintergrund: blauer Gradient (primary.main → primary.main2) */}
+                <Animated.View
+                  pointerEvents="none"
+                  style={[StyleSheet.absoluteFillObject, sendActiveGradOpacity]}
+                >
+                  <LinearGradient
+                    colors={[theme.colors.primary.main, theme.colors.primary.main2]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                </Animated.View>
+
+                {/* Inhalt: Ladeindikator oder Label */}
+                {loading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Animated.Text
+                    style={[
+                      { fontFamily: 'Manrope_700Bold', fontSize: 16 },
+                      sendLabelStyle,
+                    ]}
+                  >
+                    Umfrage senden
+                  </Animated.Text>
+                )}
+              </Animated.View>
             </Pressable>
           </View>
         </View>

@@ -188,6 +188,8 @@ export default function RootLayout() {
         <Stack.Screen name="signup" options={{ animation: 'fade' }} />
         <Stack.Screen name="chat/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="chat/group-info/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="chat/group-media/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="chat/group-n8-pics/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="user/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="new-chat" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="new-chat-details" options={{ animation: 'slide_from_right' }} />

@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { XMarkIcon, PhotoIcon } from 'react-native-heroicons/solid';
@@ -26,6 +27,16 @@ import Animated, {
 
 import { useEffect, useMemo } from 'react';
 
+/**
+ * Runder Gruppenavatar: relativ zur Bildschirmbreite, deutlich groesser als kleine Vorschau —
+ * mittig wirkt nur sauber wenn der Kreis zur Zeilenbreite passt (~72 % minus Rand).
+ *
+ * @param {number} screenWidth
+ */
+function getAvatarDiameter(screenWidth) {
+  return Math.round(Math.min(292, Math.max(220, screenWidth * 0.72)));
+}
+
 export default function GroupInfoEditModal({
   visible,
   onClose,
@@ -38,6 +49,13 @@ export default function GroupInfoEditModal({
   saving,
   name,
 }) {
+  const { width: screenW } = useWindowDimensions();
+  const avatarDiameter = useMemo(() => getAvatarDiameter(screenW), [screenW]);
+  const avatarRadius = avatarDiameter / 2;
+
+  /** Icon fuer leeren Platz skaliert mit Kreisgroesse */
+  const photoIconSize = Math.round(Math.min(64, avatarDiameter * 0.26));
+
   const showAvatar = localPreviewUri || (initialAvatarUrl && String(initialAvatarUrl).trim());
 
   // Vergleich mit Server-Stand: Name geaendert und/oder neues lokales Bild gewaehlt
@@ -111,24 +129,61 @@ export default function GroupInfoEditModal({
             maxLength={80}
           />
 
-          <Text style={[styles.label, { marginTop: 24 }]}>Gruppenbild</Text>
-          <Pressable
-            onPress={onPickImage}
-            style={({ pressed }) => [styles.imageCard, pressed && { opacity: 0.9 }]}
-          >
-            {showAvatar ? (
-              <Image
-                source={{ uri: localPreviewUri || initialAvatarUrl }}
-                style={styles.preview}
-                contentFit="cover"
-              />
-            ) : (
-              <View style={styles.previewPh}>
-                <PhotoIcon size={40} color={theme.colors.neutral.gray[400]} />
-                <Text style={styles.previewHint}>Tippen zum Auswählen</Text>
-              </View>
-            )}
-          </Pressable>
+          {/* Sektion zentriert: Label und Kreis mittig ueber die volle Breite */}
+          <View style={styles.avatarSection}>
+            <Text style={[styles.label, styles.labelAboveAvatar]}>Gruppenbild</Text>
+            {/*
+              Kreis: Kanten auf Container UND expo-image — sonst rechteckiger Clip nur auf manchen Builds.
+              alignSelf:center + wrapper alignItems garantiert echte Bildschirmmitte (nicht nur alignSelf ohne Block).
+            */}
+            <Pressable
+              onPress={onPickImage}
+              style={({ pressed }) => [
+                {
+                  width: avatarDiameter,
+                  height: avatarDiameter,
+                  borderRadius: avatarRadius,
+                  overflow: 'hidden',
+                  backgroundColor: theme.colors.neutral.gray[100],
+                },
+                pressed && { opacity: 0.92 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Gruppenbild auswählen"
+            >
+              {showAvatar ? (
+                <Image
+                  source={{ uri: localPreviewUri || initialAvatarUrl }}
+                  style={{
+                    width: avatarDiameter,
+                    height: avatarDiameter,
+                    borderRadius: avatarRadius,
+                  }}
+                  contentFit="cover"
+                />
+              ) : (
+                <View
+                  style={{
+                    width: avatarDiameter,
+                    height: avatarDiameter,
+                    borderRadius: avatarRadius,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <PhotoIcon size={photoIconSize} color={theme.colors.neutral.gray[400]} />
+                  <Text style={styles.previewHint}>Tippen zum Auswählen</Text>
+                </View>
+              )}
+            </Pressable>
+          </View>
+
+          {/*
+            Expliziter Spacer: marginTop/marginBottom zw. ScrollView-Kindern war auf iOS/Simulator
+            optisch oft unveraendert — feste Hoehe erzwingt den Abstand zuverlaessig.
+          */}
+          <View style={styles.avatarToSaveSpacer} />
 
           {/* Speichern: wie GroupInfoDescriptionModal — zwei LinearGradients (inaktiv/aktiv) */}
           <Pressable
@@ -225,23 +280,16 @@ const styles = StyleSheet.create({
     color: theme.colors.neutral.gray[900],
     backgroundColor: theme.colors.neutral.gray[50],
   },
-  imageCard: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    overflow: 'hidden',
-    alignSelf: 'center',
-    backgroundColor: theme.colors.neutral.gray[100],
-  },
-  preview: {
+  avatarSection: {
     width: '100%',
-    height: '100%',
-  },
-  previewPh: {
-    flex: 1,
+    marginTop: 28,
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+  },
+  labelAboveAvatar: {
+    width: '100%',
+    textAlign: 'center',
+    marginBottom: 20,
+    marginTop: 0,
   },
   previewHint: {
     fontFamily: theme.typography.fontFamily.medium,
@@ -249,8 +297,16 @@ const styles = StyleSheet.create({
     color: theme.colors.neutral.gray[500],
   },
   confirmPressWrap: {
-    marginTop: 32,
+    marginTop: 0,
     alignItems: 'center',
+    alignSelf: 'center',
+    width: '100%',
+  },
+  /** Abstand Avatar-Block → Speichern (Hauptabstand; siehe Spacer im JSX) */
+  avatarToSaveSpacer: {
+    width: '100%',
+    height: 112,
+    minHeight: 112,
   },
   confirmBtnOuter: {
     borderRadius: 9999,

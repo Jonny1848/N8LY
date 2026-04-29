@@ -25,9 +25,11 @@ import { theme } from '../../constants/theme';
 import {
   getPollVotes,
   castVote,
+  deleteVote,
   subscribeToPollVotes,
   unsubscribeFromPollVotes,
 } from '../../services/pollService';
+import useAuthStore from '../../stores/useAuthStore';
 
 // ============================
 // Farb-Konstanten aus Theme
@@ -42,12 +44,15 @@ const BG_GRAY  = COLOR_GRAY;
 
 // Maximale Anzahl sichtbarer Avatare pro Option
 const MAX_AVATARS = 3;
-// Groesse des Avatar-Chips
-const AVATAR_SIZE = 22;
-// Horizontaler Versatz (Ueberlappung der gestapelten Avatare)
-const AVATAR_OFFSET = -7;
+// Groesse des Avatar-Chips (etwas groesser fuer bessere Erkennbarkeit)
+const AVATAR_SIZE = 28;
+// Horizontaler Versatz: staerkere Ueberlappung wegen groesserer Chips
+const AVATAR_OFFSET = -10;
 
 export default function PollBubble({ message, userId, isOwn }) {
+  // Eigenes Profil fuer den optimistischen Avatar beim ersten Vote
+  const ownProfile = useAuthStore((s) => s.profile);
+
   // ============================
   // Poll-Daten aus message.content parsen
   // ============================
@@ -56,9 +61,8 @@ export default function PollBubble({ message, userId, isOwn }) {
   // ============================
   // State
   // ============================
-  const [votes, setVotes] = useState([]);         // Alle Stimmen mit Profilen
-  const [loading, setLoading] = useState(true);   // Initialer Ladevorgang
-  const [voting, setVoting] = useState(false);    // Laufende Stimmabgabe
+  const [votes, setVotes] = useState([]);       // Alle Stimmen mit Profilen
+  const [loading, setLoading] = useState(true); // Nur beim initialen Laden
 
   // Referenz fuer Realtime-Channel (Cleanup beim Unmount)
   const channelRef = useRef(null);
@@ -78,13 +82,9 @@ export default function PollBubble({ message, userId, isOwn }) {
   }, [message.id]);
 
   useEffect(() => {
-    // Initiales Laden
     loadVotes();
-
-    // Realtime-Abo: bei jeder Stimmaenderung neu laden
+    // Realtime-Abo: bei Stimmaenderungen anderer User neu laden
     channelRef.current = subscribeToPollVotes(message.id, loadVotes);
-
-    // Beim Unmount Realtime-Abo beenden
     return () => {
       unsubscribeFromPollVotes(channelRef.current);
     };
@@ -94,42 +94,48 @@ export default function PollBubble({ message, userId, isOwn }) {
   // Abstimmen
   // ============================
 
-  /** Gibt die aktuelle Abstimmung des Users zurueck (oder null) */
   const userVote = votes.find((v) => v.user_id === userId) ?? null;
   const hasVoted = !!userVote;
 
   const handleVote = useCallback(
     async (optionId) => {
-      if (voting || !pollData) return;
+      if (!pollData) return;
 
+      const current = userVote?.option_ids ?? [];
       let newOptionIds;
 
       if (pollData.allow_multiple) {
-        // Multiple-Choice: Option toggeln (hinzufuegen oder entfernen)
-        const current = userVote?.option_ids ?? [];
+        // Multiple-Choice: Option toggeln; leeres Array = Stimme zurueckziehen
         newOptionIds = current.includes(optionId)
           ? current.filter((id) => id !== optionId)
           : [...current, optionId];
-        if (newOptionIds.length === 0) return; // Mindestens eine Option noetig
       } else {
-        // Single-Choice: Bei bereits gleicher Wahl nichts tun
-        if (userVote?.option_ids?.[0] === optionId) return;
-        newOptionIds = [optionId];
+        // Single-Choice: gleiche Option nochmals tippen = Stimme zurueckziehen
+        newOptionIds = current[0] === optionId ? [] : [optionId];
       }
 
-      setVoting(true);
+      // ── Optimistisches UI: lokal sofort aendern, kein Ladeindikator ──
+      // Snapshot fuer Rollback bei API-Fehler
+      const prevVotes = votes;
+      // ownProfile liefert Profildaten auch beim allerersten Vote (wenn userVote noch null ist)
+      const profileForOptimistic = userVote?.profiles ?? ownProfile ?? null;
+      setVotes(applyOptimisticVote(votes, userId, newOptionIds, userVote, profileForOptimistic));
+
       try {
-        await castVote(message.id, userId, newOptionIds);
-        // Realtime-Subscription aktualisiert die Anzeige automatisch;
-        // dennoch direkt neu laden fuer sofortiges Feedback
-        await loadVotes();
+        if (newOptionIds.length === 0) {
+          // Alle Optionen abgewaehlt: Stimme loeschen
+          await deleteVote(message.id, userId);
+        } else {
+          await castVote(message.id, userId, newOptionIds);
+        }
+        // Realtime sorgt fuer den finalen Sync; kein manuelles loadVotes noetig
       } catch (err) {
         console.error('[PollBubble] Fehler bei der Stimmabgabe:', err);
-      } finally {
-        setVoting(false);
+        // Rollback auf vorherigen Zustand
+        setVotes(prevVotes);
       }
     },
-    [voting, pollData, userVote, message.id, userId, loadVotes],
+    [pollData, userVote, votes, message.id, userId],
   );
 
   // ============================
@@ -220,7 +226,7 @@ export default function PollBubble({ message, userId, isOwn }) {
             <Pressable
               key={opt.id}
               onPress={() => handleVote(opt.id)}
-              disabled={voting || loading}
+              disabled={loading}
               className="rounded-2xl overflow-hidden active:opacity-75"
               style={{ backgroundColor: bgColor }}
               accessibilityRole="button"
@@ -285,13 +291,6 @@ export default function PollBubble({ message, userId, isOwn }) {
           );
         })}
       </View>
-
-      {/* ── Ladeindikator waehrend Stimmabgabe ── */}
-      {voting && (
-        <View className="items-center pb-3">
-          <ActivityIndicator size="small" color={theme.colors.primary.main} />
-        </View>
-      )}
 
       {/* ── Fusszeile ── */}
       <View
@@ -411,6 +410,36 @@ function StackedAvatars({ profiles }) {
 // ============================
 // Hilfs-Funktionen
 // ============================
+
+/**
+ * Wendet eine optimistische Stimmaenderung auf das lokale votes-Array an.
+ * Wird vor dem API-Call aufgerufen, um sofortiges UI-Feedback zu erzeugen.
+ *
+ * @param {Array}    votes        – Aktueller votes-State
+ * @param {string}   userId       – UUID des abstimmenden Users
+ * @param {string[]} newOptionIds – Neue Auswahl (leer = Stimme zurueckziehen)
+ * @param {Object}   userVote     – Vorherige Stimme des Users (oder null beim ersten Vote)
+ * @param {Object}   profile      – Profil-Objekt des Users fuer Avatar-Anzeige
+ * @returns {Array}  Neues votes-Array
+ */
+function applyOptimisticVote(votes, userId, newOptionIds, userVote, profile) {
+  // Bestehende Stimme des Users entfernen
+  const without = votes.filter((v) => v.user_id !== userId);
+  // Leere Auswahl = Stimme zurueckziehen → nur ohne-Array zurueckgeben
+  if (newOptionIds.length === 0) return without;
+  // Neue optimistische Stimme einfuegen
+  // profile stellt sicher, dass der Avatar auch beim ersten Vote sofort sichtbar ist
+  return [
+    ...without,
+    {
+      id:         userVote?.id ?? `temp_${userId}`,
+      user_id:    userId,
+      option_ids: newOptionIds,
+      created_at: userVote?.created_at ?? new Date().toISOString(),
+      profiles:   profile,
+    },
+  ];
+}
 
 /**
  * Parsed den JSON-Content einer Poll-Nachricht.
